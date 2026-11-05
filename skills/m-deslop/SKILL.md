@@ -50,5 +50,5 @@ whenToUse: "Remove AI-generated slop and redundancy from code or prose while pre
 ## Harness notes
 
 - Claude Code：用 Read/Edit/Grep/Bash 跑测试与 lint；可用 `git diff <base>` 圈定清理范围。
-- DSH：无差异工具差异，用 bash 跑同套验证命令；`todo_write` 按 smell 拆任务。
+- DSH：工具无差异，用 bash 跑同套验证命令；`todo_write` 按 smell 拆任务。
 - Codex：`codex exec` 更适合一次性短清理；交互式细调回到 Claude Code/DSH。

@@ -1,10 +1,10 @@
 ---
-name: mstack
+name: m-start
 description: "Entry point that reads .mstack/ state to pick the right skill and resume in-flight work without the user naming a skill. Use when starting any task, or on \"继续/开工/接着干\" and other terse prompts."
 whenToUse: "At the start of every conversation and whenever a terse prompt (\"继续\", \"开工\", pasted logs) needs routing to a skill or a resume from .mstack/ state."
 ---
 
-# mstack — 总入口
+# m-start — 总入口
 
 mstack is the front door: before doing any work, inspect `.mstack/` state and the user's request to decide which sibling skill owns the task, then run it. On terse prompts it infers the current phase and continues instead of asking the user to name a skill.
 
@@ -14,7 +14,7 @@ Use at the top of every conversation, including when the user just says "继续"
 
 ## Procedure
 
-1. Read `.mstack/handoff.md` first (if present) and any `.mstack/goals/<slug>.md` or `.mstack/plans/<slug>.md` that names the current task.
+1. Read `.mstack/handoff.md` first (if present) and any `.mstack/goals/<slug>.md` or `.mstack/plans/*-<slug>.md` (plans carry a `<YYYY-MM-DD>-` prefix) that names the current task.
 2. Classify the request against the 10 core principles (below) and the skill one-liners. Report which skill you picked and why, in one line, then load that skill's SKILL.md and follow it.
 3. If `.mstack/` shows work in progress, resume it: trust the state files over your memory; do not redo steps already marked done.
 4. If no single skill obviously applies, prefer `m-think` for anything new or ambiguous; prefer `m-debug` for a broken behavior; route "提PR/提交/发布" to `m-ship`, "review一下/审一下" to `m-review`, "分派/并行" to `m-dispatch`, "组队/team/一直优化/卡在局部最优" to `m-team`.

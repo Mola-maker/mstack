@@ -28,7 +28,7 @@ Follow §4's report format, then the evidence summary: what was verified, the ex
 
 ## Stop conditions
 
-- Same failure returns twice after a real fix, or 5 runs elapsed → stop; route the stubborn red to `m-debug`.
+- The same error 3 times in a row → stop, don't try a 4th (principle 9); change the hypothesis and route the stubborn red to `m-debug`.
 - A check needs a missing tool, secret, service, or network → report it; do not stub, skip, or work around it.
 - No realistic verification path exists → say that explicitly and describe the closest manual check you *did* run.
 

@@ -4,13 +4,17 @@
 
 mstack 是 Mola-maker 的个人 agent 工作流技能栈：把 superpowers、gstack、pstack、oh-my-claudecode（OMC）四套 skill 去重、合并、按个人使用习惯重写成 **16 个互不重叠的 skill**。同一份 `skills/` 目录同时供 Claude Code（plugin）、DSH（`~/.dsh/skills`）和 Codex 使用。
 
-设计约束（详见 [FRAMEWORK.md](FRAMEWORK.md)）：短 prompt 也能接得上（`mstack` 总入口读 `.mstack/` 状态续干）、每个 SKILL.md ≤150 行、长跑任务必须写 closeout、同一个错误连错 3 次就停。
+![mstack demo](assets/demo.gif)
+
+（[MP4 版](assets/demo.mp4) · 源码在 `demo/`，Remotion：`cd demo && npm i && npm run render`）
+
+设计约束（详见 [FRAMEWORK.md](FRAMEWORK.md)）：短 prompt 也能接得上（`m-start` 总入口读 `.mstack/` 状态续干）、每个 SKILL.md ≤150 行、长跑任务必须写 closeout、同一个错误连错 3 次就停。
 
 ## 16 个 skill 一览
 
 | skill | 说明（来自 frontmatter） |
 |---|---|
-| `mstack` | 总入口：读 `.mstack/` 状态选 skill、恢复未完成的工作，"继续/开工"这类短 prompt 也能路由 |
+| `m-start` | 总入口：读 `.mstack/` 状态选 skill、恢复未完成的工作，"继续/开工"这类短 prompt 也能路由 |
 | `m-think` | 动手前想清楚：攻击前提、一次最多问 3 个带默认值的问题、产出设计稿 |
 | `m-plan` | 把设计拆成有序、可验证的步骤，每步写清验证方式，并由独立 critic 复核 |
 | `m-goal` | 长跑目标循环：goal 文件、检查点、停止条件，任何退出路径都强制写 closeout |
@@ -104,6 +108,8 @@ docs/source-map.md           每个来源文件 → 归入哪个 m-skill
 docs/migration.md            与 superpowers / OMC 共存的做法
 scripts/check.mjs            验收脚本
 tasks/                       构建记录：DSH worker 任务书与分派脚本
+reviews/                     独立验收记录（DSH reviewer 的 findings 与修复）
+demo/ · assets/              Remotion 演示动画源码与渲染产物
 CHANGELOG.md · NOTICE.md · LICENSE
 ```
 

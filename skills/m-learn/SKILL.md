@@ -14,7 +14,7 @@ whenToUse: "Turn a session's repeatable workflow or a recurring mistake into a d
 
 **不用，转给别的 m-skill**：
 - 单次事件、与项目无关的闲聊、已由某个现有 skill 正确覆盖的内容 → 不值得沉淀。
-- 事实型、需要检索的知识 → 转 `m-handoff` 或直接写 memory。
+- 事实型、需要以后还能查到的知识 → 直接写 memory（无 memory MCP 时落成 lesson 或项目内文件），不走 `m-handoff`——handoff 只存当前状态，存完就过期。
 - 要动手修代码 → 不在本 skill 范围，改完由 `m-verify` 验证。
 
 ## Procedure

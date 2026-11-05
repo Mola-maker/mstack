@@ -1,28 +1,28 @@
 # mstack — 框架规格（给构建 agent 的唯一依据）
 
-mstack = Mola-maker 的个人 agent 工作流技能栈。把 superpowers、gstack、pstack、oh-my-claudecode（OMC）四套 skill 去重合并成 **15 个** skill，按 Mola 的使用习惯改写。同一份 `skills/` 目录同时给 Claude Code（plugin）、DSH（`~/.dsh/skills`）、Codex 用。
+mstack = Mola-maker 的个人 agent 工作流技能栈。把 superpowers、gstack、pstack、oh-my-claudecode（OMC）四套 skill 去重合并成 **16 个** skill，按 Mola 的使用习惯改写。同一份 `skills/` 目录同时给 Claude Code（plugin）、DSH（`~/.dsh/skills`）、Codex 用。
 
 ## 1. 为什么要做（用户画像 → 设计约束）
 
 | 习惯 / 痛点（来自 1592 条历史 prompt） | 对 mstack 的约束 |
 |---|---|
-| prompt 很短（中位 28 字）："继续"、"开工"、贴日志 | 有一个总入口 `mstack`，能从 `.mstack/` 状态推断当前阶段并接着干；不要求用户说出 skill 名 |
+| prompt 很短（中位 28 字）："继续"、"开工"、贴日志 | 有一个总入口 `m-start`，能从 `.mstack/` 状态推断当前阶段并接着干；不要求用户说出 skill 名 |
 | 最常用：brainstorming(20)、ultragoal/goal(32)、code-review(11)、/compact(49)、/resume(73) | 这几条链路做到最好：`m-think`、`m-goal`、`m-review`、`m-handoff` |
 | 爱并行分派（"分派给 subagents"），跨 Claude / DSH / Codex / Kimi 多模型 | `m-dispatch` 跨 harness：Claude subagent、DSH headless、Codex；每个子任务自包含 |
 | 真实测试后再 PR，保留 trace 和 commit 历史 | `m-verify` 要求证据；`m-ship` 先跑真测试再开 PR |
-| 痛点：插件冲突（omc vs superpowers）、工具调用死循环、上下文膨胀 | 15 个 skill 互不重叠；每个 SKILL.md ≤150 行，细节放 `references/`；`m-guard` 管冲突与死循环（同一错误 3 次就停） |
+| 痛点：插件冲突（omc vs superpowers）、工具调用死循环、上下文膨胀 | 16 个 skill 互不重叠；每个 SKILL.md ≤150 行，细节放 `references/`；`m-guard` 管冲突与死循环（同一错误 3 次就停） |
 | 无人值守运行结束时没写 closeout（ultragoal 3 次） | `m-goal` 结束时**必须**写 closeout（成功、失败、被打断都写） |
 | 中文为主夹英文 | skill 正文英文（省 token、各模型都稳），description 里带中文触发词；对用户的输出跟随用户语言 |
 | 方向：agent infra（LayerFS/Rust、DSH 插件/TS）、个人站（Astro 动画）、CAD2GIS、信息聚合 | 例子优先用这些场景；`m-qa` 面向网页（molamaker-site） |
 | 已知陷阱：WSL 里 `pkill -f` 会杀掉自己的 shell；dev checkout 不能 `git pull`；magpie 管模型列表；清 %TEMP% 要排除 `%TEMP%\claude` | 写进 `m-guard` |
 
-## 2. 15 个 skill 与来源映射
+## 2. 16 个 skill 与来源映射
 
 来源文件都在 `.sources/<stack>/<name>.md`（只读参考，不要复制大段原文，用自己的话重写、合并、删掉重复）。
 
 | # | skill | 一句话 | 合并自（读这些） |
 |---|---|---|---|
-| 1 | `mstack` | 总入口：判断阶段 → 选 skill；"继续"时读 `.mstack/` 恢复；10 条核心原则 | superpowers/using-superpowers, pstack/poteto-mode, pstack/principle-*（全部）, omc/autopilot |
+| 1 | `m-start` | 总入口：判断阶段 → 选 skill；"继续"时读 `.mstack/` 恢复；10 条核心原则 | superpowers/using-superpowers, pstack/poteto-mode, pstack/principle-*（全部）, omc/autopilot |
 | 2 | `m-think` | 动手前想清楚：攻击前提、问最少的问题（每次 ≤3 个，带推荐默认值）、出设计稿 | superpowers/brainstorming, gstack/office-hours, gstack/plan-ceo-review, pstack/interrogate, pstack/sharpen, omc/deep-interview |
 | 3 | `m-plan` | 把设计拆成可验证的步骤，每步写清怎么验；独立 critic 复核 | superpowers/writing-plans, superpowers/executing-plans, gstack/plan-eng-review, gstack/autoplan, gstack/spec, pstack/architect, omc/ralplan, omc/plan |
 | 4 | `m-goal` | 长跑目标循环：goal 文件、检查点、停止条件、强制 closeout | omc/ultragoal, omc/ralph, omc/autopilot, pstack/principle-outcome-oriented-execution, pstack/principle-never-block-on-the-human |
@@ -37,6 +37,7 @@ mstack = Mola-maker 的个人 agent 工作流技能栈。把 superpowers、gstac
 | 13 | `m-learn` | 复盘与沉淀：post-mortem → `~/.claude/lessons/`，可复用流程 → 候选 SKILL.md，事实 → memory | gstack/retro, gstack/learn, pstack/reflect, pstack/correct, omc/skillify, omc/self-improve, superpowers/writing-skills, pstack/principle-encode-lessons-in-structure |
 | 14 | `m-deslop` | 删 AI 味：多余代码、注释、抽象、废话 | pstack/deslop, pstack/unslop, omc/ai-slop-cleaner, omc/minimal-code-discipline, omc/minimal-prose-discipline, pstack/principle-subtract-before-you-add |
 | 15 | `m-guard` | 安全护栏 + 插件冲突体检 + 死循环刹车 + Mola 的已知陷阱 | gstack/careful, gstack/freeze, gstack/guard, dsh/plugin-intake, superpowers/diagnosing-superpowers |
+| 16 | `m-team` | 会进化的 agent team：开放式大预算目标按轮次重组团队，supervisor 每轮诊断卡点并重设角色与知识流向 | papers/evolving-agent-teams, orca/*（详见 §9） |
 
 明确**不收**的（太窄或与 Mola 无关）：gstack 的 iOS 系列、design-shotgun、setup-gbrain、ubicloud、supabase；pstack 的 ketchup、bro、arena、statechart、typescript-best-practices、formal-verification 系列。
 
@@ -83,9 +84,10 @@ whenToUse: <英文一句话，DSH 用这个字段决定何时加载>
   goals/<slug>.md                  m-goal 的目标、检查点、closeout
   handoff.md                       m-handoff 的最新存档（覆盖写，旧的进 handoff-archive/）
   reviews/<date>-<slug>.md         m-review 汇总
+  qa/<YYYY-MM-DD>-<slug>.md        m-qa 验收报告（带截图与评分）
 ```
 
-**核心原则**（`mstack` 里写全，其他 skill 只引用编号）：
+**核心原则**（`m-start` 里写全，其他 skill 只引用编号）：
 1. 先攻击前提：问题本身对不对、有没有更简单的路。
 2. 先减后加：能删就不加；不做没要求的功能。
 3. 可验证的小步：每一步都有检查方式，按顺序做。
@@ -120,7 +122,7 @@ whenToUse: <英文一句话，DSH 用这个字段决定何时加载>
 
 ```
 .claude-plugin/plugin.json      Claude Code plugin 清单（name: mstack）
-README.md                       中文：是什么、15 个 skill 一览、安装（Claude / DSH / Codex）、和原插件怎么共存
+README.md                       中文：是什么、16 个 skill 一览、安装（Claude / DSH / Codex）、和原插件怎么共存
 docs/source-map.md              每个来源 skill → 归入哪个 m-skill / 不收的理由（覆盖 .sources 里的全部文件）
 docs/migration.md               装了 mstack 后建议停用哪些重叠插件/skill（只建议，不自动改用户配置）
 NOTICE.md                       致谢四个上游项目及其许可证（superpowers MIT / gstack MIT / pstack 见其仓库 / OMC MIT）
@@ -165,14 +167,18 @@ Orca 是桌面端 + CLI 的多 agent 编排器：每个 worker（Claude Code / C
 - 开 worker：`orca orchestration worker-start --spec "<自包含任务>" --worktree current|new-top-level --agent codex|claude`，开完所有 worker 就**结束本轮**，Orca 会唤醒你；不要轮询、不要写 watch 脚本。
 - 跟 worker 说话：`orca orchestration send --to dispatch:<id> --subject … --body …`；回答 worker 提问：`orca orchestration reply --id <message_id> --body …`。
 - `worker_done` 结算任务；`escalation` + `stopReason` 表示 worker 没交付就停了。
-- 交出去不需要回报的活：`orca worktree create --name … --agent … --prompt … --json`。
+- 交出去不需要回报的活：`orca worktree create --name … --no-parent --agent … --prompt … --json`（独立交接用 `--no-parent`，别做成 stacked 父子 lineage）。
 放进 `m-dispatch/references/harness-commands.md` 的一个新小节，并在 `m-dispatch` 的执行器选择表里加一行：需要别家 agent（如从 Claude 派 Codex）、要手机盯、要每个 worker 独立 worktree 且留给人继续用 → Orca。
 
 ### 9.3 要改的已有文件
 
-- `skills/mstack/SKILL.md`：路由表加 `m-team`（"组队/team/一直优化/卡在局部最优"）。
+- `skills/m-start/SKILL.md`：路由表加 `m-team`（"组队/team/一直优化/卡在局部最优"）。
 - `skills/m-dispatch/SKILL.md` + `references/harness-commands.md`：Orca 行与小节；模型一律 magpie 路由（`group/smart-split`），删掉 `deepseek/*` 的写法。
 - `skills/m-goal/SKILL.md`：开放式优化目标转交 `m-team` 的一句话。
 - `README.md`：15 → 16，表里加 `m-team`；安装方式补 GitHub marketplace：`claude plugin marketplace add Mola-maker/mstack`。
 - `docs/source-map.md`：加 `papers/evolving-agent-teams` 和 `orca/*` 五个文件的行。
 - 不改 `scripts/check.mjs`、`FRAMEWORK.md`、`.claude-plugin/*`（这些由主会话维护）。
+
+## 10. 改名：总入口 `mstack` → `m-start`（0.3.0）
+
+Claude Code 会把**与插件同名的 skill**（`mstack:mstack`）的 description 去掉，只列名字，路由时模型看不到它何时该用（2026-11-04 实测：改名为 `m-start` 后 description 立即出现）。所以总入口改名为 `m-start`；文中其余"`mstack` 总入口"均指它。skill 名一律不要与插件名相同。

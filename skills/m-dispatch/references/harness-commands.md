@@ -50,8 +50,10 @@ orca repo list --json    # gives <repoId>
 - Hand off work that needs nothing back (the human continues in that workspace):
 
 ```sh
-orca worktree create --name <name> --agent codex --prompt "<task brief>" --json
+orca worktree create --name <name> --no-parent --agent codex --prompt "<task brief>" --json
 ```
+
+`--no-parent` keeps the handoff worktree top-level instead of stacked under the current one — use it for independent hand-offs.
 
 ## Isolation
 

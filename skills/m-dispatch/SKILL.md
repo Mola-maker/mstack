@@ -19,11 +19,11 @@ Do NOT use when:
 
 ## Procedure
 
-1. **Decompose.** Write one `todo_write` entry per subtask (several may be `in_progress` at once). Each must be fully self-contained: the goal, the exact files/directories it may touch, how "done" is checked, and the output format. Never give two subtasks the same file.
+1. **Decompose.** Write one `todo_write` entry per subtask (several may be `in_progress` at once). Each must be fully self-contained: the goal, the exact files/directories it may touch, how "done" is checked, and the output format. Never give two subtasks the same file. Write each subtask prompt from `references/subtask-prompt-template.md` (GOAL / SCOPE / CONTEXT / VERIFY / RETURN) — read it before writing the first prompt.
 2. **Isolate.** Give every code-changing subtask its own workspace so they cannot interfere:
    - LayerFS bundle available → fork a Branch per agent (`layerfs`), merge on completion.
    - Else → `git worktree add ../<repo>-<task> -b agent/<task>` and have the subagent work only there.
-3. **Dispatch in one step.** Start every subtask together, without waiting between them. Pick the executor per subtask from the table in Harness notes, and route every DSH model through magpie (`group/smart-split`); see `references/harness-commands.md` for exact invocations. Name the return contract in each prompt: changed files + how each was verified, or a findings list.
+3. **Dispatch in one step.** Start every subtask together, without waiting between them. Pick the executor per subtask from the table in Harness notes, and route every DSH model through magpie (`group/smart-split`); see `references/harness-commands.md` for exact invocations. Every prompt follows `references/subtask-prompt-template.md`; its RETURN section names the return contract: changed files + how each was verified, or a findings list.
 4. **Merge.** As results land, check each one. When two subtasks disagree on the same thing, you decide — do not just take whichever finished last.
 5. **Verify separately.** After merging, dispatch one fresh subagent (or `subagent_claude_code`) whose only job is review plus running the real tests. It must not be the same agent that wrote the code. Then report.
 

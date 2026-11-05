@@ -20,15 +20,15 @@ whenToUse: "Add safety guardrails before risky work: warn on destructive command
 ## Procedure
 
 1. **破坏性命令警示**：跑 Bash/PowerShell 前识别这些模式并先征询可覆盖的警告——`rm -rf/-r`、`DROP/TRUNCATE TABLE|DATABASE`、`git push --force`、`git reset --hard`、`git checkout/restore .`、`kubectl delete`、`docker rm -f`/`system prune`。Windows 另有 `Remove-Item/del/rd -Recurse|-Force`、`rd /s`、`Clear-Disk`、`iex`。安全例外（免警告）：删 `node_modules`、`.next`、`dist`、`build`、`__pycache__`、`.cache`、`coverage` 这类产物目录。**硬拒**：`rm -r`/`-R` 直接作用于 `/`、`~`、`$HOME`；force-push 到默认分支（`--force-with-lease` 除外）。
-2. **目录冻结**（可选）：问用户哪个目录，把 Edit/Write 限定在该路径内，范围外 block（不是 warn）；路径要 resolve 真实绝对路径，尾部 `/` 防 `/src` 误匹配 `/src-old`。Read/Bash/Grep 不受限——它防的是误改，不是安全边界。`/unfreeze` 或换会话解除。
+2. **目录冻结**（可选）：问用户哪个目录，然后**自己约束** Edit/Write 只在该路径内——mstack 没有 hook，冻结靠 agent 自觉做到范围外不写，除非用户自己装了 PreToolUse hook 来做硬拦截。路径要 resolve 真实绝对路径，尾部 `/` 防 `/src` 误匹配 `/src-old`。Read/Bash/Grep 不受限——它防的是误改，不是安全边界。解除方式：告诉 agent 解除冻结，或开新会话。
 3. **死循环刹车**：同一错误连续 3 次 → 停，别再第 4 次（原则 9）；记录已试假设，转 `m-debug` 或上报，而不是重跑。
-4. **插件装前体检**（装任何第三方 skill/MCP/二进制前）：先查 `gh api repos/<owner>/<repo>` 看 stars/pushed_at/license/archived，优先官方源；读 `package.json` 的 pre/postinstall、`cordis.patch.yml` 要插的行、MCP 的启动命令；二进制先对 SHA-256 再跑；skill 逐篇读 SKILL.md 和脚本，拒掉外传数据、关安全提示、远程拉码执行的内容。先在 throwaway profile 试跑一次，再进真实环境，并记录版本与回滚路径。
-5. **冲突体检**：装新插件/skill 前先 `--dump-config` 看是否和已装的干同一件事——两个工具干一个活会让模型犯迷糊，只留一个。
+4. **插件装前体检**（装任何第三方 skill/MCP/二进制前）：先查 `gh api repos/<owner>/<repo>` 看 stars/pushed_at/license/archived，优先官方源；读 `package.json` 的 pre/postinstall、（DSH 才有）`cordis.patch.yml` 要插的行、MCP 的启动命令；二进制先对 SHA-256 再跑；skill 逐篇读 SKILL.md 和脚本，拒掉外传数据、关安全提示、远程拉码执行的内容。先在 throwaway profile 试跑一次，再进真实环境，并记录版本与回滚路径。
+5. **冲突体检**：装新插件/skill 前先看当前环境里已装了什么——DSH 用 `dsh --profile <p> --dump-config`（DSH 专有），Claude Code 用 `claude plugin details <plugin>`（列该插件的 skills/agents/hooks/MCP 清单）或 `claude plugin list`；有 skill 目录就列一遍。目的是看新工具是否和已装的干同一件事——两个工具干一个活会让模型犯迷糊，只留一个。
 6. Mola 的现成坑读 `references/known-traps.md`，匹配到就照做。
 
 ## Output
 
-- 被拦或警告的动作清单 + 用户的处理决定；冻结目录的当前边界与解除方式。
+- 被拦或警告的动作清单 + 用户的处理决定；冻结目录的当前边界与解除方式（并说明冻结靠自觉，非硬拦截）。
 - 插件体检结论：选了什么版本、为什么、它跑什么、做了哪些检查及结果、怎么卸载。
 
 ## Stop conditions
@@ -39,6 +39,6 @@ whenToUse: "Add safety guardrails before risky work: warn on destructive command
 
 ## Harness notes
 
-- Claude Code：`hookSpecificOutput.permissionDecision` 要嵌套在 `hookSpecificOutput` 下，顶层不生效；PowerShell 硬拦需 `.claude/settings.json` 的 deny 规则。
-- DSH：无 PreToolUse hook，护栏靠本 skill 的"动手前自查"落地；目录冻结用自觉 + `todo_write` 圈范围。
+- Claude Code：`hookSpecificOutput.permissionDecision` 要嵌套在 `hookSpecificOutput` 下，顶层不生效；PowerShell 硬拦需 `.claude/settings.json` 的 deny 规则。要让目录冻结真正硬拦截，用户自己装 PreToolUse hook——mstack 只提供自觉约束。
+- DSH：无 PreToolUse hook，护栏靠本 skill 的"动手前自查"落地；目录冻结纯靠自觉 + `todo_write` 圈范围。
 - Codex：`codex exec` 一次性执行，护栏在提示词里显式声明边界，没有交互式确认。

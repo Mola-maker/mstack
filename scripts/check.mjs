@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const root = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
-const expected = ["mstack", "m-team", "m-think", "m-plan", "m-goal", "m-dispatch", "m-verify", "m-debug", "m-handoff",
+const expected = ["m-start", "m-team", "m-think", "m-plan", "m-goal", "m-dispatch", "m-verify", "m-debug", "m-handoff",
   "m-review", "m-ship", "m-qa", "m-research", "m-learn", "m-deslop", "m-guard"];
 const sections = ["## When to use", "## Procedure", "## Output", "## Stop conditions", "## Harness notes"];
 const errors = [];

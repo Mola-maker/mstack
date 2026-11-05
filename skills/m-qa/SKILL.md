@@ -28,7 +28,7 @@ See `references/qa-checklist.md` for the probe checklist and report template.
 
 ## Output
 
-- A report file (`.mstack/reviews/` or a repo `qa-reports/` dir) with: findings (severity, evidence, repro steps), scores, and before/after screenshots.
+- A report file at `.mstack/qa/<YYYY-MM-DD>-<slug>.md` (its own directory — QA reports are not reviews) with: findings (severity, evidence, repro steps), scores, and before/after screenshots.
 - A one-line summary: "QA found N issues, fixed M, health X → Y."
 - What could not be tested (auth-only pages, third-party widgets) as "deferred".
 

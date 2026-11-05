@@ -10,23 +10,23 @@ A handoff is a durable, overwritable checkpoint of *decisions and where you are*
 
 ## When to use / not use
 
-Use at: before `/compact`, before switching model or harness, at session end, before a long-running job starts unattended, and at the end of any `m-goal` cycle (closeout).
+Use at: before `/compact`, before switching model or harness, at session end, and before a long-running job starts unattended.
 
-Do NOT use it for lessons that should live in durable memory (→ `m-learn`), fresh planning (→ `m-think` / `m-plan`), or shipping (→ `m-ship`). The handoff is the *current-state* record, not a knowledge base.
+Do NOT use it for the `m-goal` closeout (m-goal owns that and writes it inside `.mstack/goals/<slug>.md`; the handoff only links to it), for lessons that should live in durable memory (→ `m-learn`), for fresh planning (→ `m-think` / `m-plan`), or for shipping (→ `m-ship`). The handoff is the *current-state* record, not a knowledge base.
 
 ## Procedure
 
 ### Save
 
 1. **Gather state.** Capture the branch, `git status --short`, and changed files — no code edits here; read only.
-2. **Write `.mstack/handoff.md`** (overwrite; move the prior one to `handoff-archive/`). Cover: the goal being worked on; decisions made and *why* (alternatives rejected, trade-offs); remaining work in priority order with a provenance mark — `(done)` / `(verified)` / `(assumed)` so the next session knows what to re-check; and notes (gotchas, blockers, things tried that failed).
+2. **Write `.mstack/handoff.md`** (overwrite; move the prior one to `handoff-archive/`). Cover: the goal being worked on and a link to its goal file's `## Closeout` section if one exists (the handoff never writes the closeout itself); decisions made and *why* (alternatives rejected, trade-offs); remaining work in priority order with a provenance mark — `(done)` / `(verified)` / `(assumed)` so the next session knows what to re-check; and notes (gotchas, blockers, things tried that failed).
 3. **Mark every future step honestly.** A step you have not run gets `(assumed)`, never a completion token. Provenance is what makes a resume safe instead of a fresh start.
 4. **Report.** One-line what was saved and where, in the session's language.
 
 ### Restore
 
 1. If `.mstack/handoff.md` exists, read it first and resume from the top unchecked step — *re-verify* anything marked `(assumed)` before running it; git may have moved past the save.
-2. If it is absent or stale, rebuild the brief from `git log` / `git status` and recent transcripts (`m-learn`'s reflect path, or the harness's transcript dir) rather than pretending nothing happened.
+2. If it is absent or stale, rebuild the brief from `git log` / `git status` and the harness's transcript dir rather than pretending nothing happened.
 3. Present the capsule: goal → where it stands → next single action → open risks.
 
 ## Output
