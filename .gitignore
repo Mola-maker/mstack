@@ -8,3 +8,5 @@ cli/**/node_modules/
 cli/**/dist/
 target/
 demo/node_modules/
+.mstack/runs/
+.pnpm-store/
