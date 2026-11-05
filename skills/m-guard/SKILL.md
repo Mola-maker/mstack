@@ -1,7 +1,7 @@
 ---
 name: m-guard
-description: 上安全护栏：破坏性命令警告、目录冻结编辑、插件/skill 装前体检、死循环刹车，外加 Mola 自己的已知陷阱。Use when the user says "be careful / 小心点 / 冻结这个目录 / 这个插件安全吗 / 死循环了", or before touching prod / live systems.
-whenToUse: Add safety guardrails before risky work: warn on destructive commands, freeze edits to a directory, vet third-party plugins before install, brake on repeated-failure loops, and avoid Mola's own known traps.
+description: "上安全护栏：破坏性命令警告、目录冻结编辑、插件/skill 装前体检、死循环刹车，外加 Mola 自己的已知陷阱。Use when the user says \"be careful / 小心点 / 冻结这个目录 / 这个插件安全吗 / 死循环了\", or before touching prod / live systems."
+whenToUse: "Add safety guardrails before risky work: warn on destructive commands, freeze edits to a directory, vet third-party plugins before install, brake on repeated-failure loops, and avoid Mola's own known traps."
 ---
 
 # m-guard — 安全护栏与陷阱

@@ -9,7 +9,7 @@ const sections = ["## When to use", "## Procedure", "## Output", "## Stop condit
 const errors = [];
 const err = (m) => errors.push(m);
 
-const walk = (d) => readdirSync(d).flatMap((f) => (statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : [join(d, f)]));
+const walk = (d) => readdirSync(d).filter((f) => !f.startsWith(".")).flatMap((f) => (statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : [join(d, f)]));
 
 for (const name of expected) {
   const p = join(root, "skills", name, "SKILL.md");
@@ -17,9 +17,14 @@ for (const name of expected) {
   const text = readFileSync(p, "utf8");
   const lines = text.split("\n").length;
   if (lines > 150) err(`${name}: ${lines} lines (>150)`);
-  const fm = text.match(/^---\n([\s\S]*?)\n---/);
+  const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!fm) { err(`${name}: no frontmatter`); continue; }
   for (const k of ["name", "description", "whenToUse"]) if (!new RegExp(`^${k}:\\s*\\S`, "m").test(fm[1])) err(`${name}: frontmatter missing ${k}`);
+  // An unquoted value containing ": " or " #" is invalid YAML; Claude Code then drops the skill silently.
+  for (const line of fm[1].split(/\r?\n/)) {
+    const v = line.replace(/^[\w-]+:\s*/, "");
+    if (!/^["']/.test(v) && /: | #/.test(v)) err(`${name}: unquoted YAML value with ": " or " #": ${line.slice(0, 40)}`);
+  }
   const n = fm[1].match(/^name:\s*["']?([\w-]+)/m)?.[1];
   if (n !== name) err(`${name}: frontmatter name is ${n}`);
   if (!/^# /m.test(text)) err(`${name}: no # title`);
@@ -32,7 +37,7 @@ for (const name of expected) {
   }
 }
 
-const extra = readdirSync(join(root, "skills")).filter((d) => !expected.includes(d));
+const extra = readdirSync(join(root, "skills")).filter((d) => !d.startsWith(".") && !expected.includes(d));
 if (extra.length) err(`unexpected skill dirs: ${extra.join(", ")}`);
 
 for (const f of walk(join(root, "skills"))) {

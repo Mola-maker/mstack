@@ -1,7 +1,7 @@
 ---
 name: m-goal
-description: Long-running goal loop with a persistent goal file, checkpoints, stop conditions, and a mandatory closeout written on every exit path. Use for multi-day/multi-session work, "run until done", "别停/一直做到完成".
-whenToUse: When work spans many steps or sessions and must keep going to a defined outcome without stalling on the human, and always ends by writing a closeout file.
+description: "Long-running goal loop with a persistent goal file, checkpoints, stop conditions, and a mandatory closeout written on every exit path. Use for multi-day/multi-session work, \"run until done\", \"别停/一直做到完成\"."
+whenToUse: "When work spans many steps or sessions and must keep going to a defined outcome without stalling on the human, and always ends by writing a closeout file."
 ---
 
 # m-goal — 长跑目标循环

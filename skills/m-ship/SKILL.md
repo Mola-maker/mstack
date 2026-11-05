@@ -1,7 +1,7 @@
 ---
 name: m-ship
-description: Take finished work from branch to an open, clean PR: sync upstream, run the real tests, get an independent review, write the PR doc, push, then babysit CI and comments. Use when ready to commit or open a PR, or the user says "提PR/提交/推到上游/merge".
-whenToUse: Code changes are done and need committing, pushing, or a PR; or a PR is open and needs to be driven to green.
+description: "Take finished work from branch to an open, clean PR: sync upstream, run the real tests, get an independent review, write the PR doc, push, then babysit CI and comments. Use when ready to commit or open a PR, or the user says \"提PR/提交/推到上游/merge\"."
+whenToUse: "Code changes are done and need committing, pushing, or a PR; or a PR is open and needs to be driven to green."
 ---
 
 # m-ship

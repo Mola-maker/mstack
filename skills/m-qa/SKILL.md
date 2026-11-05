@@ -1,7 +1,7 @@
 ---
 name: m-qa
-description: Real-device acceptance testing of a running site: start the service, drive the real flows in a browser, catch visual/design/policy problems, and report with evidence (screenshots, scores, repro steps). Use when asked to "测一下/验收/QA/看看这个页面/有没有bug" — report-only by default.
-whenToUse: A site or page is ready to test end-to-end in a real browser; the user wants bugs found — and, optionally, fixed — with evidence.
+description: "Real-device acceptance testing of a running site: start the service, drive the real flows in a browser, catch visual/design/policy problems, and report with evidence (screenshots, scores, repro steps). Use when asked to \"测一下/验收/QA/看看这个页面/有没有bug\" — report-only by default."
+whenToUse: "A site or page is ready to test end-to-end in a real browser; the user wants bugs found — and, optionally, fixed — with evidence."
 ---
 
 # m-qa

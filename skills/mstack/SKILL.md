@@ -1,7 +1,7 @@
 ---
 name: mstack
-description: Entry point that reads .mstack/ state to pick the right skill and resume in-flight work without the user naming a skill. Use when starting any task, or on "继续/开工/接着干" and other terse prompts.
-whenToUse: At the start of every conversation and whenever a terse prompt ("继续", "开工", pasted logs) needs routing to a skill or a resume from .mstack/ state.
+description: "Entry point that reads .mstack/ state to pick the right skill and resume in-flight work without the user naming a skill. Use when starting any task, or on \"继续/开工/接着干\" and other terse prompts."
+whenToUse: "At the start of every conversation and whenever a terse prompt (\"继续\", \"开工\", pasted logs) needs routing to a skill or a resume from .mstack/ state."
 ---
 
 # mstack — 总入口
