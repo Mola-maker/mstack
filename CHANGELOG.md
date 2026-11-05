@@ -1,7 +1,7 @@
 # Changelog
 
 ## 0.3.1 — 2026-11-04
-- Descriptions shortened to ≤130 chars. Claude Code's skill listing has a size budget and drops some skills' descriptions once it is exceeded (m-verify was listed name-only).
+- Descriptions shortened to ≤130 chars. Claude Code's skill listing has a size budget and drops some skills' descriptions once it is exceeded (m-verify was listed name-only). This budget was probably also what hid `mstack:mstack` in 0.3.0, not the shared name; the `m-start` name stays.
 
 ## 0.3.0 — 2026-11-04
 - **Breaking**: router skill renamed from `mstack` to `m-start`. Claude Code strips the description of a skill that has the same name as its plugin (`mstack:mstack` was listed by name only), so the model could not tell when to use it.
