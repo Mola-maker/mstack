@@ -1,0 +1,25 @@
+{
+  "name": "@mola/rpc",
+  "version": "0.1.0",
+  "description": "mola JSON-RPC 2.0 NDJSON client for Rust sidecars (ADR-0001). Client half only; server side arrives with the sidecars in B3.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -b && tsc -b tsconfig.test.json",
+    "test": "node --test dist/test/"
+  }
+}

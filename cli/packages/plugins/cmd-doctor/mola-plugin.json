@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "mola-cmd-doctor",
+  "version": "0.1.0",
+  "kind": "command",
+  "displayName": "mola doctor — health report framework",
+  "mola": ">=0.1.0 <1.0.0",
+  "engine": { "node": ">=22" },
+  "entry": { "ts": "./dist/index.js" },
+  "provides": ["cmd:doctor"],
+  "requires": [],
+  "capabilities": ["command.doctor"],
+  "permissions": {
+    "mola": ["events", "commands", "config.read", "state.kv", "doctor"]
+  },
+  "hooks": {
+    "emit": [],
+    "listen": []
+  }
+}

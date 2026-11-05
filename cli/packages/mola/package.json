@@ -1,0 +1,30 @@
+{
+  "name": "mola",
+  "version": "0.1.0",
+  "description": "mola — plugin-based agent orchestration CLI (B1 skeleton)",
+  "type": "module",
+  "bin": {
+    "mola": "./dist/bin.js"
+  },
+  "main": "./dist/bin.js",
+  "exports": {
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -b && tsc -b tsconfig.test.json",
+    "test": "node --test dist/test/"
+  },
+  "dependencies": {
+    "@mola/core": "workspace:*",
+    "@mola/plugin-sdk": "workspace:*",
+    "@mola/plugin-cmd-doctor": "workspace:*",
+    "@mola/plugin-cmd-config": "workspace:*",
+    "@mola/plugin-cmd-plugin": "workspace:*"
+  }
+}

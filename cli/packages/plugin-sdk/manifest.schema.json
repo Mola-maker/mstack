@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mola.dev/schemas/mola-plugin.schema.json",
+  "title": "mola plugin manifest (mola-plugin.json)",
+  "description": "ADR-0002: one manifest per plugin, TS or Rust. schemaVersion 1.",
+  "type": "object",
+  "required": ["schemaVersion", "id", "version", "kind", "entry"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9.-]*$",
+      "description": "unique, kebab-case, e.g. mola-agent-claude"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+    },
+    "kind": { "enum": ["agent", "tool", "env", "sync", "command", "policy"] },
+    "displayName": { "type": "string" },
+    "mola": {
+      "type": "string",
+      "description": "core API semver range, e.g. >=0.1.0 <1.0.0"
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "node": { "type": "string", "description": "TS plugins only, e.g. >=22" }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "oneOf": [
+        { "required": ["ts"] },
+        { "required": ["bin", "protocol"] }
+      ],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "description": "ES module exporting the Plugin (default export)"
+        },
+        "bin": {
+          "type": "string",
+          "description": "Rust sidecar binary (ADR-0001)"
+        },
+        "protocol": { "const": "jsonrpc-stdio" }
+      },
+      "additionalProperties": false
+    },
+    "provides": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "capability ids, e.g. agent:claude"
+    },
+    "requires": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "what this plugin can do in mola terms, e.g. agent.run"
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "process.exec": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "argv[0] allow-list"
+        },
+        "fs.read": { "type": "array", "items": { "type": "string" } },
+        "fs.write": { "type": "array", "items": { "type": "string" } },
+        "net.connect": { "type": "array", "items": { "type": "string" } },
+        "env.read": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "name globs, e.g. [\"MOLA_*\"]"
+        },
+        "mola": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "mola capabilities: events, config.read, config.write, state.kv, commands, doctor, agents.register, tools.register, process, sidecars"
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "emit": { "type": "array", "items": { "type": "string" } },
+        "listen": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "conflicts": { "type": "array", "items": { "type": "string" } },
+    "overrides": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "command paths this plugin explicitly overrides, e.g. mola.cmd.agents.list"
+    },
+    "configSchema": { "type": "object" }
+  }
+}

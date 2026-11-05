@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../core" },
+    { "path": "../plugins/cmd-doctor" },
+    { "path": "../plugins/cmd-config" },
+    { "path": "../plugins/cmd-plugin" }
+  ]
+}

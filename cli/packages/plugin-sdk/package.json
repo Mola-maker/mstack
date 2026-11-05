@@ -1,0 +1,27 @@
+{
+  "name": "@mola/plugin-sdk",
+  "version": "0.1.0",
+  "description": "mola plugin SDK: Plugin/PluginContext types, manifest schema, error/exit-code contract",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json",
+    "./manifest.schema.json": "./manifest.schema.json"
+  },
+  "files": [
+    "dist",
+    "manifest.schema.json"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -b && tsc -b tsconfig.test.json",
+    "test": "node --test dist/test/"
+  }
+}

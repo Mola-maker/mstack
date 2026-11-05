@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "mola-cmd-config",
+  "version": "0.1.0",
+  "kind": "command",
+  "displayName": "mola config get|set",
+  "mola": ">=0.1.0 <1.0.0",
+  "engine": { "node": ">=22" },
+  "entry": { "ts": "./dist/index.js" },
+  "provides": ["cmd:config"],
+  "requires": [],
+  "capabilities": ["command.config"],
+  "permissions": {
+    "mola": ["events", "commands", "config.read", "config.write", "state.kv"]
+  },
+  "hooks": {
+    "emit": ["mola.config.changed"],
+    "listen": []
+  }
+}

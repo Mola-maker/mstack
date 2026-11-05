@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "mola-cmd-plugin",
+  "version": "0.1.0",
+  "kind": "command",
+  "displayName": "mola plugin list|validate",
+  "mola": ">=0.1.0 <1.0.0",
+  "engine": { "node": ">=22" },
+  "entry": { "ts": "./dist/index.js" },
+  "provides": ["cmd:plugin"],
+  "requires": [],
+  "capabilities": ["command.plugin"],
+  "permissions": {
+    "fs.read": ["**"],
+    "mola": ["events", "commands", "config.read", "state.kv"]
+  },
+  "hooks": {
+    "emit": [],
+    "listen": []
+  }
+}
