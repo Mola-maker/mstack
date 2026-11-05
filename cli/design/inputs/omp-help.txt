@@ -1,0 +1,14 @@
+129 | 	relay(child.stdout, Bun.stdout),
+130 | 	relay(child.stderr, Bun.stderr),
+131 | ]);
+132 | while (hasLiveChildren()) await Bun.sleep(10);
+133 | process.exit(exitCode ?? 1);
+134 | `}function CYr(e,t,n){let{timeout:r=-1,signal:i,stderr:o,detached:s,subreaper:a=!1,...l}=t??{},c=a&&process.platform==="linux",d=l.env??Bun.env,u=Bun.spawn(c?[process.execPath,"-e",Kca]:e,{stdin:"ignore",stdout:"pipe",stderr:"pipe",windowsHide:!0,detached:s,...l,env:c?{...d,BUN_BE_BUN:"1",[ERn]:JSON.stringify(e),[RRn]:d.BUN_BE_BUN}:l.env}),p=new T6e(u,o==="full",n,s===!0,c);if(i)p.attachSignal(i);if(r>0)p.attachTimeout(r);return p}function Py(e,t){return CYr(e,t,t?.stderr==="full")}async function GE(e,t){let{input:n,stderr:r,allowAbort:i,allowNonZero:o,...s}=t??{},a=typeof n==="string"?Buffer.from(n):n,l=a===void 0?s:{...s,stdin:a};using c=CYr(e,l,r==="full");return await c.wait({stderr:r,allowAbort:i,allowNonZero:o})}function Rg(...e){let t,n=0;for(let r=0;r<e.length;r++){let i=e[r];if(i instanceof AbortSignal){if(i.aborted)return i;if(r!==n)e[n]=i;n++}else if(typeof i==="number"&&i>0)t=t===void 0?i:Math.min(t,i)}if(t!==void 0)e[n]=AbortSignal.timeout(t),n++;switch(n){case 0:return;case 1:return e[0];default
+
+SyntaxError: Unexpected identifier 'c'
+      at <parse> (C:\Users\22494\.bun\install\global\node_modules\@oh-my-pi\pi-coding-agent\dist\cli.js:134:1)
+      at native:11:43
+note: missing sourcemaps for C:\Users\22494\.bun\install\global\node_modules\@oh-my-pi\pi-coding-agent\dist\cli.js
+note: consider bundling with '--sourcemap' to get unminified traces
+
+Bun v1.3.11 (Windows x64)

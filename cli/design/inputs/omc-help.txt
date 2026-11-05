@@ -1,0 +1,33 @@
+Usage: omc [options] [command]
+
+Multi-agent orchestration system for Claude Agent SDK
+
+Options:
+  -V, --version                           output the version number
+  -h, --help                              display help for command
+
+Commands:
+  launch [args...]                        Launch Claude Code with native tmux shell integration
+  interop                                 Launch split-pane tmux session with Claude Code (OMC) and Codex (OMX)
+  ask [args...]                           Run provider advisor prompt and write an ask artifact
+  config [options]                        Show current configuration
+  config-stop-callback [options] <type>   Configure stop hook callbacks (file/telegram/discord/slack)
+  config-notify-profile [options] [name]  Manage notification profiles
+  info                                    Show system and agent information
+  test-prompt <prompt>                    Test how a prompt would be enhanced
+  update [options]                        Check for and install updates
+  update-reconcile [options]              Internal: Reconcile runtime state after update (called by update command)
+  version                                 Show detailed version information
+  install [options]                       Install OMC agents and commands to Claude Code config directory (default: ~/.claude/)
+  wait [options]                          Rate limit wait and auto-resume (just run "omc wait" to get started)
+  teleport [options] [ref]                Create git worktree for isolated development (e.g., omc teleport '#123')
+  session|sessions                        Inspect prior local session history
+  capabilities                            Create or verify deterministic tool/skill/capability lockfiles
+  doctor [options]                        Diagnostic tools for troubleshooting OMC installation
+  setup [options]                         Run OMC setup to sync all components (hooks, agents, skills)
+  hud [options]                           Run the OMC HUD statusline renderer
+  mission-board [options]                 Render the opt-in mission board snapshot for the current workspace
+  team [args...]                          Team CLI API for worker lifecycle operations
+  autoresearch [args...]                  Hard-deprecated shim that redirects users to deep-interview + autoresearch skill
+  ralphthon [args...]                     Autonomous hackathon lifecycle: interview -> execute -> harden -> done
+  ultragoal [args...]                     Durable repo-native multi-goal workflow with Claude Code /goal handoff (see omc ultragoal help)

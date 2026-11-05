@@ -1,0 +1,23 @@
+  Claude Code                    —  ·  effort xhigh                                   ~\.claude\settings.json
+  Claude Desktop                 provider —                                           ~\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local\Claude\claude_desktop_config.json
+  Codex                          kimi-code-cn/k3  ·  effort high                      ~\.codex\config.toml
+  Antigravity CLI                Claude Sonnet 4.6 (Thinking)                         ~\.gemini\antigravity-cli\settings.json
+  Antigravity                    —  ·  effort —                                       ~\.antigravity\settings.json
+  OpenCode                       magpie/codex/gpt-6-luna  ·  small —                  ~\.config\opencode\opencode.json
+  Pi                             magpie/grok/grok-4.7  ·  thinking —                  ~\.pi\agent\settings.json
+  OmO                            —  ·  thinking —                                     ~\.omo\agent\settings.json
+  VS Code                        magpie/gemini/gemini-3.8-flash                       ~\AppData\Roaming\Code\User\settings.json
+  DeepSeek Harness               magpie/group/claude-cheap  ·  thinking high          ~\.dsh\profiles\web\cordis.patch.yml
+  omp                            magpie/gemini/gemini-3.1-pro-preview  ·  thinking —  ~\.omp\agent\config.yml
+  Devin                          —  ·  effort —                                       ~\AppData\Roaming\devin\config.json
+  Kimi Code                      kimi-code/k3.1-pro                                   ~\.kimi-code\config.toml
+  Qwen Code                      —                                                    ~\.qwen\settings.json
+  Muse Code                      —                                                    ~\.config\muse\settings.json
+  OpenClaw                       —                                                    ~\.openclaw\openclaw.json
+  Cline                          deepseek-v4-pro  ·  effort xhigh                     ~\.cline\data\settings\providers.json
+  Grok Build                     —  ·  effort —                                       ~\.grok\config.toml
+  ZCode                          provider —                                           ~\.zcode\v2\config.json
+  WorkBuddy                      provider —                                           ~\.workbuddy\models.json
+  CodeBuddy                      —                                                    ~\.codebuddy\models.json
+  Alma                           magpie/group/group                                   http://localhost:23001
+  DeepSeek Harness · WSL Ubuntu  magpie/group/smart-split  ·  thinking —              \\wsl.localhost\Ubuntu\root\.dsh\profiles\mola\cordis.patch.yml

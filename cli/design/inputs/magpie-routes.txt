@@ -1,0 +1,25 @@
+  Routing groups
+  group/smart-split             难题给强模型，简单的给便宜模型
+  group/forcp                   forcp  low/high
+  group/group-2                 无监管  max
+  group/claude-cheap            claude-cheap  high
+  group/claude-ultra            claude-ultra  low/medium/high
+  auto/deepseek-v4-flash        DeepSeek V4 Flash  high
+  auto/deepseek-v4-pro          DeepSeek V4 Pro  high
+  auto/claude-sonnet-5-5        Claude Sonnet 5.5  low/medium/high/xhigh/max
+  auto/claude-opus-5-5          Claude Opus 5.5  low/medium/high
+  auto/gpt-6-luna               GPT-6 Luna  low/medium/high/xhigh/max
+  auto/kimi-k3                  Kimi K3  low/high
+  auto/gemini-3.8-flash         Gemini 3.8 Flash  low/medium/high
+  auto/minimax-m3.1-flash       MiniMax-M3.1-Flash  low/high/xhigh
+  auto/minimax-m3               MiniMax-M3  none/high
+  DeepSeek
+  deepseek/deepseek-v4-pro[1M]  DeepSeek V4 Pro [1M]  none/low/high/max
+  deepseek/deepseek-flash       DeepSeek-V4.1-Flash  none/low/high/max
+  deepseek/deepseek-v4-flash    DeepSeek V4 Flash  none/low/high/max
+  deepseek/deepseek-v4-pro      DeepSeek-V4-Pro  none/low/high/max
+  dsh is shown smart-split, forcp, group-2, claude-cheap, claude-ultra, auto-deepseek-v4-pro, auto-deepseek-v4-flash, auto-kimi-k3, auto-minimax-m3, auto-minimax-m3-1-flash, auto-gemini-3-8-flash, auto-claude-opus-5-5, auto-claude-sonnet-5-5, auto-gpt-6-luna, deepseek
+  ! 309 kept from dsh, in none of those:
+    no family · group: group/group
+    no family · auto-glm-5-3: auto/glm-5.3
+    no family · auto-k3: auto/k3

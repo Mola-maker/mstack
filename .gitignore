@@ -3,3 +3,8 @@ logs/
 .dsh-*.yml
 probe.txt
 .omc/
+cli/node_modules/
+cli/**/node_modules/
+cli/**/dist/
+target/
+demo/node_modules/
