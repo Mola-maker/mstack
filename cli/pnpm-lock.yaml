@@ -74,6 +74,9 @@ importers:
       '@mola/plugin-tool-rtk':
         specifier: workspace:*
         version: link:../plugins/tool-rtk
+      '@mola/plugin-tool-superagent':
+        specifier: workspace:*
+        version: link:../plugins/tool-superagent
 
   packages/plugin-sdk: {}
 
@@ -168,6 +171,12 @@ importers:
         version: link:../../plugin-sdk
 
   packages/plugins/tool-rtk:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
+  packages/plugins/tool-superagent:
     dependencies:
       '@mola/plugin-sdk':
         specifier: workspace:*

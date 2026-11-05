@@ -28,6 +28,7 @@ const BUILTIN_PLUGIN_PACKAGES = [
   "@mola/plugin-agent-codex",
   "@mola/plugin-rec-runs",
   "@mola/plugin-cmd-run",
+  "@mola/plugin-tool-superagent",
 ];
 
 function parseGlobalFlags(argv: string[]): { flags: GlobalFlags; rest: string[] } {

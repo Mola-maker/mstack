@@ -37,6 +37,7 @@
     "@mola/plugin-agent-claude": "workspace:*",
     "@mola/plugin-agent-codex": "workspace:*",
     "@mola/plugin-rec-runs": "workspace:*",
-    "@mola/plugin-cmd-run": "workspace:*"
+    "@mola/plugin-cmd-run": "workspace:*",
+    "@mola/plugin-tool-superagent": "workspace:*"
   }
 }
