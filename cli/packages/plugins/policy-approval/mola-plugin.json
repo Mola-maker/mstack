@@ -3,7 +3,7 @@
   "id": "mola-policy-approval",
   "version": "0.1.0",
   "kind": "policy",
-  "displayName": "TODO policy-approval",
+  "displayName": "route whitelist + conservative approval classifier (gates)",
   "mola": ">=0.1.0 <1.0.0",
   "engine": {
     "node": ">=22"
@@ -11,14 +11,14 @@
   "entry": {
     "ts": "./dist/index.js"
   },
-  "provides": [],
+  "provides": ["policy:route-whitelist", "policy:approval-classifier"],
   "requires": [],
-  "capabilities": [],
+  "capabilities": ["policy.route-whitelist", "policy.approval-classifier"],
   "permissions": {
-    "mola": []
+    "mola": ["events", "config.read", "state.kv"]
   },
   "hooks": {
-    "emit": [],
-    "listen": []
+    "emit": ["mola.approval.granted", "mola.approval.denied"],
+    "listen": ["mola.tool.before", "mola.task.pre-dispatch"]
   }
 }

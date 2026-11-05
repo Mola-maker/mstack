@@ -3,7 +3,7 @@
   "id": "mola-cmd-rtk",
   "version": "0.1.0",
   "kind": "command",
-  "displayName": "TODO cmd-rtk",
+  "displayName": "mola rtk (verbatim passthrough)",
   "mola": ">=0.1.0 <1.0.0",
   "engine": {
     "node": ">=22"
@@ -11,11 +11,13 @@
   "entry": {
     "ts": "./dist/index.js"
   },
-  "provides": [],
+  "provides": ["cmd:rtk"],
   "requires": [],
-  "capabilities": [],
+  "capabilities": ["command.rtk"],
   "permissions": {
-    "mola": []
+    "process.exec": ["rtk", "rtk.exe"],
+    "env.read": ["LOCALAPPDATA", "PATH", "PATHEXT"],
+    "mola": ["commands"]
   },
   "hooks": {
     "emit": [],

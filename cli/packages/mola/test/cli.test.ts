@@ -38,7 +38,7 @@ function envelope(r: Run): any {
   return JSON.parse(r.stdout.trim());
 }
 
-test("plugin list --json: envelope with the 3 builtin plugins, exit 0", () => {
+test("plugin list --json: envelope with the B1 builtin plugins, exit 0", () => {
   const r = run(["plugin", "list", "--json"], tmpHome());
   assert.equal(r.status, 0, r.stderr);
   const env = envelope(r);
@@ -46,23 +46,22 @@ test("plugin list --json: envelope with the 3 builtin plugins, exit 0", () => {
   assert.equal(env.command, "plugin list");
   assert.ok(typeof env.traceId === "string" && env.traceId.length > 0);
   const ids = env.data.map((p: any) => p.id).sort();
-  assert.deepEqual(ids, ["mola-cmd-config", "mola-cmd-doctor", "mola-cmd-plugin"]);
+  assert.deepEqual([...ids].sort(), ["mola-agent-dsh", "mola-cmd-config", "mola-cmd-dispatch", "mola-cmd-doctor", "mola-cmd-model", "mola-cmd-plugin", "mola-cmd-rtk", "mola-policy-approval", "mola-tool-git", "mola-tool-magpie", "mola-tool-rtk"]);
   for (const p of env.data) {
     assert.equal(p.tier, "builtin");
     assert.equal(p.state, "active");
-    assert.equal(p.kind, "command");
+    assert.ok(["command", "agent", "tool", "policy"].includes(p.kind));
   }
 });
 
-test("doctor --json: node>=22 and plugins.plan-ok pass, exit 0", () => {
+test("doctor --json: node>=22 and plugins.plan-ok pass (overall exit depends on the host's agents)", () => {
   const r = run(["doctor", "--json"], tmpHome());
-  assert.equal(r.status, 0, r.stderr);
+  assert.ok(r.status === 0 || r.status === 69, r.stderr);
   const env = envelope(r);
   assert.equal(env.command, "doctor");
   const checks = Object.fromEntries(env.data.checks.map((c: any) => [c.id, c]));
   assert.equal(checks["node>=22"].ok, true);
   assert.equal(checks["plugins.plan-ok"].ok, true);
-  assert.equal(env.data.summary.failed, 0);
 });
 
 test("config set/get roundtrip against the fixture HOME", () => {
@@ -142,19 +141,19 @@ test("human-mode plugin list prints id/version/kind/tier/state lines", () => {
 
 test("run history is recorded in the state store keyed by traceId", () => {
   const home = tmpHome();
-  const r = run(["doctor", "--json"], home);
+  const r = run(["plugin", "list", "--json"], home);
   assert.equal(r.status, 0, r.stderr);
   const traceId = envelope(r).traceId;
   const state = JSON.parse(fs.readFileSync(path.join(home, "state.json"), "utf8"));
   const rec = state.runs.find((x: any) => x.traceId === traceId);
   assert.ok(rec, "state.json records the run");
-  assert.equal(rec.command, "doctor");
+  assert.equal(rec.command, "plugin list");
   assert.equal(rec.exitCode, 0);
 });
 
 test("MOLA_LOG_LEVEL env maps into the log layer; log file carries traceId", () => {
   const home = tmpHome();
-  const r = spawnSync(process.execPath, [BIN, "doctor", "--json"], {
+  const r = spawnSync(process.execPath, [BIN, "plugin", "list", "--json"], {
     encoding: "utf8",
     cwd: os.tmpdir(),
     env: { ...process.env, MOLA_HOME: home, MOLA_LOG_LEVEL: "debug" },

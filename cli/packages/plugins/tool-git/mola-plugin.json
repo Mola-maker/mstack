@@ -3,7 +3,7 @@
   "id": "mola-tool-git",
   "version": "0.1.0",
   "kind": "tool",
-  "displayName": "TODO tool-git",
+  "displayName": "mola tool git + gh (worktrees, PRs)",
   "mola": ">=0.1.0 <1.0.0",
   "engine": {
     "node": ">=22"
@@ -11,11 +11,12 @@
   "entry": {
     "ts": "./dist/index.js"
   },
-  "provides": [],
+  "provides": ["tool:git", "tool:gh", "tool:git.worktree"],
   "requires": [],
-  "capabilities": [],
+  "capabilities": ["tool.git", "tool.gh", "tool.git.worktree"],
   "permissions": {
-    "mola": []
+    "process.exec": ["git", "git.exe", "gh", "gh.exe"],
+    "mola": ["doctor", "tools.register"]
   },
   "hooks": {
     "emit": [],

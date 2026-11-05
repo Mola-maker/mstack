@@ -3,7 +3,7 @@
   "id": "mola-tool-rtk",
   "version": "0.1.0",
   "kind": "tool",
-  "displayName": "TODO tool-rtk",
+  "displayName": "mola tool rtk (output compaction)",
   "mola": ">=0.1.0 <1.0.0",
   "engine": {
     "node": ">=22"
@@ -11,11 +11,13 @@
   "entry": {
     "ts": "./dist/index.js"
   },
-  "provides": [],
+  "provides": ["tool:rtk"],
   "requires": [],
-  "capabilities": [],
+  "capabilities": ["tool.rtk"],
   "permissions": {
-    "mola": []
+    "process.exec": ["rtk", "rtk.exe"],
+    "env.read": ["LOCALAPPDATA", "PATH", "PATHEXT", "XDG_DATA_HOME"],
+    "mola": ["doctor", "tools.register"]
   },
   "hooks": {
     "emit": [],

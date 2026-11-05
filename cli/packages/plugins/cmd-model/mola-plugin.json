@@ -3,19 +3,16 @@
   "id": "mola-cmd-model",
   "version": "0.1.0",
   "kind": "command",
-  "displayName": "TODO cmd-model",
+  "displayName": "mola model show|set|routes — thin passthrough to magpie",
   "mola": ">=0.1.0 <1.0.0",
-  "engine": {
-    "node": ">=22"
-  },
-  "entry": {
-    "ts": "./dist/index.js"
-  },
-  "provides": [],
+  "engine": { "node": ">=22" },
+  "entry": { "ts": "./dist/index.js" },
+  "provides": ["cmd:model"],
   "requires": [],
-  "capabilities": [],
+  "capabilities": ["command.model"],
   "permissions": {
-    "mola": []
+    "process.exec": ["magpie", "magpie.exe"],
+    "mola": ["events", "commands", "config.read", "state.kv"]
   },
   "hooks": {
     "emit": [],

@@ -3,7 +3,7 @@
   "id": "mola-tool-magpie",
   "version": "0.1.0",
   "kind": "tool",
-  "displayName": "TODO tool-magpie",
+  "displayName": "magpie — model brain: agent discovery, routes, healthcheck",
   "mola": ">=0.1.0 <1.0.0",
   "engine": {
     "node": ">=22"
@@ -11,11 +11,43 @@
   "entry": {
     "ts": "./dist/index.js"
   },
-  "provides": [],
+  "provides": [
+    "tool:magpie",
+    "cmd:agents"
+  ],
   "requires": [],
-  "capabilities": [],
+  "capabilities": [
+    "tool.magpie",
+    "agent.discovery",
+    "doctor.check"
+  ],
   "permissions": {
-    "mola": []
+    "process.exec": [
+      "magpie",
+      "magpie.exe",
+      "dsh",
+      "bash",
+      "wsl",
+      "claude",
+      "codex",
+      "kimi",
+      "grok",
+      "agy",
+      "devin",
+      "pi",
+      "opencode",
+      "omp",
+      "cmd"
+    ],
+    "mola": [
+      "events",
+      "commands",
+      "config.read",
+      "state.kv",
+      "doctor",
+      "agents.register",
+      "tools.register"
+    ]
   },
   "hooks": {
     "emit": [],

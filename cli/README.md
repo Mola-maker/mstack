@@ -64,8 +64,9 @@ Events use the ADR-0004 `mola.<domain>.<verb>` vocabulary; waterfalls may
 rewrite or reject (`PolicyDenial` → exit 77). The death-loop brake quarantines
 a plugin after 3 consecutive listener failures.
 
-## B1 status
+## B1 status (2026-11-05)
 
-Step 1 (this tree): core skeleton + cmd-doctor/cmd-config/cmd-plugin.
-Step 2 adds cmd-dispatch, cmd-model, cmd-rtk, agent-dsh, tool-magpie, tool-rtk,
-tool-git, policy-approval (see BATCHES.md B1 acceptance commands).
+Done. 11 builtin plugins: cmd-doctor, cmd-config, cmd-plugin, cmd-dispatch, cmd-model, cmd-rtk, agent-dsh, policy-approval, tool-magpie, tool-rtk, tool-git.
+185 tests: Windows runs 152 and skips 33 POSIX/WSL-only cases; Linux (WSL, CI) runs all 185.
+Verified on the main machine: `mola doctor` (16 checks, exit 0), `mola dispatch tasks/b1-smoke.md` end to end through WSL DSH on `group/smart-split` (16 s), `deepseek/*` routes rejected with exit 77, unknown agent exits 66, `mola rtk` passthrough.
+Set `MOLA_PLATFORM=linux|win32` to force a platform code path when debugging.

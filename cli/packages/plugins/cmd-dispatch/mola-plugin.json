@@ -3,7 +3,7 @@
   "id": "mola-cmd-dispatch",
   "version": "0.1.0",
   "kind": "command",
-  "displayName": "TODO cmd-dispatch",
+  "displayName": "mola dispatch <task-file|-> — DSH headless worker (WSL, profile mola-cli)",
   "mola": ">=0.1.0 <1.0.0",
   "engine": {
     "node": ">=22"
@@ -11,14 +11,23 @@
   "entry": {
     "ts": "./dist/index.js"
   },
-  "provides": [],
-  "requires": [],
-  "capabilities": [],
+  "provides": ["cmd:dispatch"],
+  "requires": ["agent:dsh"],
+  "capabilities": ["command.dispatch"],
   "permissions": {
-    "mola": []
+    "process.exec": ["bash", "wsl"],
+    "fs.read": ["**"],
+    "fs.write": ["**/logs/**", "**/.mstack/runs/**"],
+    "mola": ["events", "commands", "config.read", "state.kv"]
   },
   "hooks": {
-    "emit": [],
+    "emit": [
+      "mola.session.started",
+      "mola.session.ended",
+      "mola.tool.after",
+      "mola.task.done",
+      "mola.error.raised"
+    ],
     "listen": []
   }
 }

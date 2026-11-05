@@ -3,7 +3,7 @@
   "id": "mola-agent-dsh",
   "version": "0.1.0",
   "kind": "agent",
-  "displayName": "TODO agent-dsh",
+  "displayName": "DSH (DeepSeek Harness) — WSL headless adapter, profile mola-cli",
   "mola": ">=0.1.0 <1.0.0",
   "engine": {
     "node": ">=22"
@@ -11,11 +11,17 @@
   "entry": {
     "ts": "./dist/index.js"
   },
-  "provides": [],
+  "provides": ["agent:dsh"],
   "requires": [],
-  "capabilities": [],
+  "capabilities": [
+    "headless",
+    "headless-json-stream",
+    "resume",
+    "native-hooks"
+  ],
   "permissions": {
-    "mola": []
+    "process.exec": ["bash", "wsl", "dsh"],
+    "mola": ["doctor", "agents.register"]
   },
   "hooks": {
     "emit": [],

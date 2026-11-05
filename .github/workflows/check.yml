@@ -29,3 +29,25 @@ jobs:
           PY
       - name: Plugin manifests are valid JSON
         run: for f in .claude-plugin/*.json; do python -m json.tool "$f" > /dev/null && echo "ok $f"; done
+
+  cli:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r build
+      - name: Tests (Linux runs the POSIX/WSL cases that Windows skips)
+        run: pnpm -r --no-bail test
+      - name: Smoke
+        run: |
+          node packages/mola/dist/bin.js plugin list --json > /dev/null
+          node packages/mola/dist/bin.js agents show nope --json; test $? -eq 66
