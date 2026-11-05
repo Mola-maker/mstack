@@ -1,0 +1,5 @@
+.sources/
+logs/
+.dsh-*.yml
+probe.txt
+.omc/
