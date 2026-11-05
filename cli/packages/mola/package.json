@@ -1,7 +1,7 @@
 {
   "name": "mola",
   "version": "0.1.0",
-  "description": "mola — plugin-based agent orchestration CLI (B1 skeleton)",
+  "description": "mola \u2014 plugin-based agent orchestration CLI (B1 skeleton)",
   "type": "module",
   "bin": {
     "mola": "./dist/bin.js"
@@ -33,6 +33,10 @@
     "@mola/plugin-tool-magpie": "workspace:*",
     "@mola/plugin-cmd-rtk": "workspace:*",
     "@mola/plugin-tool-rtk": "workspace:*",
-    "@mola/plugin-tool-git": "workspace:*"
+    "@mola/plugin-tool-git": "workspace:*",
+    "@mola/plugin-agent-claude": "workspace:*",
+    "@mola/plugin-agent-codex": "workspace:*",
+    "@mola/plugin-rec-runs": "workspace:*",
+    "@mola/plugin-cmd-run": "workspace:*"
   }
 }

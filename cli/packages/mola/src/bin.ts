@@ -24,6 +24,10 @@ const BUILTIN_PLUGIN_PACKAGES = [
   "@mola/plugin-cmd-rtk",
   "@mola/plugin-tool-rtk",
   "@mola/plugin-tool-git",
+  "@mola/plugin-agent-claude",
+  "@mola/plugin-agent-codex",
+  "@mola/plugin-rec-runs",
+  "@mola/plugin-cmd-run",
 ];
 
 function parseGlobalFlags(argv: string[]): { flags: GlobalFlags; rest: string[] } {

@@ -26,6 +26,12 @@ importers:
       '@mola/core':
         specifier: workspace:*
         version: link:../core
+      '@mola/plugin-agent-claude':
+        specifier: workspace:*
+        version: link:../plugins/agent-claude
+      '@mola/plugin-agent-codex':
+        specifier: workspace:*
+        version: link:../plugins/agent-codex
       '@mola/plugin-agent-dsh':
         specifier: workspace:*
         version: link:../plugins/agent-dsh
@@ -47,9 +53,15 @@ importers:
       '@mola/plugin-cmd-rtk':
         specifier: workspace:*
         version: link:../plugins/cmd-rtk
+      '@mola/plugin-cmd-run':
+        specifier: workspace:*
+        version: link:../plugins/cmd-run
       '@mola/plugin-policy-approval':
         specifier: workspace:*
         version: link:../plugins/policy-approval
+      '@mola/plugin-rec-runs':
+        specifier: workspace:*
+        version: link:../plugins/rec-runs
       '@mola/plugin-sdk':
         specifier: workspace:*
         version: link:../plugin-sdk
@@ -64,6 +76,18 @@ importers:
         version: link:../plugins/tool-rtk
 
   packages/plugin-sdk: {}
+
+  packages/plugins/agent-claude:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
+  packages/plugins/agent-codex:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
 
   packages/plugins/agent-dsh:
     dependencies:
@@ -107,7 +131,19 @@ importers:
         specifier: workspace:*
         version: link:../../plugin-sdk
 
+  packages/plugins/cmd-run:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
   packages/plugins/policy-approval:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
+  packages/plugins/rec-runs:
     dependencies:
       '@mola/plugin-sdk':
         specifier: workspace:*
