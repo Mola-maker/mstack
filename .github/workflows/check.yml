@@ -50,4 +50,4 @@ jobs:
       - name: Smoke
         run: |
           node packages/mola/dist/bin.js plugin list --json > /dev/null
-          node packages/mola/dist/bin.js agents show nope --json; test $? -eq 66
+          rc=0; node packages/mola/dist/bin.js agents show nope --json || rc=$?; test "$rc" -eq 66
