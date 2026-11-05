@@ -1,0 +1,31 @@
+name: check
+on:
+  push:
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Acceptance checks (FRAMEWORK.md §8)
+        run: node scripts/check.mjs
+      - name: Frontmatter parses as YAML
+        run: |
+          pip install --quiet pyyaml
+          python - <<'PY'
+          import glob, re, sys, yaml
+          bad = 0
+          for f in sorted(glob.glob("skills/*/SKILL.md")):
+              m = re.match(r"---\n(.*?)\n---", open(f, encoding="utf8").read(), re.S)
+              try:
+                  d = yaml.safe_load(m.group(1))
+                  assert {"name", "description", "whenToUse"} <= set(d), f"missing keys in {f}"
+              except Exception as e:
+                  bad += 1; print(f"FAIL {f}: {e}")
+          sys.exit(bad)
+          PY
+      - name: Plugin manifests are valid JSON
+        run: for f in .claude-plugin/*.json; do python -m json.tool "$f" > /dev/null && echo "ok $f"; done

@@ -1,8 +1,8 @@
 # 迁移建议：装了 mstack 之后
 
-mstack 把四套来源的 skill 去重合并成了 15 个。为避免同一触发词命中多个插件、规则互相打架（历史上 omc 与 superpowers 就冲突过），建议按下面调整。
+mstack 把四套来源的 skill 去重合并成了 16 个。为避免同一触发词命中多个插件、规则互相打架（历史上 omc 与 superpowers 就冲突过），建议按下面调整。
 
-**这份文件只有建议。mstack 不会、也不应该自动修改你的任何配置；所有停用动作由你自己执行。**
+**这份文件只有建议，mstack 本身不会改你的任何配置。** 作者机器上已按 §1（停用 superpowers）和 §2 的推荐做法执行（2026-11-04）。
 
 ## 1. superpowers —— 建议整体停用
 
@@ -20,13 +20,21 @@ superpowers 的全部 skill 都已被吸收（对应关系见 [source-map.md](so
 
 建议：在 Claude Code 里用 `/plugin` 禁用 superpowers 插件。确认 mstack 用顺手、没有想念的东西之后，再考虑卸载。
 
-## 2. oh-my-claudecode（OMC）—— 停用重叠 skill，保留 MCP 工具
+## 2. oh-my-claudecode（OMC）—— 保留插件，关掉会抢路由的部分
 
-OMC 里和 mstack 重叠的 skill 建议停用：autopilot、deep-interview、plan、ralplan、ultragoal、ralph、team、verify、debug、trace、review、remember、research、self-improve、skillify、ai-slop-cleaner、minimal-code-discipline、minimal-prose-discipline（全部 18 个 skill 均有对应，见 source-map）。
+OMC 里和 mstack 重叠的 skill：autopilot、deep-interview、plan、ralplan、ultragoal、ralph、team、verify、debug、trace、review、remember、research、self-improve、skillify、ai-slop-cleaner、minimal-code-discipline、minimal-prose-discipline、tdd（对应关系见 source-map）。
 
-**但 OMC 的 MCP 工具保留启用**：`state` / `notepad` 等 MCP server 被 m-goal、m-handoff 等 skill 当作可选后端引用（没有时自动退回文件方案），与 skill 停用互不影响。
+**不能逐个隐藏。** 用户级 `~/.claude/settings.json` 的 `skillOverrides` 对**插件** skill 不生效（Claude Code 只从 policy / flag 设置读插件 skill 的覆盖），实测设了也照样出现在列表里。所以可选的只有两条路：
 
-建议做法：禁用 OMC 插件中的 skill 部分（按你的客户端支持的方式：逐条禁用 skill，或整体禁用插件后单独把 MCP server 配置留下）。如果客户端不支持只留 MCP，可以接受短期内 skill 共存——触发词冲突时 mstack 的 `m-` 前缀足够区分。
+- **（推荐）保留 OMC**：它的 19 个 agents（executor、verifier、critic……）、MCP 工具（state / notepad）和 hooks 仍有用。只关掉会抢路由的两个 hook，并在全局 CLAUDE.md 写明工作流先走 mstack：
+  ```json
+  "env": { "OMC_SKIP_HOOKS": "keyword-detector,persistent-mode" }
+  ```
+  `keyword-detector` 会在你说 "ralph/autopilot/ulw" 时强行拉起 OMC skill；`persistent-mode` 是 "The boulder never stops" 的续跑循环，和 `m-goal` 的停止条件冲突。
+- **整体停用 OMC**：`claude plugin disable oh-my-claudecode@omc`。最干净，但 agents、MCP 工具和 hooks 一起没了；mstack 的 skill 会退回 Claude Code 自带的 general-purpose agent 和文件状态。
+
+如果全局 CLAUDE.md 由 magpie 管理（文件里有 `<!-- magpie:begin -->`），改完后要同步回 magpie 的 library，否则下次同步会覆盖：
+`magpie library instructions set <只含 begin/end 之间内容的文件>`。
 
 ## 3. gstack / pstack —— 当前未安装，无需处理
 

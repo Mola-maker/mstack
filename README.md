@@ -1,5 +1,7 @@
 # mstack
 
+[![check](https://github.com/Mola-maker/mstack/actions/workflows/check.yml/badge.svg)](https://github.com/Mola-maker/mstack/actions/workflows/check.yml)
+
 mstack 是 Mola-maker 的个人 agent 工作流技能栈：把 superpowers、gstack、pstack、oh-my-claudecode（OMC）四套 skill 去重、合并、按个人使用习惯重写成 **16 个互不重叠的 skill**。同一份 `skills/` 目录同时供 Claude Code（plugin）、DSH（`~/.dsh/skills`）和 Codex 使用。
 
 设计约束（详见 [FRAMEWORK.md](FRAMEWORK.md)）：短 prompt 也能接得上（`mstack` 总入口读 `.mstack/` 状态续干）、每个 SKILL.md ≤150 行、长跑任务必须写 closeout、同一个错误连错 3 次就停。
@@ -72,16 +74,37 @@ cp -r /path/to/mstack/skills/* ~/.codex/skills/
 
 ## 和原插件怎么共存
 
-装了 mstack 后，superpowers 建议整体停用，OMC 只保留 MCP 工具、停掉重叠的 skill。具体建议和理由见 [docs/migration.md](docs/migration.md)——那里只有建议，不会替你改任何配置。
+作者机器上的实际做法（2026-11-04，细节和理由见 [docs/migration.md](docs/migration.md)）：
+
+- superpowers：整体停用（`claude plugin disable superpowers@claude-plugins-official`）。
+- OMC：保留它的 agents、MCP 工具（state / notepad）和 hooks；关掉关键词触发和 persistent-mode（`settings.json` 的 `env.OMC_SKIP_HOOKS=keyword-detector,persistent-mode`）；全局 CLAUDE.md 写明工作流先走 mstack。
+- 注意：用户级 `settings.json` 的 `skillOverrides` **对插件 skill 不生效**，没法单独隐藏 OMC 的某个 skill。
+
+## 验证
+
+```sh
+node scripts/check.mjs                       # FRAMEWORK.md §8 验收：16 个 skill、6 节结构、≤150 行、frontmatter 合法、无上游引用
+claude plugin validate .                     # 插件清单
+claude -p "列出所有以 mstack: 开头的 skill"    # 真实加载：应列出 16 个
+```
+
+CI（`.github/workflows/check.yml`）在每次 push 时跑前两类检查。有 `.sources/`（上游原文，不入库）时 `check.mjs` 还会检查 source-map 覆盖率和"连续 3 行雷同"。
+
+## 怎么造出来的
+
+主会话（Claude）写 [FRAMEWORK.md](FRAMEWORK.md) 规格和每个 worker 的任务书（`tasks/w*.md`），用 `tasks/dispatch.sh` 把任务派给 DSH headless worker（WSL，`mola-cli` profile，magpie 路由 `group/smart-split`）并行写 skill，主会话再审查、修正、跑验收。改 skill 时照这个流程：改规格 → 派 worker 或直接改 → `check.mjs` → push → `claude plugin marketplace update mstack && claude plugin update mstack@mstack`。
 
 ## 仓库结构
 
 ```
-.claude-plugin/plugin.json   Claude Code plugin 清单
+.claude-plugin/              plugin.json（插件清单）+ marketplace.json（本仓库即 marketplace）
 skills/<name>/SKILL.md       16 个 skill（≤150 行，细节放 references/）
-docs/source-map.md           每个来源 skill → 归入哪个 m-skill
-docs/migration.md            停用重叠插件的建议
-NOTICE.md                    上游项目致谢与许可证
+FRAMEWORK.md                 规格：画像 → 约束、来源映射、格式、共享约定、验收标准、§9 m-team
+docs/source-map.md           每个来源文件 → 归入哪个 m-skill
+docs/migration.md            与 superpowers / OMC 共存的做法
+scripts/check.mjs            验收脚本
+tasks/                       构建记录：DSH worker 任务书与分派脚本
+CHANGELOG.md · NOTICE.md · LICENSE
 ```
 
-许可证见 [NOTICE.md](NOTICE.md)。
+MIT License（[LICENSE](LICENSE)）；上游致谢见 [NOTICE.md](NOTICE.md)。
