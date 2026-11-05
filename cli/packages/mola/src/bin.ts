@@ -16,6 +16,14 @@ const BUILTIN_PLUGIN_PACKAGES = [
   "@mola/plugin-cmd-doctor",
   "@mola/plugin-cmd-config",
   "@mola/plugin-cmd-plugin",
+  "@mola/plugin-cmd-dispatch",
+  "@mola/plugin-agent-dsh",
+  "@mola/plugin-policy-approval",
+  "@mola/plugin-cmd-model",
+  "@mola/plugin-tool-magpie",
+  "@mola/plugin-cmd-rtk",
+  "@mola/plugin-tool-rtk",
+  "@mola/plugin-tool-git",
 ];
 
 function parseGlobalFlags(argv: string[]): { flags: GlobalFlags; rest: string[] } {

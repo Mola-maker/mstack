@@ -26,22 +26,58 @@ importers:
       '@mola/core':
         specifier: workspace:*
         version: link:../core
+      '@mola/plugin-agent-dsh':
+        specifier: workspace:*
+        version: link:../plugins/agent-dsh
       '@mola/plugin-cmd-config':
         specifier: workspace:*
         version: link:../plugins/cmd-config
+      '@mola/plugin-cmd-dispatch':
+        specifier: workspace:*
+        version: link:../plugins/cmd-dispatch
       '@mola/plugin-cmd-doctor':
         specifier: workspace:*
         version: link:../plugins/cmd-doctor
+      '@mola/plugin-cmd-model':
+        specifier: workspace:*
+        version: link:../plugins/cmd-model
       '@mola/plugin-cmd-plugin':
         specifier: workspace:*
         version: link:../plugins/cmd-plugin
+      '@mola/plugin-cmd-rtk':
+        specifier: workspace:*
+        version: link:../plugins/cmd-rtk
+      '@mola/plugin-policy-approval':
+        specifier: workspace:*
+        version: link:../plugins/policy-approval
       '@mola/plugin-sdk':
         specifier: workspace:*
         version: link:../plugin-sdk
+      '@mola/plugin-tool-git':
+        specifier: workspace:*
+        version: link:../plugins/tool-git
+      '@mola/plugin-tool-magpie':
+        specifier: workspace:*
+        version: link:../plugins/tool-magpie
+      '@mola/plugin-tool-rtk':
+        specifier: workspace:*
+        version: link:../plugins/tool-rtk
 
   packages/plugin-sdk: {}
 
+  packages/plugins/agent-dsh:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
   packages/plugins/cmd-config:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
+  packages/plugins/cmd-dispatch:
     dependencies:
       '@mola/plugin-sdk':
         specifier: workspace:*
@@ -53,7 +89,43 @@ importers:
         specifier: workspace:*
         version: link:../../plugin-sdk
 
+  packages/plugins/cmd-model:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
   packages/plugins/cmd-plugin:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
+  packages/plugins/cmd-rtk:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
+  packages/plugins/policy-approval:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
+  packages/plugins/tool-git:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
+  packages/plugins/tool-magpie:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
+  packages/plugins/tool-rtk:
     dependencies:
       '@mola/plugin-sdk':
         specifier: workspace:*

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "mola-cmd-model",
+  "version": "0.1.0",
+  "kind": "command",
+  "displayName": "TODO cmd-model",
+  "mola": ">=0.1.0 <1.0.0",
+  "engine": {
+    "node": ">=22"
+  },
+  "entry": {
+    "ts": "./dist/index.js"
+  },
+  "provides": [],
+  "requires": [],
+  "capabilities": [],
+  "permissions": {
+    "mola": []
+  },
+  "hooks": {
+    "emit": [],
+    "listen": []
+  }
+}

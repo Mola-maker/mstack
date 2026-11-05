@@ -18,13 +18,21 @@
   },
   "scripts": {
     "build": "tsc -b && tsc -b tsconfig.test.json",
-    "test": "node --test dist/test/"
+    "test": "node --test \"dist/test/**/*.test.js\""
   },
   "dependencies": {
     "@mola/core": "workspace:*",
     "@mola/plugin-sdk": "workspace:*",
     "@mola/plugin-cmd-doctor": "workspace:*",
     "@mola/plugin-cmd-config": "workspace:*",
-    "@mola/plugin-cmd-plugin": "workspace:*"
+    "@mola/plugin-cmd-plugin": "workspace:*",
+    "@mola/plugin-cmd-dispatch": "workspace:*",
+    "@mola/plugin-agent-dsh": "workspace:*",
+    "@mola/plugin-policy-approval": "workspace:*",
+    "@mola/plugin-cmd-model": "workspace:*",
+    "@mola/plugin-tool-magpie": "workspace:*",
+    "@mola/plugin-cmd-rtk": "workspace:*",
+    "@mola/plugin-tool-rtk": "workspace:*",
+    "@mola/plugin-tool-git": "workspace:*"
   }
 }

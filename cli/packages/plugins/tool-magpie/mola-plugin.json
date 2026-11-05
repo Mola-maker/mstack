@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "mola-tool-magpie",
+  "version": "0.1.0",
+  "kind": "tool",
+  "displayName": "TODO tool-magpie",
+  "mola": ">=0.1.0 <1.0.0",
+  "engine": {
+    "node": ">=22"
+  },
+  "entry": {
+    "ts": "./dist/index.js"
+  },
+  "provides": [],
+  "requires": [],
+  "capabilities": [],
+  "permissions": {
+    "mola": []
+  },
+  "hooks": {
+    "emit": [],
+    "listen": []
+  }
+}
