@@ -202,7 +202,8 @@ export interface AgentAdapter {
   id: string;
   /** PATH probe + magpie merge (tool-magpie supplies the magpie side in step 2) */
   detect(): Promise<AgentDetection>;
-  // run()/resume()/streamEvents() arrive with agent-dsh/cmd-dispatch in step 2.
+  // The B2 run surface (run/resume/listSessions/usage/bridgeHooks) extends this
+  // interface as HeadlessAgentAdapter — see ./agents.js and ./../AGENTS.md.
 }
 
 export interface ToolProbe {

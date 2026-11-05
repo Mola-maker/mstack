@@ -3,7 +3,7 @@
   "id": "mola-cmd-plugin",
   "version": "0.1.0",
   "kind": "command",
-  "displayName": "mola plugin list|validate",
+  "displayName": "mola plugin list|validate|install|update|remove|enable|disable|doctor",
   "mola": ">=0.1.0 <1.0.0",
   "engine": { "node": ">=22" },
   "entry": { "ts": "./dist/index.js" },
@@ -11,7 +11,9 @@
   "requires": [],
   "capabilities": ["command.plugin"],
   "permissions": {
+    "process.exec": ["pnpm", "cmd"],
     "fs.read": ["**"],
+    "fs.write": ["**"],
     "mola": ["events", "commands", "config.read", "state.kv"]
   },
   "hooks": {

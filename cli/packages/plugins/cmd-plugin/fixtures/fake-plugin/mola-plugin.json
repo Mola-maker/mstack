@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "mola-fake-plugin",
+  "version": "0.1.0",
+  "kind": "command",
+  "displayName": "Fake plugin (install fixture)",
+  "mola": ">=0.1.0 <1.0.0",
+  "engine": { "node": ">=22" },
+  "entry": { "ts": "./index.js" },
+  "provides": ["cmd:fake"],
+  "requires": [],
+  "capabilities": ["command.fake"],
+  "permissions": {
+    "process.exec": [],
+    "fs.read": ["~/.mola/**"],
+    "env.read": ["MOLA_*"],
+    "mola": ["events", "commands", "config.read", "state.kv"]
+  },
+  "hooks": {
+    "emit": [],
+    "listen": []
+  }
+}

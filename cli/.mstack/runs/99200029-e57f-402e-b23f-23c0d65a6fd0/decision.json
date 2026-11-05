@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "runId": "99200029-e57f-402e-b23f-23c0d65a6fd0",
+  "traceId": "99200029-e57f-402e-b23f-23c0d65a6fd0",
+  "source": "mola.session.started",
+  "decidedAt": "2026-11-05T12:38:43.488Z",
+  "agent": "dsh",
+  "machine": "wsl:Ubuntu",
+  "modelRoute": "group/smart-split",
+  "workspaceDir": "/mnt/e/mstack/cli",
+  "command": "dispatch",
+  "argv": [
+    ".tmp-b2-ws/b2-smoke.md"
+  ],
+  "exitCode": 1,
+  "endedAt": "2026-11-05T12:38:43.798Z",
+  "durationMs": 357
+}

@@ -1,5 +1,5 @@
 {
   "extends": "../../../tsconfig.base.json",
   "include": ["src/**/*"],
-  "references": [{ "path": "../../plugin-sdk" }]
+  "references": [{ "path": "../../plugin-sdk" }, { "path": "../../core" }]
 }

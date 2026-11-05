@@ -1,0 +1,2 @@
+{"id":"fcbcef07-9ffb-44a9-aded-a3cd9e785199","ts":"2026-11-05T12:51:31.739Z","kind":"mola.command.started","source":{"runId":"347a761e-6e7a-42ca-b591-27f65efe7499"},"data":{"traceId":"347a761e-6e7a-42ca-b591-27f65efe7499","path":"plugin remove","argv":["nonexistent"]}}
+{"id":"d61a9f17-4909-4a76-a1bd-e4fd42b27bf4","ts":"2026-11-05T12:51:31.777Z","kind":"mola.command.ended","source":{"runId":"347a761e-6e7a-42ca-b591-27f65efe7499"},"data":{"traceId":"347a761e-6e7a-42ca-b591-27f65efe7499","path":"plugin remove","exitCode":66,"durationMs":3,"error":"PLUGIN_NOT_FOUND"}}

@@ -1,3 +1,4 @@
+import { openStateStore } from "@mola/core";
 /**
  * Golden-ish CLI integration tests (core §9): fixture HOME (MOLA_HOME points at
  * a tmp dir), run `node dist/bin.js <cmd> --json`, assert envelope stability,
@@ -46,7 +47,7 @@ test("plugin list --json: envelope with the B1 builtin plugins, exit 0", () => {
   assert.equal(env.command, "plugin list");
   assert.ok(typeof env.traceId === "string" && env.traceId.length > 0);
   const ids = env.data.map((p: any) => p.id).sort();
-  assert.deepEqual([...ids].sort(), ["mola-agent-dsh", "mola-cmd-config", "mola-cmd-dispatch", "mola-cmd-doctor", "mola-cmd-model", "mola-cmd-plugin", "mola-cmd-rtk", "mola-policy-approval", "mola-tool-git", "mola-tool-magpie", "mola-tool-rtk"]);
+  assert.deepEqual([...ids].sort(), ["mola-agent-dsh", "mola-cmd-config", "mola-cmd-dispatch", "mola-cmd-doctor", "mola-cmd-model", "mola-cmd-plugin", "mola-cmd-rtk", "mola-policy-approval", "mola-tool-git", "mola-tool-magpie", "mola-tool-rtk", "mola-agent-claude", "mola-agent-codex", "mola-rec-runs", "mola-cmd-run"].sort());
   for (const p of env.data) {
     assert.equal(p.tier, "builtin");
     assert.equal(p.state, "active");
@@ -144,9 +145,10 @@ test("run history is recorded in the state store keyed by traceId", () => {
   const r = run(["plugin", "list", "--json"], home);
   assert.equal(r.status, 0, r.stderr);
   const traceId = envelope(r).traceId;
-  const state = JSON.parse(fs.readFileSync(path.join(home, "state.json"), "utf8"));
-  const rec = state.runs.find((x: any) => x.traceId === traceId);
-  assert.ok(rec, "state.json records the run");
+  // the store is SQLite (state.db) since B2, JSON fallback otherwise: read it through core
+  const store = openStateStore(home);
+  const rec: any = store.runs(1000).find((x: any) => x.traceId === traceId);
+  assert.ok(rec, "the state store records the run");
   assert.equal(rec.command, "plugin list");
   assert.equal(rec.exitCode, 0);
 });

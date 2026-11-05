@@ -15,7 +15,7 @@ import * as os from "node:os";
 import type { LogLevel } from "@mola/plugin-sdk";
 import { MolaEvents, toMolaError, ExitCode } from "@mola/plugin-sdk";
 import { loadConfig, makeConfigWriter } from "./config.js";
-import { openJsonStateStore } from "./state.js";
+import { openStateStore } from "./state.js";
 import { createFileLogger } from "./logging.js";
 import { CoreEventBus } from "./bus.js";
 import { CommandRouter, IoImpl } from "./router.js";
@@ -90,10 +90,10 @@ export async function boot(opts: BootOptions): Promise<number> {
     return toMolaError(err, ExitCode.DataErr).exitCode;
   }
 
-  // step b — state (fatal → 70)
+  // step b — state (fatal → 70); SQLite (~/.mola/state.db) with JSON fallback
   let state;
   try {
-    state = openJsonStateStore(path.join(homeDir, "state.json"));
+    state = openStateStore(homeDir);
   } catch (err) {
     earlyError(flags, traceId, err);
     return ExitCode.Software;

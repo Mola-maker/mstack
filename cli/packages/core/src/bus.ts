@@ -32,6 +32,17 @@ export interface BusOptions {
 
 type Kind = "broadcast" | "waterfall" | "serial";
 
+/** Delivery semantics of one registered listener (public, for `mola hooks list`). */
+export type ListenerKind = Kind;
+
+/** One entry of the bus listener registry (read-only view, core §3). */
+export interface ListenerInfo {
+  event: string;
+  kind: ListenerKind;
+  /** plugin id that registered the listener ("core" for core-internal) */
+  owner: string;
+}
+
 interface Entry {
   kind: Kind;
   event: string;
@@ -41,11 +52,26 @@ interface Entry {
 
 const BRAKE_LIMIT = 3;
 
+/**
+ * The process-wide bus (one per boot). `mola hooks list` needs the listener
+ * registry as a read-only inventory; PluginContext deliberately exposes no bus
+ * handle, so core publishes the active bus's inventory here (weakly held —
+ * nothing is kept alive just to describe it).
+ */
+let activeBus: WeakRef<CoreEventBus> | undefined;
+
+/** Read-only listener inventory of the active bus (empty before boot). */
+export function describeActiveBus(): ListenerInfo[] {
+  return activeBus?.deref()?.describe() ?? [];
+}
+
 export class CoreEventBus implements EventBus {
   private entries: Entry[] = [];
   private failures = new Map<string, number>();
 
-  constructor(private readonly opts: BusOptions) {}
+  constructor(private readonly opts: BusOptions) {
+    activeBus = new WeakRef(this);
+  }
 
   private add(kind: Kind, event: string, fn: Listener | WaterfallFn, owner: string): Disposer {
     const entry: Entry = { kind, event, owner, fn };
@@ -124,7 +150,7 @@ export class CoreEventBus implements EventBus {
   }
 
   /** Listener inventory — the data behind `mola hooks list` (B2). */
-  describe(): Array<{ event: string; kind: Kind; owner: string }> {
+  describe(): ListenerInfo[] {
     return this.entries.map(({ event, kind, owner }) => ({ event, kind, owner }));
   }
 

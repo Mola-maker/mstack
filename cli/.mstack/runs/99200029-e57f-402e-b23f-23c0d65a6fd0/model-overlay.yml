@@ -1,0 +1,4 @@
+- id: agent-default-model
+  config:
+    provider: magpie
+    model: group/smart-split

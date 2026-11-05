@@ -40,3 +40,16 @@ export function dshProbeScript(): string {
 export function dshExecArgv(script: string, windows = onWindows()): string[] {
   return windows ? ["wsl", "-e", "bash", "-lc", script] : ["bash", "-lc", script];
 }
+
+/** Single-quote a value for safe interpolation into a bash -lc script. */
+export function shellQuote(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+/** E:\mstack → /mnt/e/mstack; null when the path is not a drive-letter path. */
+export function winToWslPath(p: string): string | null {
+  const m = /^([A-Za-z]):[\\/](.*)$/.exec(p);
+  if (!m) return null;
+  const rest = m[2].replace(/\\/g, "/").replace(/\/+$/, "");
+  return `/mnt/${m[1].toLowerCase()}${rest ? `/${rest}` : ""}`;
+}

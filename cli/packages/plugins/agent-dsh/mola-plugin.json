@@ -17,14 +17,23 @@
     "headless",
     "headless-json-stream",
     "resume",
-    "native-hooks"
+    "native-hooks",
+    "acp"
   ],
   "permissions": {
     "process.exec": ["bash", "wsl", "dsh"],
-    "mola": ["doctor", "agents.register"]
+    "fs.write": ["**/.mstack/runs/**"],
+    "mola": ["doctor", "agents.register", "events"]
   },
   "hooks": {
-    "emit": [],
+    "emit": [
+      "mola.session.started",
+      "mola.agent.message",
+      "mola.turn.completed",
+      "mola.task.done",
+      "mola.error.raised",
+      "mola.session.ended"
+    ],
     "listen": []
   }
 }

@@ -3,7 +3,7 @@
   "id": "mola-agent-codex",
   "version": "0.1.0",
   "kind": "agent",
-  "displayName": "agent-codex",
+  "displayName": "agent-codex — Codex CLI headless adapter (exec, probe-gated --json/resume)",
   "mola": ">=0.1.0 <1.0.0",
   "engine": {
     "node": ">=22"
@@ -11,14 +11,25 @@
   "entry": {
     "ts": "./dist/index.js"
   },
-  "provides": [],
+  "provides": ["agent:codex"],
   "requires": [],
-  "capabilities": [],
+  "capabilities": [
+    "headless",
+    "list-sessions"
+  ],
   "permissions": {
-    "mola": []
+    "process.exec": ["codex", "cmd", "magpie"],
+    "mola": ["agents.register", "events"]
   },
   "hooks": {
-    "emit": [],
+    "emit": [
+      "mola.session.started",
+      "mola.agent.message",
+      "mola.turn.completed",
+      "mola.task.done",
+      "mola.error.raised",
+      "mola.session.ended"
+    ],
     "listen": []
   }
 }

@@ -1,7 +1,7 @@
 {
   "name": "@mola/plugin-rec-runs",
   "version": "0.1.0",
-  "description": "mola builtin plugin: rec-runs (B2)",
+  "description": "mola builtin plugin: run recording + runs/hooks commands (B2)",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -24,6 +24,7 @@
     "test": "node --test \"dist/test/**/*.test.js\""
   },
   "dependencies": {
+    "@mola/core": "workspace:*",
     "@mola/plugin-sdk": "workspace:*"
   }
 }

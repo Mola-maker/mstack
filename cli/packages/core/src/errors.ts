@@ -19,6 +19,9 @@ export const ERROR_EXIT: Readonly<Record<MolaErrorCode, ExitCode>> = {
   COMMAND_CONFLICT: ExitCode.DataErr,
   NO_INPUT: ExitCode.NoInput,
   AGENT_NOT_FOUND: ExitCode.NoInput,
+  // capability missing on the agent (sdk UnsupportedCapability) — the upstream
+  // cannot take the work, so exit 69 like the sdk class
+  UNSUPPORTED_CAPABILITY: ExitCode.Unavailable,
   PLUGIN_NOT_FOUND: ExitCode.NoInput,
   UPSTREAM_UNAVAILABLE: ExitCode.Unavailable,
   INTERNAL_ERROR: ExitCode.Software,

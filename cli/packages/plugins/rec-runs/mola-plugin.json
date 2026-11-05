@@ -3,7 +3,7 @@
   "id": "mola-rec-runs",
   "version": "0.1.0",
   "kind": "command",
-  "displayName": "rec-runs",
+  "displayName": "run recorder: .mstack/runs artifacts + mola runs|hooks commands",
   "mola": ">=0.1.0 <1.0.0",
   "engine": {
     "node": ">=22"
@@ -11,14 +11,31 @@
   "entry": {
     "ts": "./dist/index.js"
   },
-  "provides": [],
+  "provides": ["cmd:runs", "cmd:hooks"],
   "requires": [],
-  "capabilities": [],
+  "capabilities": ["runs.record", "runs.query", "hooks.list"],
   "permissions": {
-    "mola": []
+    "fs.read": ["**/.mstack/runs/**"],
+    "fs.write": ["**/.mstack/runs/**"],
+    "mola": ["events", "commands", "state.kv"]
   },
   "hooks": {
     "emit": [],
-    "listen": []
+    "listen": [
+      "mola.command.started",
+      "mola.command.ended",
+      "mola.session.started",
+      "mola.agent.message",
+      "mola.turn.completed",
+      "mola.agent.idle",
+      "mola.tool.after",
+      "mola.permission.requested",
+      "mola.approval.granted",
+      "mola.approval.denied",
+      "mola.cost.reported",
+      "mola.error.raised",
+      "mola.task.done",
+      "mola.session.ended"
+    ]
   }
 }

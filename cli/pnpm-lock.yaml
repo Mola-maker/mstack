@@ -121,6 +121,9 @@ importers:
 
   packages/plugins/cmd-plugin:
     dependencies:
+      '@mola/core':
+        specifier: workspace:*
+        version: link:../../core
       '@mola/plugin-sdk':
         specifier: workspace:*
         version: link:../../plugin-sdk
@@ -145,6 +148,9 @@ importers:
 
   packages/plugins/rec-runs:
     dependencies:
+      '@mola/core':
+        specifier: workspace:*
+        version: link:../../core
       '@mola/plugin-sdk':
         specifier: workspace:*
         version: link:../../plugin-sdk

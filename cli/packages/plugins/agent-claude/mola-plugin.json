@@ -3,7 +3,7 @@
   "id": "mola-agent-claude",
   "version": "0.1.0",
   "kind": "agent",
-  "displayName": "agent-claude",
+  "displayName": "agent-claude — Claude Code headless adapter (-p, stream-json, per-run --settings hooks)",
   "mola": ">=0.1.0 <1.0.0",
   "engine": {
     "node": ">=22"
@@ -11,14 +11,33 @@
   "entry": {
     "ts": "./dist/index.js"
   },
-  "provides": [],
+  "provides": ["agent:claude"],
   "requires": [],
-  "capabilities": [],
+  "capabilities": [
+    "headless",
+    "headless-json-stream",
+    "resume",
+    "continue-latest",
+    "fork-session",
+    "native-hooks",
+    "background-sessions",
+    "worktree",
+    "budget-cap"
+  ],
   "permissions": {
-    "mola": []
+    "process.exec": ["claude", "cmd", "magpie"],
+    "fs.write": ["**/.mstack/runs/**"],
+    "mola": ["agents.register", "events"]
   },
   "hooks": {
-    "emit": [],
+    "emit": [
+      "mola.session.started",
+      "mola.agent.message",
+      "mola.turn.completed",
+      "mola.task.done",
+      "mola.error.raised",
+      "mola.session.ended"
+    ],
     "listen": []
   }
 }
