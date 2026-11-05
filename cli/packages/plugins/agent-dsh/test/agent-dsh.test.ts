@@ -10,6 +10,11 @@ import { dshExecArgv, dshMachine, dshProbeScript } from "../src/platform.js";
 import plugin from "../src/index.js";
 import { makeFakeCtx, errOf } from "./fake.js";
 
+// Cases that read /proc/version: they only hold inside WSL (not on a plain Linux CI runner, not on Windows).
+import { readFileSync as __readProc } from "node:fs";
+const insideWsl = (() => { try { return /microsoft/i.test(__readProc("/proc/version", "utf8")); } catch { return false; } })();
+const wslTest = insideWsl ? test : test.skip;
+
 // POSIX paths and WSL detection: these run on Linux (WSL, CI); skipped on a Windows host.
 const linuxTest = process.platform === "win32" ? test.skip : test;
 
@@ -79,7 +84,7 @@ linuxTest("activate: registers the dsh adapter and the agent.dsh doctor check", 
   assert.deepEqual(f.commands, []); // discovery (`mola agents list`) lives in tool-magpie
 });
 
-linuxTest("adapter.detect: available, managedByMagpie, machine wsl:Ubuntu", async () => {
+wslTest("adapter.detect: available, managedByMagpie, machine wsl:Ubuntu", async () => {
   const f = makeFakeCtx({ exec: async () => ({ code: 0, stdout: "0.2.1-rc.5\n", stderr: "" }) });
   plugin.activate(f.ctx);
   const d = await f.agents[0].detect();
@@ -89,7 +94,7 @@ linuxTest("adapter.detect: available, managedByMagpie, machine wsl:Ubuntu", asyn
   assert.equal(d.profile, "mola-cli");
 });
 
-linuxTest("doctor check agent.dsh: ok names machine wsl:Ubuntu; failure maps to exit 69", async () => {
+wslTest("doctor check agent.dsh: ok names machine wsl:Ubuntu; failure maps to exit 69", async () => {
   const ok = makeFakeCtx({ exec: async () => ({ code: 0, stdout: "0.2.1-rc.5\n", stderr: "" }) });
   plugin.activate(ok.ctx);
   const good = await ok.checks.find((c) => c.id === "agent.dsh")!.run();

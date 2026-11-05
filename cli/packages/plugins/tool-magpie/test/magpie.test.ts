@@ -4,6 +4,11 @@ import { createMagpieRunner, magpieCandidates, stripLogNoise } from "@mola/plugi
 import type { ExecService } from "@mola/plugin-sdk";
 import { MAGPIE_STDERR_NOISE } from "./fixtures.js";
 
+// Cases that read /proc/version: they only hold inside WSL (not on a plain Linux CI runner, not on Windows).
+import { readFileSync as __readProc } from "node:fs";
+const insideWsl = (() => { try { return /microsoft/i.test(__readProc("/proc/version", "utf8")); } catch { return false; } })();
+const wslTest = insideWsl ? test : test.skip;
+
 // Fake CLIs are POSIX shell scripts: these run on Linux (WSL, CI); skipped on a Windows host.
 const linuxTest = process.platform === "win32" ? test.skip : test;
 
@@ -50,7 +55,7 @@ test("the runner turns exec failures into an unavailable result, not a throw", a
   assert.match(res.unavailable!, /ENOENT/);
 });
 
-linuxTest("magpieCandidates prefers PATH names and adds the Windows install path", () => {
+wslTest("magpieCandidates prefers PATH names and adds the Windows install path", () => {
   const candidates = magpieCandidates();
   const expected = process.platform === "win32" ? ["magpie.exe", "magpie"] : ["magpie", "magpie.exe"];
   assert.deepEqual(candidates.slice(0, 2), expected);
