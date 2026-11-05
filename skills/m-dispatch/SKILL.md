@@ -1,6 +1,6 @@
 ---
 name: m-dispatch
-description: "Split an independent, parallelizable task into self-contained subtasks and run them concurrently across Claude subagents, DSH headless, or Codex — each in its own workspace — then merge and verify. Use when \"分派给 subagents / 并行开 N 个 agents / 委派\"."
+description: "Fan independent subtasks out to Claude subagents, DSH headless, Codex or Orca; isolate, merge, verify. Use for 分派/并行/开N个agents."
 whenToUse: "The task decomposes into 2+ parts with no shared files or sequential dependency, or the user asks to fan work out to parallel agents."
 ---
 

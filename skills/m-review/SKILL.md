@@ -1,6 +1,6 @@
 ---
 name: m-review
-description: "Review finished or in-progress work for real defects, not style noise, by running independent multi-angle passes; never the author's own context. Use when asked to \"review一下/审一下/看看这个PR/代码review\" or before merging anything."
+description: "Multi-angle defect review by someone other than the author; verify feedback before applying. Use for review一下/审一下/看看这个PR."
 whenToUse: "A change or branch needs a correctness/security/quality audit before merge, or the user asks for code review."
 ---
 

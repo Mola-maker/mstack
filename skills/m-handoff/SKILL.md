@@ -1,6 +1,6 @@
 ---
 name: m-handoff
-description: "Save your current working context to `.mstack/handoff.md` so any future session (same or different model) can resume without re-deriving state, and restore it on reload — always write before compact, model switch, or session end. Use when \"存档 / 保存进度 / 接着上次 / 换模型 / compact\"."
+description: "Save or restore working state in .mstack/handoff.md before compact, model switch or session end. Use for 存档/交接/接着上次/compact."
 whenToUse: "Before compaction, switching models, or ending a session; or when asked to resume / \"where was I\" / \"pick up where I left off\"."
 ---
 

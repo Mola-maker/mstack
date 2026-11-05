@@ -1,6 +1,6 @@
 ---
 name: m-think
-description: "Think it through before building — attack the premise, ask the fewest questions (max 3 at a time with recommended defaults), then write a design spec. Use when the request is new, vague, or \"先想想/帮我梳理/这个想法\"."
+description: "Before building: attack the premise, ask ≤3 questions with defaults, write a design spec. Use for new or vague requests, 先想想/梳理一下."
 whenToUse: "Before any creative or new work, whenever a request is vague or exploratory, or when the user says \"先想想\", \"brainstorm一下\", \"这个想法怎么样\"."
 ---
 

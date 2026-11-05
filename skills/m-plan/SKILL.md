@@ -1,6 +1,6 @@
 ---
 name: m-plan
-description: "Turn an approved design into an ordered plan of verifiable steps, then have an independent critic review it before execution. Use when ready to plan before coding, or on \"拆解/定计划/先规划\"."
+description: "Turn a design into ordered, verifiable steps with an independent critic pass. Use before coding, 拆任务/做计划/先规划."
 whenToUse: "When a design spec exists (from m-think) or a detailed request is ready, and you need a step-by-step, independently-checked implementation plan."
 ---
 

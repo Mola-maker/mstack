@@ -1,6 +1,6 @@
 ---
 name: m-verify
-description: "Produce fresh evidence that a change actually works before claiming it is done, green, or fixed — run the real test/build/repro, read the actual output, and test behavior not implementation. Use when \"验证一下 / 跑测试 / 真的能跑吗 / 确认修好了\"."
+description: "No 'done' without fresh evidence: run the real test/build, read the output, test behavior. Use before any success claim, 验证一下/跑通没."
 whenToUse: "Before any success claim, commit, PR, or \"done\" — or whenever confidence that a feature or fix works is required."
 ---
 

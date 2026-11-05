@@ -1,6 +1,6 @@
 ---
 name: m-debug
-description: "Find the root cause of a bug, test failure, or unexpected behavior before fixing it, using reproduction, competing hypotheses, and a regression test. Use when \"debug 一下 / 为什么报错 / 这个测试挂了 / 修这个 bug / 帮我查根因\"."
+description: "Root-cause a bug or failing test: reproduce, competing hypotheses, regression test. Use for debug一下/为什么报错/这个测试挂了."
 whenToUse: "A test fails, code errors, output is wrong, or a build is broken — before any edit that claims to fix it."
 ---
 

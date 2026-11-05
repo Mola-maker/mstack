@@ -1,6 +1,6 @@
 ---
 name: m-research
-description: "Multi-round, multi-channel research that cross-checks at least 3 independent channels before treating anything as fact, with every key claim cited to a source URL. Use when \"调研 / 深度调研 / 查清楚 / 搜一下 / 选型对比\", or the answer depends on information newer than training data."
+description: "Multi-channel research: ≥3 independent channels, cross-checked, every claim cited. Use for 调研/深度调研/查一下/选型对比."
 whenToUse: "The next step depends on something unknown, recent, or contested — technology selection, open-source landscape, fact verification — and needs sourced evidence, not recollection."
 ---
 
