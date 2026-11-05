@@ -10,14 +10,14 @@ mstack is the front door: before doing any work, inspect `.mstack/` state and th
 
 ## When to use / not use
 
-Use at the top of every conversation, including when the user just says "继续" or pastes a log. Use it to route to one of: `m-think`, `m-plan`, `m-goal`, `m-dispatch`, `m-verify`, `m-debug`, `m-review`, `m-ship`, `m-qa`, `m-research`, `m-handoff`, `m-learn`, `m-deslop`, `m-guard`. Do not use it when a sibling skill is already running with clear in-progress state — hand back to that skill instead.
+Use at the top of every conversation, including when the user just says "继续" or pastes a log. Use it to route to one of: `m-think`, `m-plan`, `m-goal`, `m-team`, `m-dispatch`, `m-verify`, `m-debug`, `m-review`, `m-ship`, `m-qa`, `m-research`, `m-handoff`, `m-learn`, `m-deslop`, `m-guard`. Do not use it when a sibling skill is already running with clear in-progress state — hand back to that skill instead.
 
 ## Procedure
 
 1. Read `.mstack/handoff.md` first (if present) and any `.mstack/goals/<slug>.md` or `.mstack/plans/<slug>.md` that names the current task.
 2. Classify the request against the 10 core principles (below) and the skill one-liners. Report which skill you picked and why, in one line, then load that skill's SKILL.md and follow it.
 3. If `.mstack/` shows work in progress, resume it: trust the state files over your memory; do not redo steps already marked done.
-4. If no single skill obviously applies, prefer `m-think` for anything new or ambiguous; prefer `m-debug` for a broken behavior; route "提PR/提交/发布" to `m-ship`, "review一下/审一下" to `m-review`, "分派/并行" to `m-dispatch`.
+4. If no single skill obviously applies, prefer `m-think` for anything new or ambiguous; prefer `m-debug` for a broken behavior; route "提PR/提交/发布" to `m-ship`, "review一下/审一下" to `m-review`, "分派/并行" to `m-dispatch`, "组队/team/一直优化/卡在局部最优" to `m-team`.
 5. Follow the reporting format (one-line conclusion → what changed with file:line → how it was verified → what you did not do / risks) in Chinese, matching the user's language.
 
 ### The 10 core principles (other skills cite these by number)

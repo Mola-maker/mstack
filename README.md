@@ -1,10 +1,10 @@
 # mstack
 
-mstack 是 Mola-maker 的个人 agent 工作流技能栈：把 superpowers、gstack、pstack、oh-my-claudecode（OMC）四套 skill 去重、合并、按个人使用习惯重写成 **15 个互不重叠的 skill**。同一份 `skills/` 目录同时供 Claude Code（plugin）、DSH（`~/.dsh/skills`）和 Codex 使用。
+mstack 是 Mola-maker 的个人 agent 工作流技能栈：把 superpowers、gstack、pstack、oh-my-claudecode（OMC）四套 skill 去重、合并、按个人使用习惯重写成 **16 个互不重叠的 skill**。同一份 `skills/` 目录同时供 Claude Code（plugin）、DSH（`~/.dsh/skills`）和 Codex 使用。
 
 设计约束（详见 [FRAMEWORK.md](FRAMEWORK.md)）：短 prompt 也能接得上（`mstack` 总入口读 `.mstack/` 状态续干）、每个 SKILL.md ≤150 行、长跑任务必须写 closeout、同一个错误连错 3 次就停。
 
-## 15 个 skill 一览
+## 16 个 skill 一览
 
 | skill | 说明（来自 frontmatter） |
 |---|---|
@@ -23,19 +23,27 @@ mstack 是 Mola-maker 的个人 agent 工作流技能栈：把 superpowers、gst
 | `m-learn` | 复盘沉淀：post-mortem 进 lessons，可复用流程进候选 SKILL.md，事实进 memory |
 | `m-deslop` | 删 AI 味：多余代码、注释、抽象、废话，先保行为再做减法 |
 | `m-guard` | 安全护栏 + 插件冲突体检 + 死循环刹车 + Mola 的已知陷阱清单 |
+| `m-team` | 会进化的 agent team：开放式大预算任务交给按轮次重组的团队，supervisor 每轮诊断卡点、重设角色与知识流向 |
 
 ## 安装
 
 ### Claude Code
 
-方式一（本地 plugin marketplace）：
+方式一（GitHub marketplace）：
+
+```sh
+claude plugin marketplace add Mola-maker/mstack
+claude plugin install mstack@mstack
+```
+
+方式二（本地 plugin marketplace）：
 
 ```sh
 claude plugin marketplace add /path/to/mstack
 claude plugin install mstack@mstack
 ```
 
-方式二（直接软链 skills 到个人目录）：
+方式三（直接软链 skills 到个人目录）：
 
 ```sh
 for d in /path/to/mstack/skills/*/; do
@@ -70,7 +78,7 @@ cp -r /path/to/mstack/skills/* ~/.codex/skills/
 
 ```
 .claude-plugin/plugin.json   Claude Code plugin 清单
-skills/<name>/SKILL.md       15 个 skill（≤150 行，细节放 references/）
+skills/<name>/SKILL.md       16 个 skill（≤150 行，细节放 references/）
 docs/source-map.md           每个来源 skill → 归入哪个 m-skill
 docs/migration.md            停用重叠插件的建议
 NOTICE.md                    上游项目致谢与许可证

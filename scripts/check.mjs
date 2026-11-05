@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const root = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
-const expected = ["mstack", "m-think", "m-plan", "m-goal", "m-dispatch", "m-verify", "m-debug", "m-handoff",
+const expected = ["mstack", "m-team", "m-think", "m-plan", "m-goal", "m-dispatch", "m-verify", "m-debug", "m-handoff",
   "m-review", "m-ship", "m-qa", "m-research", "m-learn", "m-deslop", "m-guard"];
 const sections = ["## When to use", "## Procedure", "## Output", "## Stop conditions", "## Harness notes"];
 const errors = [];
@@ -46,8 +46,8 @@ for (const f of ["README.md", "docs/source-map.md", "docs/migration.md", "NOTICE
 const mapPath = join(root, "docs", "source-map.md");
 if (existsSync(mapPath) && existsSync(join(root, ".sources"))) {
   const map = readFileSync(mapPath, "utf8");
-  for (const stack of readdirSync(join(root, ".sources")))
-    for (const f of readdirSync(join(root, ".sources", stack))) {
+  for (const stack of readdirSync(join(root, ".sources")).filter((s) => !s.startsWith(".")))
+    for (const f of readdirSync(join(root, ".sources", stack)).filter((x) => !x.startsWith("."))) {
       const base = f.replace(/\.md$/, "");
       if (!map.includes(`${stack}/${base}`) && !new RegExp(`\\b${base}\\b`).test(map)) err(`source-map: ${stack}/${base} not covered`);
     }

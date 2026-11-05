@@ -1,7 +1,7 @@
 {
   "name": "mstack",
-  "version": "0.1.0",
-  "description": "Mola-maker's personal agent workflow stack: 15 skills distilled from superpowers, gstack, pstack and oh-my-claudecode.",
+  "version": "0.2.0",
+  "description": "Mola-maker's personal agent workflow stack: 16 skills distilled from superpowers, gstack, pstack and oh-my-claudecode.",
   "author": { "name": "Mola-maker" },
   "license": "MIT"
 }

@@ -10,7 +10,7 @@ m-goal drives a long-running objective to completion across checkpoints and sess
 
 ## When to use / not use
 
-Use for "keep going until done", multi-phase or multi-session work, or anything the user walks away from ("going to bed", "trust it when I'm back"). Do not use for a single focused fix, a bounded plan (use `m-plan` then `m-dispatch`), or pure planning with no execution loop. If work is reversible, proceed and report rather than asking.
+Use for "keep going until done", multi-phase or multi-session work, or anything the user walks away from ("going to bed", "trust it when I'm back"). Do not use for a single focused fix, a bounded plan (use `m-plan` then `m-dispatch`), or pure planning with no execution loop. If the goal is an open-ended optimization target — a metric like performance, score, or pass rate that should keep climbing — hand the loop to `m-team`, which re-forms an agent team round by round; m-goal still owns the goal file and writes the closeout when `m-team` returns. If work is reversible, proceed and report rather than asking.
 
 ## Procedure
 

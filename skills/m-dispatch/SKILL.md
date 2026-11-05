@@ -23,7 +23,7 @@ Do NOT use when:
 2. **Isolate.** Give every code-changing subtask its own workspace so they cannot interfere:
    - LayerFS bundle available → fork a Branch per agent (`layerfs`), merge on completion.
    - Else → `git worktree add ../<repo>-<task> -b agent/<task>` and have the subagent work only there.
-3. **Dispatch in one step.** Start every subtask together, without waiting between them. Pick the harness and model per subtask (see `references/harness-commands.md`). Name the return contract in each prompt: changed files + how each was verified, or a findings list.
+3. **Dispatch in one step.** Start every subtask together, without waiting between them. Pick the executor per subtask from the table in Harness notes, and route every DSH model through magpie (`group/smart-split`); see `references/harness-commands.md` for exact invocations. Name the return contract in each prompt: changed files + how each was verified, or a findings list.
 4. **Merge.** As results land, check each one. When two subtasks disagree on the same thing, you decide — do not just take whichever finished last.
 5. **Verify separately.** After merging, dispatch one fresh subagent (or `subagent_claude_code`) whose only job is review plus running the real tests. It must not be the same agent that wrote the code. Then report.
 
@@ -41,7 +41,17 @@ Do NOT use when:
 
 ## Harness notes
 
+Executor selection:
+
+| Need | Executor |
+|---|---|
+| Parallel subtasks inside this session | Claude Code `Agent`; DSH `subagent` / `subagent_fork` |
+| One-shot second opinion from another model | `subagent_claude_code` / `subagent_codex`; `codex exec` |
+| Headless batch on WSL | `dsh --profile mola-cli` |
+| Another vendor's agent (e.g. dispatching Codex from Claude), watching progress from a phone, or each worker in its own worktree left for the human to continue in | Orca — only when `orca` is on PATH |
+
 - Claude Code: `Agent` / `Task` tool; use `run_in_background: true`; one dispatch message = parallel, sequential messages = sequential. Spawn responses carry an `agent_id` for follow-ups.
 - DSH: `subagent` (supports `send_message` follow-up) or `subagent_fork` (inherits this session); `subagent_claude_code` / `subagent_codex` for one-shot second opinions; `workflow` for a fixed shape over N items. See `references/harness-commands.md`.
 - Codex CLI: `codex exec "<task>"`.
-- Model choice: light reading/copyscribing → cheap model; architecture/review → stronger model; always set the model explicitly (an omitted model silently inherits the most expensive default).
+- Orca: optional backend — desktop + CLI orchestrator where each worker gets its own worktree. Use it only when `orca` is on PATH; commands in `references/harness-commands.md`.
+- Model choice: light reading/copyscribing → cheap model; architecture/review → stronger model; always set the model explicitly (an omitted model silently inherits the most expensive default). For DSH always route through magpie (`group/smart-split`); never a direct `deepseek/*` route.

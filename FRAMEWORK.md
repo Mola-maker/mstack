@@ -111,7 +111,7 @@ whenToUse: <英文一句话，DSH 用这个字段决定何时加载>
   wsl -e bash -lc 'source ~/src/mola-dsh-stack/scripts/env.sh; cd <wsl路径>; \
     dsh --profile mola-cli --patch <model-overlay.yml> "<task>" > <log> 2>&1'
   ```
-  model overlay：`- id: agent-default-model / config: {provider: magpie, model: deepseek/deepseek-v4-pro}`；轻活用 `deepseek/deepseek-v4-flash`。Windows 路径 `E:\x` 在 WSL 里是 `/mnt/e/x`。`--json` 输出事件流。
+  model overlay：`- id: agent-default-model / config: {provider: magpie, model: group/smart-split}`。**一律走 magpie 路由**（`group/*` 或 `auto/*`），不要用 `deepseek/*`（直连 DeepSeek，余额会耗尽，402 时所有 worker 同时死）。`group/smart-split` 不接受 reasoningEffort。Windows 路径 `E:\x` 在 WSL 里是 `/mnt/e/x`。`--json` 输出事件流。
 - DSH 交互会话内：`subagent` / `subagent_fork` / `subagent_claude_code` / `subagent_codex` / `workflow`。
 - Codex：`codex exec "<task>"`。
 - 隔离：改代码的子任务各自一个 `git worktree`（`agent/<task>` 分支）或 LayerFS branch；两个子任务不许改同一个文件。
@@ -128,8 +128,51 @@ NOTICE.md                       致谢四个上游项目及其许可证（superp
 
 ## 8. 验收标准（构建完成的定义）
 
-- 15 个 `skills/*/SKILL.md` 都在，frontmatter 三字段齐全，`name` 与目录名一致，每个 ≤150 行。
+- 16 个 `skills/*/SKILL.md` 都在（含 §9 的 `m-team`），frontmatter 三字段齐全，`name` 与目录名一致，每个 ≤150 行。
 - 每个 SKILL.md 含 §3 规定的 6 节。
 - 不出现 `superpowers:`、`oh-my-claudecode:`、`omc:` 形式的 skill 引用。
 - `docs/source-map.md` 覆盖 `.sources/` 下每一个文件。
 - 没有从来源复制超过 2 行的原文。
+
+## 9. 增补：会进化的 agent team（`m-team`）+ Orca 后端（2026-11-04）
+
+依据：`.sources/papers/evolving-agent-teams.md`（arXiv 2610.36848，Evolving Agent Teams）和 `.sources/orca/*`（stablyai/orca 的 orchestration / orca-cli 指南）。
+
+### 9.1 新 skill `m-team`（第 16 个）
+
+一句话：开放式、长预算的任务交给一个**会按轮次重组**的 agent team。supervisor 每轮结束读结果、诊断卡点、重新设计角色 / 协作方式 / 知识流向，再开下一轮。
+
+与已有 skill 的边界（不许重叠）：
+- `m-dispatch` = 一轮内的执行机制（拆、隔离、发、合并、验）。`m-team` 每轮都调用它，不重复写分派细节。
+- `m-goal` = 目标文件、检查点、closeout。开放式优化目标（性能、得分、通过率要一直往上推）由 `m-goal` 转交 `m-team`，closeout 仍由 `m-goal` 写。
+- 小预算或目标明确的任务：单 agent 或一轮 `m-dispatch` 就够（论文：预算小时 team 与 solo 几乎打平，预算大了 team 才拉开）。`m-team` 的 When-not-use 要写清这一点。
+
+必须包含：
+1. **Team 配置 = (角色, 协作方式, 知识放哪)**，每一轮写成 `.mstack/team/<slug>/v<N>.md`：本轮角色（每个角色有职责、能改什么、禁止改什么、交付什么证据）、协作形状（solo / 流水线 / 并行分支）、每个角色写到哪个文件或分支、本轮预算、本轮的门槛。
+2. **持久知识 K**（所有轮次共享）：`.mstack/team/<slug>/LEARNINGS.md`（追加式实测观察，每条带证据）、`SYNTHESIS.md`（Knowledge Integrator 整理的可执行结论，**每个新角色开工前必读**）、`history.md`（supervisor 每轮的反思与设计决定）。新一轮继承全部失败尝试和成功策略。
+3. **Supervisor 反思清单**：先看指标与门槛，再逐条查失败模式：滑向容易的路、前几轮的关键结论丢了、卡在调试、对着过期的 profile 微调、平台期。归类为知识缺口 / 搜索穷尽 / 纪律问题，然后对应重组。
+4. **角色是按需发明的**，references 里给一个起步角色目录（不是固定清单）：Focused Debugger（隔离分支、不许碰主产物）、Disciplinarian（守住选定架构、一次一个改动、先测量后改）、Knowledge Integrator、Challenger（挑战"已到上限"的说法）、Auditor、Profile-Driven Optimizer、Dead-End Revisitor（重开被放弃的难方向）、Research（查资料）、Architect。每个配"什么症状 → 加这个角色"。
+5. **用文件和产物协作，不用散文消息**：角色之间传递的是文件、diff、测量数据、失败用例，交叉核对要逐字节对产物，不要"我们达成一致"式的总结消息（论文里固定团队就败在这）。
+6. **硬门槛**：任何一个门槛失败，这个候选就记 0 分；保留一组 held-out 检查（只检查不计分）。发现评估本身漏掉一类 bug 时，加一条新检查，以后每个候选都必须通过（评估加固），并记进 LEARNINGS。
+7. **触发与停止**：一轮结束，或按固定间隔触发 supervisor（Claude Code：`ScheduleWakeup` / `CronCreate`；DSH：loop 插件 / `max_goal_rounds`）。停止条件：预算（token/$/墙钟）、轮次上限、连续 2 轮指标无提升且 supervisor 给不出新诊断 → 交回 `m-goal` 写 closeout。
+8. **执行后端**沿用 `m-dispatch`，另加 Orca（§9.2）。
+
+文件：`skills/m-team/SKILL.md` ≤150 行；`references/supervisor-checklist.md`、`references/role-catalog.md`、`references/team-config-template.md`（v<N>.md 的模板）。
+
+### 9.2 Orca 后端（stablyai/orca，可选）
+
+Orca 是桌面端 + CLI 的多 agent 编排器：每个 worker（Claude Code / Codex / OpenCode / Pi）各自一个 worktree，手机端可盯。**当前没装**，所以写成"`orca` 在 PATH 上才用"。用法（只写 `.sources/orca/` 里有的命令，别编）：
+- 开 worker：`orca orchestration worker-start --spec "<自包含任务>" --worktree current|new-top-level --agent codex|claude`，开完所有 worker 就**结束本轮**，Orca 会唤醒你；不要轮询、不要写 watch 脚本。
+- 跟 worker 说话：`orca orchestration send --to dispatch:<id> --subject … --body …`；回答 worker 提问：`orca orchestration reply --id <message_id> --body …`。
+- `worker_done` 结算任务；`escalation` + `stopReason` 表示 worker 没交付就停了。
+- 交出去不需要回报的活：`orca worktree create --name … --agent … --prompt … --json`。
+放进 `m-dispatch/references/harness-commands.md` 的一个新小节，并在 `m-dispatch` 的执行器选择表里加一行：需要别家 agent（如从 Claude 派 Codex）、要手机盯、要每个 worker 独立 worktree 且留给人继续用 → Orca。
+
+### 9.3 要改的已有文件
+
+- `skills/mstack/SKILL.md`：路由表加 `m-team`（"组队/team/一直优化/卡在局部最优"）。
+- `skills/m-dispatch/SKILL.md` + `references/harness-commands.md`：Orca 行与小节；模型一律 magpie 路由（`group/smart-split`），删掉 `deepseek/*` 的写法。
+- `skills/m-goal/SKILL.md`：开放式优化目标转交 `m-team` 的一句话。
+- `README.md`：15 → 16，表里加 `m-team`；安装方式补 GitHub marketplace：`claude plugin marketplace add Mola-maker/mstack`。
+- `docs/source-map.md`：加 `papers/evolving-agent-teams` 和 `orca/*` 五个文件的行。
+- 不改 `scripts/check.mjs`、`FRAMEWORK.md`、`.claude-plugin/*`（这些由主会话维护）。

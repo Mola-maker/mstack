@@ -1,6 +1,6 @@
 # Source map — .sources/ 每个文件的去向
 
-每个来源文件归入哪个 m-skill，依据 FRAMEWORK.md §2。`.sources/` 下全部 91 个文件均被采纳；FRAMEWORK.md §2 明确不收的来源（gstack 的 iOS 系列、design-shotgun、setup-gbrain、ubicloud、supabase；pstack 的 ketchup、bro、arena、statechart、typescript-best-practices、formal-verification 系列）本就不在 `.sources/` 中，故无 "not adopted" 行。
+每个来源文件归入哪个 m-skill，依据 FRAMEWORK.md §2 和 §9。`.sources/` 下 97 个来源文件全部被覆盖、全部采纳；FRAMEWORK.md §2 明确不收的来源（gstack 的 iOS 系列、design-shotgun、setup-gbrain、ubicloud、supabase；pstack 的 ketchup、bro、arena、statechart、typescript-best-practices、formal-verification 系列）本就不在 `.sources/` 中。
 
 | 来源文件 | 归入 | 备注 |
 |---|---|---|
@@ -50,6 +50,12 @@
 | omc/trace | m-debug | 调用链追踪 |
 | omc/ultragoal | m-goal | 长跑目标主流程 |
 | omc/verify | m-verify | 完成前验证 |
+| orca/coordinator-loop | m-dispatch | Orca 任务 DAG、多 Run 与唤醒节奏 |
+| orca/low-level-topology | m-dispatch | Orca 终端层拓扑（terminal create / dispatch --inject） |
+| orca/messaging-and-gates | m-dispatch | Orca 组消息与 check 批次纪律 |
+| orca/orchestration | m-dispatch + m-team | Orca 后端主流程：worker-start / send / reply / worker_done |
+| orca/orca-cli | m-dispatch | Orca worktree create 交出不需回报的活 |
+| papers/evolving-agent-teams | m-team | 会进化 team 的论文依据：supervisor 反思清单、按需发明角色、持久知识 K、产物协作 |
 | pstack/architect | m-plan | 架构拆解 |
 | pstack/babysit | m-ship | 盯 PR |
 | pstack/blast-radius | m-review | 影响面评估 |
