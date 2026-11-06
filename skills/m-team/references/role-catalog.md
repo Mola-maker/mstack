@@ -76,6 +76,6 @@ Roles are invented per round to fit the current bottleneck — this catalog is a
 
 ## Composing a round
 
-- One role can be the whole team (coordination shape: solo) when the diagnosis points at a single bottleneck.
+- One role can be the whole team (coordination shape: solo) when the diagnosis points at a single bottleneck. That solo-shaped round is already the baseline: do not add a second solo agent. A pipeline or parallel round still runs one extra solo agent at the team's shared budget; that agent is not a catalog role.
 - Pipeline (Research → Architect → Profile-Driven Optimizer) when knowledge must precede structure which must precede tuning.
 - Parallel branches (Focused Debugger isolated + main-line work continuing) when a bug blocks progress but the metric work shouldn't stop.

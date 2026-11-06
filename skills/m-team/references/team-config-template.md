@@ -9,7 +9,9 @@ Copy this file to `.mstack/team/<slug>/v<N>.md` at the start of every round and 
 - **Objective (from m-goal):** <one testable sentence; goal file: .mstack/goals/<slug>.md>
 - **Metric:** <name, unit, how measured (exact command)>
 - **Metric at round start:** <value + evidence>
-- **Round budget:** <tokens / $ / wall-clock>
+- **Round budget:** <tokens / $ / wall-clock — the cap the whole team shares>
+- **Noise band (write before scoring):** <spread from earlier measurements on unchanged code, or the smallest delta the command resolves; mark "weak" if you have no prior spread. Do not fill this from this round's results>
+- **Solo baseline:** <same cap as Round budget, one agent, not a role; or "this round is already solo">
 - **Round threshold:** <the metric value that makes this round a success>
 - **Diagnosis from last supervisor round:** <knowledge gap / exhausted search / discipline problem — one line why> (v1: "initial design")
 
@@ -25,7 +27,7 @@ Copy this file to `.mstack/team/<slug>/v<N>.md` at the start of every round and 
 
 ## Coordination shape
 
-<solo | pipeline | parallel branches> — <one line: who hands what to whom, in which order or in parallel>
+<solo | pipeline | parallel branches> — <one line: who hands what to whom, in which order or in parallel. The solo baseline is not a role in the list below; it runs beside a pipeline or parallel team and writes only its own workspace>
 
 ## Roles
 
@@ -52,6 +54,9 @@ Copy this file to `.mstack/team/<slug>/v<N>.md` at the start of every round and 
 ## Round close (filled in by the supervisor)
 
 - **Metric after round:** <value + evidence>
+- **Solo metric / team-best metric:** <values, or "n/a, this round was solo">
+- **Gain vs noise band:** <improvement of team over solo in the metric's success direction; inside band → stop teaming and hand back to m-goal>
+- **Label map (fill after scoring, never send to the scorer):** <label → role or solo>
 - **Candidates scored 0:** <list + failed gate>
 - **Held-out results:** <pass/fail per check>
 - **Handed to supervisor checklist at:** <timestamp>; next version: v<N+1> or stop

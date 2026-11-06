@@ -37,13 +37,16 @@ For each page/flow: navigate → assert expected state → one screenshot → ch
 
 ## Report template
 
+The summary line is only `verdict: clean`, `verdict: changed`, or `verdict: blocked`. Definitions are in `verify-skill.md`. Do not invent a fourth word.
+
 ```
 # QA report — {target} {date}
-## Summary (one line: N issues, M fixed, health X → Y)
+## Summary
+verdict: clean|changed|blocked
+<one line: what ran, what was edited, what failed>
 ## Findings
 | id | severity | page | problem | evidence | repro steps | status |
 ## Design findings
-## Scores (health / design, baseline → final)
 ## Deferred / untested
-## Evidence (screenshots, baseline json)
+## Evidence (path that survived cleanup)
 ```

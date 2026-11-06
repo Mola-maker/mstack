@@ -1,0 +1,18 @@
+schema_version: "1.1"
+name: boundary-plain-coding-no-skill
+description: "A plain coding request fires no m-skill (trigger boundary)."
+tags: [trigger-boundary, pair:route-continue-to-m-start]
+execution:
+  prompt: "用 Python 写一个快速排序函数"
+  max_turns: 4
+  timeout_seconds: 180
+  allowed_tools: [Read, Glob, Grep]
+runs: 3
+graders:
+  - type: tool_used
+    name: no-m-skill
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?m-'
+    min: 0
+    max: 0
+    arm: with-only

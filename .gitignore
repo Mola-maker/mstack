@@ -11,3 +11,4 @@ demo/node_modules/
 **/.mstack/runs/
 .pnpm-store/
 .tmp-dsh/
+evals/results/

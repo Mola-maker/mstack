@@ -15,10 +15,15 @@ Use at the top of every conversation, including when the user just says "继续"
 ## Procedure
 
 1. Read `.mstack/handoff.md` first (if present) and any `.mstack/goals/<slug>.md` or `.mstack/plans/*-<slug>.md` (plans carry a `<YYYY-MM-DD>-` prefix) that names the current task.
-2. Classify the request against the 10 core principles (below) and the skill one-liners. Report which skill you picked and why, in one line, then load that skill's SKILL.md and follow it.
-3. If `.mstack/` shows work in progress, resume it: trust the state files over your memory; do not redo steps already marked done.
-4. If no single skill obviously applies, prefer `m-think` for anything new or ambiguous; prefer `m-debug` for a broken behavior; route "提PR/提交/发布" to `m-ship`, "review一下/审一下" to `m-review`, "分派/并行" to `m-dispatch`, "组队/team/一直优化/卡在局部最优" to `m-team`.
-5. Follow the reporting format (one-line conclusion → what changed with file:line → how it was verified → what you did not do / risks) in Chinese, matching the user's language.
+2. Flag stale state, advisory only — report it, never auto-resume, clean up, or close it. Judge staleness from the state file, not from headings (a goal's `## Closeout` heading exists from creation, so its presence means nothing):
+   - A goal (`.mstack/goals/<slug>.md`) is stale when its `<slug>.state.json` has `"status": "active"` and the state file's mtime is older than 2 hours. Its resume hint is the goal file path plus the last row of its checkpoint table — an unfinished goal has no resume-hint of its own.
+   - A goal file whose `## Closeout` contains no `status:` line, while its `state.json` is missing, counts as abnormally interrupted (the loop died before writing either). A `## Closeout` that holds only the placeholder text from creation is not a closeout.
+   - A team run (`.mstack/team/<slug>/`) is stale when the newest `v<N>.md` has no `status:` line and its mtime is older than 2 hours. `status: active|done|failed` is written into each round file's round-close block (`m-team` owns that line); resume from that file plus `history.md`.
+   - `done` and `failed` are terminal and never stale. Anything you cannot read, say you could not read.
+3. Classify the request against the 10 core principles (below) and the skill one-liners. Report which skill you picked and why, in one line, then load that skill's SKILL.md and follow it.
+4. If `.mstack/` shows work in progress, resume it: trust the state files over your memory; do not redo steps already marked done.
+5. If no single skill obviously applies, prefer `m-think` for anything new or ambiguous; prefer `m-debug` for a broken behavior; route "提PR/提交/发布" to `m-ship`, "review一下/审一下" to `m-review`, "分派/并行" to `m-dispatch`, "组队/team/一直优化/卡在局部最优" to `m-team`.
+6. Follow the reporting format (one-line conclusion → what changed with file:line → how it was verified → what you did not do / risks) in Chinese, matching the user's language.
 
 ### The 10 core principles (other skills cite these by number)
 
@@ -35,7 +40,7 @@ Use at the top of every conversation, including when the user just says "继续"
 
 ## Output
 
-No new files on its own. It produces a one-line routing decision and then hands off to the chosen sibling skill, whose own Output section governs. When resuming, it replays the current phase from `.mstack/` state.
+No new files on its own. It produces a one-line routing decision — plus a stale-state warning whenever step 2 fires — and then hands off to the chosen sibling skill, whose own Output section governs. When resuming, it replays the current phase from `.mstack/` state.
 
 ## Stop conditions
 

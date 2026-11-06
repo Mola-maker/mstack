@@ -1,0 +1,17 @@
+schema_version: "1.1"
+name: route-verify-to-m-verify
+description: "验证一下 fires m-verify."
+tags: [routing, trigger]
+execution:
+  prompt: "验证一下刚才的修复跑通没"
+  max_turns: 8
+  timeout_seconds: 300
+  allowed_tools: [Read, Glob, Grep]
+runs: 3
+graders:
+  - type: tool_used
+    name: fires-m-verify
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?m-verify"'
+    min: 1
+    arm: with-only

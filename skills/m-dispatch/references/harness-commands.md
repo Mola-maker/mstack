@@ -30,13 +30,13 @@ codex exec "<task>"
 
 ## Claude Code
 
-- `Agent`/`Task` tool with `subagent_type` (executor / explorer / verifier), `run_in_background: true`.
+- `Agent`/`Task` tool with `subagent_type` (executor / explore / verifier), `run_in_background: true`. `explore` is the read-only name in the installed agent set; `explorer` was not verified.
 
-## Orca (optional backend — use only when `orca` is on PATH)
+## Orca (not the default)
 
-Desktop + CLI orchestrator: each worker (Claude Code / Codex / OpenCode / Pi) runs in its own worktree, and progress can be watched from a phone. Not installed by default — check `orca` resolves before using any of this.
+Use this session's own subagent unless the job needs another vendor's agent, or a worktree a human will keep working in. Only then, and only when `orca` is on PATH, use the commands below. Desktop + CLI: each worker (Claude Code / Codex / OpenCode / Pi) gets its own worktree, and a phone can watch progress.
 
-Start one worker per self-contained subtask, then **end your turn**: Orca wakes you when there is mail. Never poll and never write watch scripts — a script's plain `check` swallows the mail Orca would wake you with.
+Start one worker per self-contained subtask, then **end your turn**: Orca wakes you when there is mail. Never poll and never write watch scripts — a script's plain `check` swallows the mail Orca would wake you with. If `orca` does not resolve, do not invent a replacement command.
 
 ```sh
 orca orchestration worker-start --spec "<self-contained task>" --worktree current --agent codex

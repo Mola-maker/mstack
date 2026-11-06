@@ -6,50 +6,56 @@ whenToUse: "A change or branch needs a correctness/security/quality audit before
 
 # m-review
 
-Find what is actually wrong with a change, ranked by severity, with enough detail to act on. Reviews are advisory: they inform, never gate. The reviewer must be a separate context from the author (principle 6), and every finding must be verified against real code before it is reported.
+Find what is actually wrong with a change, ranked by severity, with enough detail to act. The reviewer is a separate context from the author (principle 6). A finding counts only when a command reproduced it. m-review does not edit or merge. It ends with one verdict — `APPROVE` or `REQUEST CHANGES` — and under `REQUEST CHANGES` lists the blocking findings. The caller (`m-goal`, `m-ship`, or the user) gates on that verdict; `REQUEST CHANGES` is a rejected review.
 
-## When to use
+Intent and standards are their own verdicts, not more defect bullets. Intent: does the diff meet the plan or spec? Standards: does it follow the repo's own rules? Do not cross-rank those axes.
 
-Use it: after a feature or task completes, before merge, on "review this diff", or when a branch looks risky and you want fresh eyes.
+## When to use / not use
+
+Use it after the change exists, before merge, on "review this diff", or when a branch looks risky.
 
 Do not use it (hand off instead):
-- The change isn't written yet → `m-think` / `m-plan`.
-- You want to fix the bugs found → this skill reports; `m-debug` and `m-ship` act on findings.
-- The author's same active context is doing the review → spawn a separate `subagent` or another model (never self-review).
+
+- Nothing is written yet → `m-think` / `m-plan`.
+- You want the bugs fixed → this skill reports; `m-debug` and `m-ship` act.
+- The author's own context would be the reviewer → spawn someone else. Never self-review.
+- The only question is whether tests pass → `m-verify`.
+- Several workers produced candidate patches → `m-dispatch` clusters exact diffs and sends the set to a verifier. That verifier follows the comparison rules below; do not start a second panel unless a full review was asked for.
 
 ## Procedure
 
-1. **Establish scope.** Get the change: `git diff <base>...HEAD` (or `git diff` for uncommitted work) plus untracked files (`git ls-files --others --exclude-standard`). Identify the merge base and what the work was supposed to do (plan, task, ticket, spec). Read the whole diff before commenting.
-2. **Dispense parallel reviewers.** Do not run the five angles in one pass. Spawn one independent reviewer per angle below, each given the diff plus scope but *not* your conclusions. Each reviewer returns findings as `file:line`, `problem`, `failure scenario` (what breaks in production or a test, how an attacker or user triggers it). Use `subagent` (DSH) / `Agent` (Claude Code); for a small diff (<50 lines) a single pass is acceptable.
-3. **Verify before reporting.** For each candidate finding, re-check it against the code: reproduce the path, confirm the `file:line` exists, and drop anything that is already handled elsewhere in the diff or that cannot actually fail. A plausible-sounding finding that does not reproduce is noise.
-4. **Rank and report.** Merge findings (dedupe by location/root cause), order most severe first, keep each axis's verdict separate, and mark anything that could not be assessed. "No findings" is a valid result.
-5. **Persist.** Write the summary to `.mstack/reviews/<date>-<slug>.md`.
-
-### Reviewer angles
-
-Refer to `references/review-template.md` for the full prompt template and the five angle prompts. The five angles:
-
-1. **Correctness** — logic, edge cases, error paths, off-by-one, wrong types.
-2. **Concurrency / resources** — races, deadlocks, leaks, unbounded growth, lifecycle bugs.
-3. **API / compatibility** — breaking changes, changed contracts, miss-ing migrations, version/platform drift.
-4. **Tests / edges** — untested behavior, wrong assertions, missing boundary cases, flaky tests.
-5. **Security** — trust boundaries, injection, authz, secrets, destructive operations.
+1. **Establish scope.** Take `git diff <base>...HEAD`, or `git diff` plus `git ls-files --others --exclude-standard`. Untracked files are in scope. Name the base and the plan or spec. Read the whole diff before commenting.
+2. **Apply the scope rules** in `references/review-template.md` before any reviewer starts. Report only lines the diff adds or replaces. An intentional break whose blast radius is explicit goes under Cleared. Pre-existing code outside the diff is out of scope.
+3. **Census consumers.** List exported symbols, protocols, and data formats the diff adds, changes, or removes, plus callers outside the diff. Attach one command you ran and its output. An empty search is a result; do not invent a caller.
+4. **Pick a tier and spawn reviewers.** Thresholds are in the template's tier table: fewer than 5 files and no auth, crypto, or destructive change → sonnet floor; 5–20 files with no such risk stays on that floor; more than 20 files, or any of those risks → opus and the security angle. Read the template and fill its prompt before the first spawn. One reviewer per angle that applies. Do not pass your conclusions or the author's name. On the floor tier one reviewer may cover every applicable angle, but each axis still gets its own verdict. Skip devex and feature-gate when the template says they are not applicable.
+5. **Require a repro.** Each finding is `file:line | problem | failure scenario` plus `repro: <command> → <actual output>`. Classify with `node "<this skill dir>/scripts/split-findings.mjs" <report.md> --diff <diff>`, run from the project root. `<this skill dir>` is the directory this SKILL.md was loaded from (Claude Code shows it as the skill base directory; in the mstack repo it is `skills/m-review`). If that script cannot be found, classify by hand and say so in the report. The script parses; it does not run the repro. It treats untracked files (`git ls-files --others --exclude-standard`) as in scope, so an empty `git diff` does not drop a finding in a new file. No repro → Unconfirmed, and it does not count. Confirmed but outside the diff and not untracked (script exit 1) → drop it.
+6. **Refute high-risk survivors.** Critical, security, auth, crypto, destructive, or data-loss findings go to a refuter whose only job is to disprove them. Promote only survivors. Record how many were killed. Prompt in the template.
+7. **Compare in both orders.** When two patches are compared, run A-then-B and B-then-A. Keep a preference only if both orders agree. Hide author identity and any hint that one side is correct. Put every surviving candidate in the same prompt. Bind the verdict to the repro, not to which writeup is longer.
+8. **Merge and persist.** Dedupe by location and root cause. Keep each axis's verdict separate. Write `.mstack/reviews/<date>-<slug>.md`. End that file, and the user-facing summary, with the verdict in Output.
 
 ## Output
 
-- Findings, most-severe first, each as `file:line` + `problem` + a concrete `failure scenario`.
-- What was checked and found clean (per angle).
-- What could not be assessed.
-- Answer every finding to the author as one line problem + one line fix, with technical reasoning (never performative agreement). Push back with `file:line` or test evidence when a finding is wrong.
+User-facing summary in Chinese (§4): one-line conclusion → what you found (`file:line`) → how you checked (command + output) → what you did not assess.
+
+Also include:
+
+- One verdict per axis you ran: `pass` / `issues` / `not-assessed` / `not-applicable`. Intent quotes the criterion sentence. Standards names the file and the rule.
+- Confirmed findings, most severe first, each with the repro field.
+- Unconfirmed and Cleared, both excluded from the conclusion.
+- The consumer census plus its command and output.
+- Refuter drop count.
+- To the author: one line for the problem, one line for the fix. Push back with `file:line` or a test when a finding is wrong.
+- **Verdict (last line).** `APPROVE` when no confirmed in-scope finding remains and no axis is `issues`. `REQUEST CHANGES` otherwise; under it list each blocking finding as `file:line` and each axis marked `issues`. Unconfirmed and Cleared do not block. `not-assessed` and `not-applicable` do not block by themselves. The caller gates on this line.
 
 ## Stop conditions
 
-- Stop and ask when the diff cannot be established (missing base, ambiguous branch) or when scope is unclear.
-- Stop reporting and hand back when a finding would need the author's context to judge (ask, don't guess).
-- Abandon a finding once it fails to reproduce or is already handled in the diff — do not pad the list.
+- The base or the diff cannot be established → stop and ask.
+- No plan or spec to judge intent against → mark intent `not-assessed` and ask. Do not invent criteria.
+- A finding does not reproduce → Unconfirmed. Do not pad the list.
+- Reviewer and refuter still disagree after one refute pass → report both sides. Do not call it confirmed.
 
 ## Harness notes
 
-- Claude Code: spawn reviewers with `Agent` (`run_in_background` where available); gh CLI for PR context.
-- DSH: `subagent` / `subagent_fork` for reviewers; `git diff` via Bash.
-- Codex: `codex exec` a self-contained reviewer prompt with the diff path passed in.
+- Claude Code: spawn with `Agent`. Prefer a type that denies Write and Edit. Locally installed reviewer definitions for `code-reviewer` and `verifier` set `disallowedTools: Write, Edit` (read from those files, not from a live tool call). Pass the type string the session actually lists. A stock install may reject the bare name — say so, and use a listed type with the same deny list (`explore` has it in that same set). Bash is not in the deny list, so the prompt must forbid shell writes. Set `model` to the tier (`sonnet` or `opus`); if the tool rejects the slug, report the error and use the closest slug it names. Use `run_in_background` when the tool offers it. `gh` for PR context.
+- DSH: `subagent` / `subagent_fork`. No tool-deny flag is documented for those calls; forbid edits in the prompt and do not give the reviewer a writable worktree. For a high-risk refuter, use another model family (`subagent_codex` or `subagent_claude_code`) when one is available. If it is not, say so and continue with a different context (see `references/decisions.md`).
+- Codex: `codex exec "<task>"` with the diff path inside the prompt. No further flags are documented here.

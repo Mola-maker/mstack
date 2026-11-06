@@ -84,6 +84,10 @@ whenToUse: <英文一句话，DSH 用这个字段决定何时加载>
   goals/<slug>.md                  m-goal 的目标、检查点、closeout
   handoff.md                       m-handoff 的最新存档（覆盖写，旧的进 handoff-archive/）
   reviews/<date>-<slug>.md         m-review 汇总
+  verify/baseline.txt              m-verify 基线：开工前已失败的测试签名（新失败才阻断）
+  goals/<slug>.state.json          m-goal 循环状态：status、起始提交、连续失败计数、预算
+  qa/<YYYY-MM-DD>-<slug>.md        m-qa 报告
+  freeze                           m-guard 冻结范围（可选钩子读取）
   qa/<YYYY-MM-DD>-<slug>.md        m-qa 验收报告（带截图与评分）
 ```
 
@@ -182,3 +186,91 @@ Orca 是桌面端 + CLI 的多 agent 编排器：每个 worker（Claude Code / C
 ## 10. 改名：总入口 `mstack` → `m-start`（0.3.0）
 
 Claude Code 会把**与插件同名的 skill**（`mstack:mstack`）的 description 去掉，只列名字，路由时模型看不到它何时该用（2026-11-04 实测：改名为 `m-start` 后 description 立即出现）。所以总入口改名为 `m-start`；文中其余"`mstack` 总入口"均指它。skill 名一律不要与插件名相同。
+
+## 11. 第二轮改进：工程实践整合（0.4.0，2026-11-06）
+
+依据：`research/omc.md`、`research/pstack.md`、`research/papers.md`、`research/repos.md`、`research/evals.md`（5 个 haiku subagent 调研，每条都带来源）。总方向：**把"只靠文字的约束"改成"可检查的规则、有固定字段的产出、可执行的脚本或钩子"**（原则 10）。不收：OMC 的多轮全流程（5 轮 interview、ralplan 循环）、pstack 的 arena / TLA+ 工具链。只吸收做法。
+
+每个 SKILL.md 仍然 ≤150 行；细节放 `references/`；可执行的东西放 `skills/<name>/scripts/`（Node，零依赖，跨平台）。
+
+### 11.1 按 skill 的改动
+
+**m-verify**（OMC 1/10/12，pstack 2/6，papers 10-12，repos cursorrules）
+- 基线门：第一次改代码前，把已失败的测试签名存到 `.mstack/verify/baseline.txt`；之后只有**新出现**的失败才阻断，基线里的失败只作为警告。
+- 新检查必须先红：新增或修改的检查，要先在破坏版本上跑出预期失败，并引用失败内容。（同时修 m-debug 那句"see m-verify"的悬空引用。）
+- 防作弊门：diff 改到测试、fixture、conftest、grader 或 CI 配置，而用户没要求时，判为不通过。最终验收在干净的 checkout 里跑。
+- 机械扫描：`skills/m-verify/scripts/diff-blockers.mjs` 扫描 `git diff <base>` 新增行里的 `.only(`、`.skip(`、`TODO`、`FIXME`、`NotImplemented`、`not implemented`、`debugger`；退出码非 0 就不算完成。
+- 产出：按验收标准逐条给 VERIFIED / PARTIAL / MISSING，每条附证明命令；加一行回归检查（改动文件的调用方的测试，给通过和失败数）；加一行范围检查（`git diff --stat` 里的文件是否都在任务范围内）。
+- 数字：凡是性能或准确率数字，必须附 run 次数、离散度和噪声来源。
+- 跨模型复核：明确为"不同模型家族"。
+
+**m-debug**（OMC 13，papers 2/4/19）
+- 每个假设一行表：支持证据 / 反对证据 / 可区分的预测 / 最便宜的区分探针；只靠时间巧合、命名或类比的证据要降权。
+- bug 修复默认按固定顺序走：定位 → 复现 → 补丁 → 验证。有测试时先用覆盖率定位。固定路径失败后才自由探索。
+- 一次尝试失败后写一段反思（哪里失败、为什么、下一步查什么），交给下一次重试。
+
+**m-review**（OMC 5/11，pstack 3/8/9，papers 13-17，repos ECC agents）
+- 加两个轴，分开出结论：**intent**（diff 对照 plan 或 spec 的验收标准，要引用原句）和 **standards**（找出仓库里的 CLAUDE.md、AGENTS.md、CONTRIBUTING 并逐条对照）。
+- 消费者普查：列出改动的导出符号、协议、数据格式在 diff 之外的调用方，附一条能跑的证明。
+- 新角度：downstream consumers、devex（环境变量、端口、新增必跑脚本），以及 feature-gate（只在改动涉及时启用）。
+- 范围规则：只报 diff 里新增或修改的代码；作者有意改动且范围明确的，归入 cleared。
+- 每条 finding 加一个 `repro: <command> → <实际输出>` 字段；没有 repro 的归入"未证实"，不计入结论。
+- 比较多个候选时：A/B 和 B/A 各评一次，结论一致才采纳；隐藏作者身份；高风险 finding 加一个反驳阶段，专门尝试推翻它。
+- 评审强度按规模定：少于 5 个文件且无风险用 sonnet；超过 20 个文件，或涉及 auth、crypto、破坏性改动，用 opus 并加 security 角度。
+- Claude Code 下评审用只读工具的 agent（`code-reviewer`、`verifier`），由工具权限保证"写的人不审"。
+
+**m-dispatch**（pstack 10，papers 6/9/16，repos orca）
+- 分派前先写明选择规则：first pass / rank all / best-of。
+- RETURN 里缺证据，记为 gap 并重派一次；第二次仍缺，不算通过。
+- 多个候选补丁时：先按完全相同的 diff 聚类取多数，再交给另一个模型家族的验证者，并把所有候选并排给它看。
+- 默认用自己的 subagent。只有需要其他 agent，或需要独立 worktree 留给人接手时才用 Orca。派出后结束本轮，不轮询。
+
+**m-goal**（OMC 2/3/9，pstack 7，papers 7/26）
+- 循环状态写进 `.mstack/goals/<slug>.state.json`：每种错误签名的失败次数、轮数、已用 token、上次有进展的时间。每个 checkpoint 读一次：同一签名失败 3 次，或预算用到 100%，就停；用到 90% 时警告。
+- 最终门固定顺序：m-deslop（只处理改动过的文件）→ m-verify → m-review。review 被否决时追加一个新的子目标，不能标记完成。closeout 里加一个 `gate` 块，记录这三项的结果。
+- 验收标准只能修订、不能改写：被推翻的标准原文保留在 `## Amendments` 下，附理由和实测证据。
+- checkpoint 固定 5 列（ts / decision / why / evidence / result），只追加。closeout 加一个 "Attention" 段，由另一个模型填写（可以写"无"）。
+- 预算优先花在"多次尝试加选优"上，不要花在一次更大的单次尝试上；goal 文件里写明每个任务的尝试上限。
+
+**m-start**（OMC 6）
+- 读状态时检查陈旧：状态不是终态、且文件超过 2 小时没修改的 goal 或 team 文件，报告为 stale，并附上它的 resume-hint；没有 `## Closeout` 的 goal 视为异常中断。只提示，不自动处理。
+
+**m-handoff**（OMC 4，repos superpowers hooks，papers 18/19）
+- 插件随附 `hooks/hooks.json`：
+  - **PreCompact**：运行 `node "${CLAUDE_PLUGIN_ROOT}/hooks/precompact.mjs"`，写一个 `.mstack/handoff.md` 骨架（分支、`git status --short`、当前 goal 路径、时间戳）；已有内容不覆盖，只追加一个 "auto snapshot" 段。
+  - **SessionStart**，matcher 为 `compact`：如果存在 `.mstack/handoff.md`，输出一行提示让模型读它。
+  - 两个脚本都必须在 1 秒内退出、不联网、任何异常都以 0 退出（不能阻断会话）。
+- 状态分三层：稳定的任务框架（goal、约束）、压缩后的进度、最近几步的原文。
+
+**m-plan**（OMC 8，pstack 4/5，papers 2）
+- 涉及新的模块边界或公开类型时，先写 ≥2 个结构不同的形状（每个只给接口草图，≤15 行），由 critic 选定，理由写进 Review Focus。
+- 有状态或并发的任务，加必填小节"状态与不变量"：列出状态、转移，以及 3-5 条不变量，每条注明由哪个测试检查。
+- critic 的提示词放进 `references/critic.md`：假设按 VERIFIED / REASONABLE / FRAGILE 评级；做一个 3 场景的 pre-mortem，每个场景对应到一个任务或一行 Review Focus。
+
+**m-think**（OMC 7，pstack 11）
+- 能用 30 分钟以内的运行回答的问题，先做原型，不占提问名额。
+- spec 头部写一个 readiness 自评（goal、约束、验收标准各 0-1）。这只是参考，不是门槛，也不能因此增加问题数。
+
+**m-team**（papers 26，pstack 12）
+- 每轮都要有一个同预算的 solo 基线；如果团队相对 solo 的增益在噪声范围内，就停止组队。
+- 评分只看匿名标签。
+
+**m-learn**（papers 21-25，repos superpowers/ECC）
+- 写 skill 走 RED-GREEN：先跑一次没有这个 skill 的基线，记下 agent 的借口，再写 skill 去堵它，然后复跑验证。清单放 `references/skill-creation.md`。
+- 同一教训出现 2 次以上，且通过验证，才写成 skill；只在一个项目出现的，留在该项目的 `.mstack/`。
+- skill 生命周期：create / verify / retrieve / refine / retire，记录成功次数，低成功率的 skill 退役。
+
+**m-guard**（repos gstack careful/freeze, ECC）
+- `references/hooks.md`：可选的 Claude Code PreToolUse 钩子片段，用 `permissionDecision: "ask"` 语义：
+  - Bash 拦截 `rm -rf /`、`~`、force-push 到默认分支（允许 `--force-with-lease`）；
+  - Edit/Write 拦截 `.mstack/freeze` 里列出路径之外的修改。
+  - 默认不安装，由用户选择是否装。
+- `references/skill-audit.md`：装好之后的 skill 体检清单（重名、frontmatter、体积、冲突）。
+
+**m-qa**（pstack 1）
+- 首次运行时，为项目生成一个验证 skill，放在项目的 `.claude/skills/verify/SKILL.md`，固定章节为 Launch / Doctor / Drive / Evidence / Cleanup，外加 features/ 功能地图。之后的运行先用它，并维护它。报告结论只能是 clean / changed / blocked。
+
+### 11.2 仓库级（主会话负责）
+- `evals/`：用 `claude plugin eval` 跑的路由用例（case.yaml schema 1.1，见 research/evals.md），先覆盖 m-start、m-review、m-verify、m-debug、m-ship，包括应该触发和不该触发两类。本地运行，不进默认 CI，因为要花钱。
+- `check.mjs` 新增检查：SKILL.md ≤12000 字节；`skills/<name>/` 下只允许 SKILL.md、references/、scripts/；description ≤1024 字符；evals 文件能解析。
+- 仓库根加一个约 20 行的 `AGENTS.md`：验证命令和仓库约定。

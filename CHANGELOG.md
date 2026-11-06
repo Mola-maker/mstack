@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 — 2026-11-06
+Round 2: engineering practice from OMC, pstack, 26 papers and 12 high-star repos (research/, five haiku research agents), integrated by DSH workers per FRAMEWORK §11, independently reviewed (reviews/2026-11-06-round2.md, 15 findings fixed).
+- Executable checks instead of prose: m-verify diff-blockers (incl. untracked files) and baseline gate; m-review split-findings and an explicit APPROVE / REQUEST CHANGES verdict; m-goal goal-state (consecutive-failure and budget breakers); m-dispatch candidate clustering; m-guard optional PreToolUse hook snippets; m-qa generates and maintains a project verify skill.
+- Plugin hooks: PreCompact snapshot into an existing .mstack/handoff.md, and a post-compact reminder. Both no-ops in projects without .mstack/.
+- Review: intent and standards axes, consumer census, repro per finding, position-swap and refuter stage, reviewer tier by size and risk.
+- Anti-cheat: modifying or deleting existing tests, fixtures or graders fails unless the task asked for it; adding tests never does.
+- evals/: 6 routing cases for `claude plugin eval` (5 should-fire + 1 boundary); all pass live (with plugin 1.0, without 0.0, $1.31).
+- check.mjs: ≤12000 bytes per SKILL.md, skill dir whitelist, description ≤1024, eval case keys. AGENTS.md added.
+
 ## 0.3.1 — 2026-11-04
 - Descriptions shortened to ≤130 chars. Claude Code's skill listing has a size budget and drops some skills' descriptions once it is exceeded (m-verify was listed name-only). This budget was probably also what hid `mstack:mstack` in 0.3.0, not the shared name; the `m-start` name stays.
 

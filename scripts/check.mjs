@@ -17,6 +17,13 @@ for (const name of expected) {
   const text = readFileSync(p, "utf8");
   const lines = text.split("\n").length;
   if (lines > 150) err(`${name}: ${lines} lines (>150)`);
+  // Claude Code truncates long skills; keep well under its 20k-character limit
+  const bytes = Buffer.byteLength(text, "utf8");
+  if (bytes > 12000) err(`${name}: ${bytes} bytes (>12000)`);
+  // only SKILL.md, references/ and scripts/ belong in a skill dir (no dev or test scenario files)
+  for (const entry of readdirSync(join(root, "skills", name))) {
+    if (!["SKILL.md", "references", "scripts"].includes(entry) && !entry.startsWith(".")) err(`${name}: unexpected entry skills/${name}/${entry}`);
+  }
   const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!fm) { err(`${name}: no frontmatter`); continue; }
   for (const k of ["name", "description", "whenToUse"]) if (!new RegExp(`^${k}:\\s*\\S`, "m").test(fm[1])) err(`${name}: frontmatter missing ${k}`);
@@ -25,6 +32,8 @@ for (const name of expected) {
     const v = line.replace(/^[\w-]+:\s*/, "");
     if (!/^["']/.test(v) && /: | #/.test(v)) err(`${name}: unquoted YAML value with ": " or " #": ${line.slice(0, 40)}`);
   }
+  const desc = fm[1].match(/^description:\s*(.*)$/m)?.[1] ?? "";
+  if (desc.length > 1024) err(`${name}: description ${desc.length} chars (>1024, the Agent Skills limit)`);
   const n = fm[1].match(/^name:\s*["']?([\w-]+)/m)?.[1];
   if (n !== name) err(`${name}: frontmatter name is ${n}`);
   if (!/^# /m.test(text)) err(`${name}: no # title`);
@@ -37,12 +46,25 @@ for (const name of expected) {
   }
 }
 
+// evals/<case>/case.yaml (claude plugin eval): required keys present, and every skill named in a should-fire grader exists
+if (existsSync(join(root, "evals"))) {
+  for (const c of readdirSync(join(root, "evals")).filter((d) => !d.startsWith(".") && d !== "results" && statSync(join(root, "evals", d)).isDirectory())) {
+    const f = join(root, "evals", c, "case.yaml");
+    if (!existsSync(f)) { err(`evals/${c}: case.yaml missing`); continue; }
+    const y = readFileSync(f, "utf8");
+    for (const k of ['schema_version: "1.1"', "name:", "execution:", "prompt:", "graders:"]) if (!y.includes(k)) err(`evals/${c}: missing ${k}`);
+    for (const m of y.matchAll(/name: fires-(m-[\w-]+|mstack)/g)) if (!expected.includes(m[1])) err(`evals/${c}: grader names unknown skill ${m[1]}`);
+  }
+}
+
 const extra = readdirSync(join(root, "skills")).filter((d) => !d.startsWith(".") && !expected.includes(d));
 if (extra.length) err(`unexpected skill dirs: ${extra.join(", ")}`);
 
 for (const f of walk(join(root, "skills"))) {
   const t = readFileSync(f, "utf8");
   for (const bad of ["superpowers:", "oh-my-claudecode:", "omc:"]) if (t.includes(bad)) err(`${f}: references "${bad}"`);
+  // scripts ship inside the skill: a repo-relative path does not exist once mstack is installed as a plugin
+  if (t.includes("node skills/m-") && f.endsWith(".md")) err(`${f}: repo-relative script path "node skills/m-…" (use the skill dir)`);
 }
 
 for (const f of ["README.md", "docs/source-map.md", "docs/migration.md", "NOTICE.md", ".claude-plugin/plugin.json"])

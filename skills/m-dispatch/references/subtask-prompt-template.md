@@ -25,14 +25,17 @@ VERIFY
 "N tests pass", "0 failures". Name the command, not "run the tests".>
 
 RETURN
-<the exact shape — e.g. "changed files + how each was verified", or a list of
-findings as `file:line + problem + failure scenario`, at most N items.>
+<the exact shape — changed files (or "no files changed") plus the VERIFY
+command and the output you actually saw, or findings as
+`file:line + problem + failure scenario`, at most N items. If this brief
+names a SHA or a method, record both.>
 
 Do not spawn further subagents. If you are blocked, report BLOCKED with the
-exact missing input rather than guessing.
+exact missing input rather than guessing. Do not claim the selection rule;
+the parent already wrote first pass, rank all, or best-of outside this prompt.
 ```
 
 ## Notes
 
 - Put long context (a review package, a diff, a ledger) in a file and give the path, not the content.
-- The return contract is what lets Step 4/5 verify: an agent that reports "done" without naming changed files and the command it ran has not verified anything.
+- Evidence is the command, the output, and the changed files, plus any SHA or method the brief required. A RETURN that omits them is a gap: the parent re-dispatches that worker once, naming the missing field. A second miss stays a gap and does not count as a pass. Do not invent the missing output.

@@ -1,0 +1,24 @@
+schema_version: "1.1"
+name: route-review-to-m-review
+description: "review一下 fires m-review and never m-ship."
+tags: [routing, trigger]
+execution:
+  prompt: "review一下我刚才的改动"
+  max_turns: 8
+  timeout_seconds: 300
+  allowed_tools: [Read, Glob, Grep]
+runs: 3
+graders:
+  - type: tool_used
+    name: fires-m-review
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?m-review"'
+    min: 1
+    arm: with-only
+  - type: tool_used
+    name: must-not-fire-m-ship
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?m-ship"'
+    min: 0
+    max: 0
+    arm: with-only

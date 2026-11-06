@@ -1,0 +1,17 @@
+schema_version: "1.1"
+name: route-continue-to-m-start
+description: "A terse 继续 routes through m-start."
+tags: [routing, trigger]
+execution:
+  prompt: "继续"
+  max_turns: 6
+  timeout_seconds: 300
+  allowed_tools: [Read, Glob, Grep]
+runs: 3
+graders:
+  - type: tool_used
+    name: fires-m-start
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?m-start"'
+    min: 1
+    arm: with-only

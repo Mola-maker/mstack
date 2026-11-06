@@ -19,19 +19,22 @@ Do NOT use it for the `m-goal` closeout (m-goal owns that and writes it inside `
 ### Save
 
 1. **Gather state.** Capture the branch, `git status --short`, and changed files — no code edits here; read only.
-2. **Write `.mstack/handoff.md`** (overwrite; move the prior one to `handoff-archive/`). Cover: the goal being worked on and a link to its goal file's `## Closeout` section if one exists (the handoff never writes the closeout itself); decisions made and *why* (alternatives rejected, trade-offs); remaining work in priority order with a provenance mark — `(done)` / `(verified)` / `(assumed)` so the next session knows what to re-check; and notes (gotchas, blockers, things tried that failed).
+2. **Write `.mstack/handoff.md`** (overwrite; move the prior one to `handoff-archive/`). Lay it out in three layers (template: `references/handoff-template.md`):
+   - **Task frame** (stable): the goal being worked on, the constraints, and a link to the goal file's `## Closeout` if one exists (the handoff never writes the closeout itself).
+   - **Progress** (condensed): decisions made and *why* (alternatives rejected, trade-offs); remaining work in priority order, each step with a provenance mark — `(done)` / `(verified)` / `(assumed)`; notes (gotchas, blockers, things tried that failed).
+   - **Recent steps** (verbatim): the last few commands and their key outputs, enough to pick up the thread. Prune this layer on every rewrite — rewriting the handoff *is* the explicit summarize-and-prune step: the task frame stays, the progress layer is re-condensed, old verbatim steps are dropped.
 3. **Mark every future step honestly.** A step you have not run gets `(assumed)`, never a completion token. Provenance is what makes a resume safe instead of a fresh start.
 4. **Report.** One-line what was saved and where, in the session's language.
 
 ### Restore
 
-1. If `.mstack/handoff.md` exists, read it first and resume from the top unchecked step — *re-verify* anything marked `(assumed)` before running it; git may have moved past the save.
+1. If `.mstack/handoff.md` exists, read it first and resume from the top unchecked step — *re-verify* anything marked `(assumed)` before running it; git may have moved past the save. An `## Auto snapshot` section (written by the plugin's pre-compact hook, see Harness notes) is mechanical state only: trust its branch/status data, but it carries no decisions.
 2. If it is absent or stale, rebuild the brief from `git log` / `git status` and the harness's transcript dir rather than pretending nothing happened.
 3. Present the capsule: goal → where it stands → next single action → open risks.
 
 ## Output
 
-A written `.mstack/handoff.md` (markdown), plus on restore a tight brief: up to ~5 status lines (one per thread, tagged `[in flight]` / `[open PR #N]` / `[verified, uncommitted]` / `[planned]`), at most ~5 recurring problems, and the single most useful next step.
+A written `.mstack/handoff.md` (markdown, three layers), plus on restore a tight brief: up to ~5 status lines (one per thread, tagged `[in flight]` / `[open PR #N]` / `[verified, uncommitted]` / `[planned]`), at most ~5 recurring problems, and the single most useful next step.
 
 ## Stop conditions
 
@@ -41,5 +44,6 @@ A written `.mstack/handoff.md` (markdown), plus on restore a tight brief: up to 
 ## Harness notes
 
 - Claude Code: transcripts live under `$CLAUDE_CONFIG_DIR/projects/<encoded-cwd>/<uuid>.jsonl` — a source when no handoff exists.
+- Claude Code plugin hooks (shipped in `hooks/hooks.json` at the plugin root): **PreCompact** runs `hooks/precompact.mjs`, which writes one `## Auto snapshot` section (branch, `git status --short`, the goal whose `state.json` says `active`, timestamp) into `.mstack/handoff.md`, replacing the previous auto-snapshot section instead of appending another — hand-written content above it is kept. A repo with no commits yet is labelled `(no commits yet)`. **SessionStart** with matcher `compact` runs `hooks/session-compact.mjs`, which prints a one-line reminder to read the handoff if it exists. Both exit 0 on any error, finish well under a second, and never touch the network. The decisions layers stay the job of this skill.
 - DSH: use `send_message` to a still-live child to request its own handoff before it exits; `subagent_fork` inherits this session, so a fork can resume directly.
 - Codex: the file on disk is the only portable state; `codex exec` gets the handoff path in its prompt, since it has no shared session memory.
