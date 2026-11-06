@@ -6,6 +6,12 @@
   "references": [
     {
       "path": "../../plugin-sdk"
+    },
+    {
+      "path": "../../core"
+    },
+    {
+      "path": "../tool-superagent"
     }
   ]
 }

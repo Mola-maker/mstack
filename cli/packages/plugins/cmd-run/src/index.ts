@@ -30,7 +30,7 @@ import type {
   RunRequest,
   RunResult,
 } from "@mola/plugin-sdk";
-import { definePlugin, ExitCode, MolaError, MolaEvents } from "@mola/plugin-sdk";
+import { definePlugin, ExitCode, formatDuration, ioSpinner, MolaError, MolaEvents, verboseRequested } from "@mola/plugin-sdk";
 import {
   checkRoute,
   loadPolicy,
@@ -523,6 +523,9 @@ export async function executeRun(
 ): Promise<ExitCode> {
   const { prepared, runId } = opts;
   const { decision, policy, adapter } = prepared;
+  const t0 = Date.now();
+  // NDJSON on stderr only for --json and -v. Human mode gets a spinner instead.
+  const streamEvents = io.json || verboseRequested();
 
   // the routing policy gate (policy-approval): route whitelist before any
   // worker starts (ADR-0003 §2; the rejection is the denial path, exit 77)
@@ -588,7 +591,9 @@ export async function executeRun(
   // is also the authoritative list of what the run emitted. The adapter's
   // `RunResult.events` is optional in the SDK — the stream is not.
   const streamed: HookEvent[] = [];
-  const sink = opts.sink ?? makeRunStream();
+  const sink = opts.sink ?? (streamEvents ? makeRunStream() : () => {});
+  const spin = streamEvents ? undefined : ioSpinner(io, `${decision.agent} · ${decision.machine} · ${route}`);
+  spin?.start();
   // The permission profile the AGENT actually applied (ADR-0003 §5: the router
   // must know what is in effect, not only what it asked for). The adapters
   // report it in their own mola.session.started (`permissionMode`), and they
@@ -605,6 +610,7 @@ export async function executeRun(
     }
     streamed.push(e);
     sink(e);
+    if (spin) spin.update(progressLine(e));
   };
   emitToStream(routingEnvelope);
   const runOnce = async (agentId: string, modelRoute: string): Promise<RunResult> => {
@@ -628,7 +634,13 @@ export async function executeRun(
     return (target as HeadlessAgentAdapter).run(req);
   };
 
-  const first = await runOnce(decision.agent, route);
+  let first: RunResult;
+  try {
+    first = await runOnce(decision.agent, route);
+  } catch (err) {
+    spin?.fail(`${decision.agent} failed`);
+    throw err;
+  }
   let result = first;
   let attempts: LadderAttempt[] = [];
   let exhausted = false;
@@ -701,16 +713,33 @@ export async function executeRun(
     ...(opts.mstackRoot ? { mstackRoot: opts.mstackRoot } : {}),
   });
 
+  spin?.stop();
   if (!io.json) {
     const text = finalTextOf(result);
     if (text) io.out(text);
     else io.note(`mola: no final answer (exit ${result.exitCode})`);
     if (exhausted) io.note("mola: the quota ladder is exhausted — no route or agent could take the task");
-    io.note(
-      `mola: ${decision.agent} on ${decision.machine} via ${route} (run ${runId})`,
-    );
+    // one line: agent, machine, route, duration, run id
+    io.note(`${decision.agent} · ${decision.machine} · ${route} · ${formatDuration(Date.now() - t0)} · ${runId}`);
   }
   return exitCode;
+}
+
+/** One line of human progress from a run event. Never more than one line. */
+function progressLine(e: HookEvent): string {
+  const data = (e.data ?? {}) as Record<string, unknown>;
+  if (e.kind === "mola.agent.message") {
+    const text = typeof data.textExcerpt === "string" ? data.textExcerpt : typeof data.text === "string" ? data.text : "";
+    const one = text.replace(/\s+/g, " ").trim().slice(0, 72);
+    return one || "agent message";
+  }
+  if (e.kind === "mola.session.started") {
+    const agent = typeof data.agent === "string" ? data.agent : e.source.agent;
+    const machine = typeof data.machine === "string" ? data.machine : e.source.machine;
+    const modelRoute = typeof data.modelRoute === "string" ? data.modelRoute : "";
+    return [agent, machine, modelRoute].filter(Boolean).join(" · ");
+  }
+  return e.kind.replace(/^mola\./, "").replace(/\./g, " ");
 }
 
 /** Does the failure look quota-shaped even when the adapter did not normalize it? */

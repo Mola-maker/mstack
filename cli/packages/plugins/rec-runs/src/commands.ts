@@ -12,17 +12,13 @@
 
 import * as path from "node:path";
 import type { Command, ParsedArgs } from "@mola/plugin-sdk";
-import { ExitCode, MolaError } from "@mola/plugin-sdk";
+import { ExitCode, MolaError, formatDuration, statusGlyph, table } from "@mola/plugin-sdk";
 import type { ListenerInfo } from "@mola/core";
 import type { DecisionFile, RunEntry } from "./recorder.js";
 
 function flagInt(v: string | boolean | undefined, fallback: number): number {
   const n = typeof v === "string" ? Number.parseInt(v, 10) : Number.NaN;
   return Number.isFinite(n) && n > 0 ? n : fallback;
-}
-
-function pad(s: string, w: number): string {
-  return s.length >= w ? s : s + " ".repeat(w - s.length);
 }
 
 function short(id: string): string {
@@ -45,23 +41,22 @@ function summarize(r: RunEntry) {
   };
 }
 
-function humanRunRow(r: RunEntry): string {
+function humanRunCells(r: RunEntry): string[] {
   const exit = r.exitCode === undefined ? "-" : String(r.exitCode);
   const who = r.agent ? `${r.agent}${r.machine ? `@${r.machine}` : ""}` : "-";
-  const route = r.modelRoute ?? "-";
-  const cmd = r.command ?? "-";
   return [
+    statusGlyph(r.exitCode === undefined ? "warn" : r.exitCode === 0 ? "ok" : "fail"),
     r.startedAt.replace("T", " ").slice(0, 19),
-    pad(r.status, 5),
-    pad(exit, 4),
-    pad(cmd, 12),
-    pad(who, 16),
-    pad(route, 20),
+    r.status,
+    exit,
+    r.command ?? "-",
+    who,
+    r.modelRoute ?? "-",
     short(r.runId),
-  ].join("  ");
+  ];
 }
 
-const RUNS_HEADER = ["started", "state", "exit", "command", "agent", "route", "traceId"].join("  ");
+const RUNS_HEADER = ["", "started", "state", "exit", "command", "agent", "route", "traceId"];
 
 export function runsListCommand(all: () => RunEntry[]): Command {
   return {
@@ -77,8 +72,7 @@ export function runsListCommand(all: () => RunEntry[]): Command {
       rows = rows.slice(0, limit);
       io.data(rows.map(summarize));
       if (!io.json) {
-        io.out(RUNS_HEADER);
-        for (const r of rows) io.out(humanRunRow(r));
+        for (const line of table({ header: RUNS_HEADER, rows: rows.map(humanRunCells) })) io.out(line);
         if (rows.length === 0) io.out("(no recorded runs — dispatch or run a task first)");
       }
       return ExitCode.Ok;
@@ -150,23 +144,26 @@ export function runsShowCommand(
       const data: RunShowData = { run: summarize(run), decision, events };
       io.data(data);
       if (!io.json) {
-        io.out(`run ${run.runId} (${run.status})`);
-        io.out(`  command     ${run.command ?? "-"}`);
-        if (run.agent) io.out(`  agent       ${run.agent}${run.machine ? ` @ ${run.machine}` : ""}`);
-        if (run.modelRoute) io.out(`  route       ${run.modelRoute}`);
-        io.out(`  started     ${run.startedAt}`);
-        io.out(
-          `  exit        ${run.exitCode ?? "-"}${run.durationMs !== undefined ? ` (${run.durationMs} ms)` : ""}`,
-        );
-        if (run.workspaceDir) io.out(`  workspace   ${run.workspaceDir}`);
-        for (const e of events) io.out(`  event       ${e.kind} ×${e.count}`);
+        const glyph = statusGlyph(run.exitCode === undefined ? "warn" : run.exitCode === 0 ? "ok" : "fail");
+        const fields: Array<[string, string]> = [
+          ["run", `${glyph}  ${run.runId} (${run.status})`],
+          ["command", run.command ?? "-"],
+        ];
+        if (run.agent) fields.push(["agent", `${run.agent}${run.machine ? ` @ ${run.machine}` : ""}`]);
+        if (run.modelRoute) fields.push(["route", run.modelRoute]);
+        fields.push(["started", run.startedAt]);
+        fields.push([
+          "exit",
+          `${run.exitCode ?? "-"}${run.durationMs !== undefined ? `  ${formatDuration(run.durationMs)}` : ""}`,
+        ]);
+        if (run.workspaceDir) fields.push(["workspace", run.workspaceDir]);
+        for (const line of table({ rows: fields })) io.out(line);
+        for (const e of events) io.out(`  event  ${e.kind} ×${e.count}`);
       }
       return ExitCode.Ok;
     },
   };
 }
-
-const HOOKS_HEADER = ["event", "kind", "owner"].join("  ");
 
 /**
  * Index-miss fallback: rebuild a minimal entry from the run's artifacts
@@ -220,11 +217,11 @@ export function hooksListCommand(describe: () => ListenerInfo[]): Command {
           io.out("(no listeners registered)");
           return ExitCode.Ok;
         }
-        const wEvent = Math.max("event".length, ...rows.map((r) => r.event.length));
-        const wKind = Math.max("kind".length, ...rows.map((r) => r.kind.length));
-        io.out([pad("event", wEvent), pad("kind", wKind), "owner"].join("  "));
-        for (const r of rows) {
-          io.out([pad(r.event, wEvent), pad(r.kind, wKind), r.owner].join("  "));
+        for (const line of table({
+          header: ["event", "kind", "owner"],
+          rows: rows.map((r) => [r.event, r.kind, r.owner]),
+        })) {
+          io.out(line);
         }
       }
       return ExitCode.Ok;

@@ -6,11 +6,49 @@
  */
 
 import type { Command, Disposer, EventBus, Io, ParsedArgs } from "@mola/plugin-sdk";
-import { MolaError, MolaEvents, ExitCode, parseArgv, toMolaError } from "@mola/plugin-sdk";
+import {
+  MolaError,
+  MolaEvents,
+  ExitCode,
+  banner,
+  detectColor,
+  formatValue,
+  palette,
+  parseArgv,
+  table,
+  toMolaError,
+} from "@mola/plugin-sdk";
 
 export interface RegisteredCommand extends Command {
   owner: string;
 }
+
+/** Help sections, in display order. Unknown first-tokens fall into "Other". */
+const HELP_GROUP_ORDER = ["Overview", "Run a task", "Agents", "Models", "Superagent", "Tools", "Setup"] as const;
+
+const HELP_GROUP_OF: Record<string, (typeof HELP_GROUP_ORDER)[number]> = {
+  dash: "Overview",
+  doctor: "Overview",
+  version: "Overview",
+  run: "Run a task",
+  dispatch: "Run a task",
+  think: "Run a task",
+  plan: "Run a task",
+  goal: "Run a task",
+  team: "Run a task",
+  review: "Run a task",
+  ship: "Run a task",
+  agents: "Agents",
+  runs: "Agents",
+  hooks: "Agents",
+  model: "Models",
+  superagent: "Superagent",
+  rtk: "Tools",
+  plugin: "Setup",
+  config: "Setup",
+  completions: "Setup",
+  skills: "Setup",
+};
 
 export interface RouterOptions {
   bus?: EventBus;
@@ -20,6 +58,8 @@ export interface RouterOptions {
 /** Io implementation; the router calls finish() after the handler returns. */
 export class IoImpl implements Io {
   private result: { set: boolean; value?: unknown } = { set: false };
+  /** true once the handler printed its own human line (so finish() stays quiet) */
+  private wroteHuman = false;
   commandPath = "";
 
   constructor(
@@ -35,6 +75,7 @@ export class IoImpl implements Io {
   }
 
   out(line: string): void {
+    this.wroteHuman = true;
     // --json mode: stdout carries only the envelope; human output goes to stderr
     if (this.json) process.stderr.write(line + "\n");
     else process.stdout.write(line + "\n");
@@ -72,11 +113,12 @@ export class IoImpl implements Io {
           data: this.result.value ?? null,
         }) + "\n",
       );
-    } else if (typeof this.result.value === "string") {
-      process.stdout.write(this.result.value + "\n");
-    } else {
-      process.stdout.write(JSON.stringify(this.result.value, null, 2) + "\n");
+      return;
     }
+    // the handler already spoke; don't dump data after it (and never as JSON)
+    if (this.wroteHuman) return;
+    const text = formatValue(this.result.value);
+    if (text.length > 0) process.stdout.write(text + "\n");
   }
 }
 
@@ -132,16 +174,37 @@ export class CommandRouter {
   }
 
   help(): string {
-    const rows = this.list();
-    const width = rows.reduce((w, c) => Math.max(w, this.key(c.path).length), 0);
-    const lines = [
-      "mola — plugin-based agent orchestration CLI",
+    // color is decoration: a pipe or NO_COLOR gets the plain banner and table
+    const p = palette(detectColor());
+    const groups = new Map<string, RegisteredCommand[]>();
+    for (const title of HELP_GROUP_ORDER) groups.set(title, []);
+    for (const c of this.list()) {
+      const title = HELP_GROUP_OF[c.path[0]] ?? "Other";
+      if (!groups.has(title)) groups.set(title, []);
+      groups.get(title)!.push(c);
+    }
+    const lines: string[] = [
+      banner(p),
       "",
       "usage: mola [--json] [-v…] [-q] [--config <path>] [--cwd <dir>] [--no-color] [--yes] <command> [args]",
       "",
-      "commands:",
-      ...rows.map((c) => `  ${this.key(c.path).padEnd(width)}  ${c.description}`),
     ];
+    for (const title of [...HELP_GROUP_ORDER, "Other"]) {
+      const cmds = groups.get(title);
+      if (!cmds || cmds.length === 0) continue;
+      lines.push(p.bold(title));
+      lines.push(
+        ...table({
+          rows: cmds.map((c) => [this.key(c.path), c.description]),
+          indent: "  ",
+        }),
+        "",
+      );
+    }
+    lines.push(p.bold("examples"));
+    lines.push("  mola doctor");
+    lines.push('  mola run "count TODOs in README.md"');
+    lines.push("  mola dash");
     return lines.join("\n");
   }
 

@@ -17,7 +17,7 @@
  */
 
 import type { PluginContext } from "@mola/plugin-sdk";
-import { definePlugin, MolaError, ExitCode } from "@mola/plugin-sdk";
+import { definePlugin, detectColor, MolaError, ExitCode, palette, statusGlyph, table } from "@mola/plugin-sdk";
 import {
   createMagpieRunner,
   parseMagpieLs,
@@ -110,7 +110,8 @@ export default definePlugin({
         if (io.json) {
           io.data({ agent: id, magpieId: row.id, route, source, configPath: row.configPath });
         } else {
-          io.out(`${route ?? "-"} (source: ${source})`);
+          const paint = palette(detectColor());
+          io.out(`${statusGlyph(route ? "ok" : "warn", paint)}  ${route ?? "-"}  (source: ${source})`);
         }
         return ExitCode.Ok;
       },
@@ -186,10 +187,13 @@ export default definePlugin({
         if (io.json) {
           io.data({ allowed, banned, routes });
         } else {
-          for (const r of routes) {
-            const mark = r.allowed ? "allowed     " : r.reason === "banned" ? "banned      " : "not-allowed ";
-            io.out(`${mark} ${r.id}`);
-          }
+          const paint = palette(detectColor());
+          const body = routes.map((r) => {
+            const glyph = statusGlyph(r.allowed ? "ok" : r.reason === "banned" ? "fail" : "warn", paint);
+            const verdict = r.allowed ? "allowed" : r.reason === "banned" ? "banned" : "not-allowed";
+            return [glyph, verdict, r.id];
+          });
+          for (const line of table({ header: ["", "verdict", "route"], rows: body })) io.out(line);
         }
         return ExitCode.Ok;
       },

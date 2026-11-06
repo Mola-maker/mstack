@@ -20,7 +20,7 @@ import type {
   ToolAdapter,
   ToolProbe,
 } from "@mola/plugin-sdk";
-import { definePlugin, MolaError, ExitCode } from "@mola/plugin-sdk";
+import { definePlugin, detectColor, MolaError, ExitCode, palette, statusGlyph, table } from "@mola/plugin-sdk";
 import { AGENT_PROBES, mergeAgents, probeAgent, type AgentRecord } from "./agents.js";
 import { createMagpieRunner, type MagpieRunner } from "./magpie.js";
 import { parseMagpieLs, parseMagpieRoutes, visibleRouteNames, matchVisibleRoutes } from "./parse.js";
@@ -168,11 +168,18 @@ export default definePlugin({
         }
         io.data({ agents, magpieUnavailable: magpieUnavailable ?? null });
         if (!io.json) {
-          for (const a of agents) {
-            const managed = a.managedByMagpie ? "magpie" : a.source;
-            const model = a.model ?? "-";
-            io.out(`${a.id}\t${a.available ? "ok" : "no"}\t${a.health ?? "unknown"}\t${model}\t${managed}`);
+          const paint = palette(detectColor());
+          const body = agents.map((a) => {
+            const glyph = statusGlyph(a.health === "ok" ? "ok" : a.health === "broken" ? "fail" : "warn", paint);
+            return [glyph, a.id, a.health ?? "unknown", a.model ?? "-", a.managedByMagpie ? "magpie" : a.source, a.machine];
+          });
+          for (const line of table({
+            header: ["", "agent", "health", "route", "managed", "machine"],
+            rows: body,
+          })) {
+            io.out(line);
           }
+          if (agents.length === 0) io.out("(no agents detected)");
         }
         return ExitCode.Ok;
       },
@@ -201,7 +208,20 @@ export default definePlugin({
         }
         io.data(agent);
         if (!io.json) {
-          io.out(`${agent.id}\t${agent.health ?? "unknown"}\t${agent.model ?? "-"}\t${agent.bin ?? "-"}`);
+          const paint = palette(detectColor());
+          const glyph = statusGlyph(agent.health === "ok" ? "ok" : agent.health === "broken" ? "fail" : "warn", paint);
+          const rows: Array<[string, string]> = [
+            ["agent", agent.id],
+            ["health", `${glyph}  ${agent.health ?? "unknown"}`],
+            ["route", agent.model ?? "-"],
+            ["machine", agent.machine],
+            ["binary", agent.bin ?? "-"],
+            ["managed", agent.managedByMagpie ? "magpie" : agent.source],
+          ];
+          if (agent.version) rows.push(["version", agent.version]);
+          if (agent.configPath) rows.push(["config", agent.configPath]);
+          if (agent.detail) rows.push(["detail", agent.detail]);
+          for (const line of table({ rows })) io.out(line);
         }
         return ExitCode.Ok;
       },

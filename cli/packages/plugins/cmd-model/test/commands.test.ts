@@ -56,7 +56,7 @@ test("model show dsh reads the WSL dispatch profile: group/smart-split (source: 
     [["ls"]],
     "one live magpie read, nothing else",
   );
-  assert.deepEqual(io.outs, ["group/smart-split (source: profile patch)"]);
+  assert.match(io.outs[0] ?? "", /group\/smart-split\s+\(source: profile patch\)/);
 });
 
 test("model show resolves other agents and strips the magpie/ prefix", async () => {
@@ -65,7 +65,7 @@ test("model show resolves other agents and strips the magpie/ prefix", async () 
   const io = fakeIo(false);
   const code = await handler({ positionals: ["codex"], flags: {} }, io);
   assert.equal(code, 0);
-  assert.deepEqual(io.outs, ["kimi-code-cn/k3 (source: magpie)"]);
+  assert.match(io.outs[0] ?? "", /kimi-code-cn\/k3\s+\(source: magpie\)/);
 });
 
 test("model show --json emits an envelope payload", async () => {

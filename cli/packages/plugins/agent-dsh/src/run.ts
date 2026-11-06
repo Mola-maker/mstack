@@ -186,7 +186,8 @@ export async function runDsh(deps: DshRunDeps, req: RunRequest): Promise<RunResu
 
   let overlayPath: string | undefined;
   if (req.modelRoute) {
-    overlayPath = path.join(".mstack", "runs", runId, "model-overlay.yml");
+    // POSIX separators: the path goes into a bash script that runs inside WSL/Linux
+    overlayPath = path.posix.join(".mstack", "runs", runId, "model-overlay.yml");
     deps.fs.writeFile(path.join(req.cwd, overlayPath), dshOverlayYaml(req.modelRoute));
   }
 

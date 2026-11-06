@@ -88,10 +88,56 @@ test("handler MolaError maps to its exit code; positionals and flags reach the h
   assert.match(res.stderr, /MANIFEST_INVALID/);
 });
 
-test("help lists registered commands", async () => {
+test("help lists registered commands, grouped, with examples", async () => {
   const r = makeRouter();
   r.register({ path: ["doctor"], description: "health checks", handler: async () => 0 }, "x");
+  r.register({ path: ["plugin", "list"], description: "installed plugins", handler: async () => 0 }, "y");
   const res = await capture(() => r.dispatch([], quietIo()));
   assert.equal(res.code, 0);
   assert.match(res.stdout, /doctor\s+health checks/);
+  assert.match(res.stdout, /plugin list\s+installed plugins/);
+  assert.match(res.stdout, /Overview/);
+  assert.match(res.stdout, /mola dash/);
+  assert.doesNotMatch(res.stdout, /\x1b\[/);
+});
+
+test("human mode prints data as a table only when the handler wrote nothing", async () => {
+  const r = makeRouter();
+  r.register(
+    {
+      path: ["show"],
+      description: "s",
+      handler: async (_a, io) => {
+        io.data({ agent: "dsh", route: "group/smart-split" });
+        return 0;
+      },
+    },
+    "x",
+  );
+  const io = new IoImpl(false, false, "t-test", process.cwd(), false);
+  const res = await capture(() => r.dispatch(["show"], io));
+  assert.equal(res.code, 0);
+  assert.match(res.stdout, /agent\s+dsh/);
+  assert.match(res.stdout, /route\s+group\/smart-split/);
+  assert.doesNotMatch(res.stdout, /\{/);
+});
+
+test("human mode does not repeat data when the handler already wrote", async () => {
+  const r = makeRouter();
+  r.register(
+    {
+      path: ["show"],
+      description: "s",
+      handler: async (_a, io) => {
+        io.out("hello");
+        io.data({ secret: 1 });
+        return 0;
+      },
+    },
+    "x",
+  );
+  const io = new IoImpl(false, false, "t-test", process.cwd(), false);
+  const res = await capture(() => r.dispatch(["show"], io));
+  assert.equal(res.code, 0);
+  assert.equal(res.stdout, "hello\n");
 });

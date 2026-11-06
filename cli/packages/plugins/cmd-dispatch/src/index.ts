@@ -19,7 +19,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { PluginContext } from "@mola/plugin-sdk";
-import { definePlugin, ExitCode, MolaEvents, MolaError } from "@mola/plugin-sdk";
+import { definePlugin, ExitCode, formatDuration, MolaEvents, MolaError } from "@mola/plugin-sdk";
 import {
   DISPATCH_TIMEOUT_MS,
   DEFAULT_ROUTE,
@@ -209,6 +209,7 @@ export default definePlugin({
         if (!io.json) {
           if (finalText) io.out(finalText);
           else io.note(`no final answer on stdout (dsh exit ${res.code}) — see ${logRef}`);
+          io.note(`${agent} · ${machine} · ${route} · ${formatDuration(durationMs)} · ${runId}`);
         }
         return (res.code === 0 ? ExitCode.Ok : res.code) as ExitCode;
       },

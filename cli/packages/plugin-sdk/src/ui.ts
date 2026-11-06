@@ -12,8 +12,6 @@
  *   - Tables align by display width, so CJK text (2 cells) keeps its columns.
  */
 
-import type { Io } from "./types.js";
-
 // ------------------------------------------------------------------- color
 
 /** Anything paintable: identity when color is off. */
@@ -259,7 +257,11 @@ export class Spinner {
  * The one policy for command plugins: spinners only in human mode, only on a
  * TTY, never in --json or --quiet. `const spin = ioSpinner(io, "text")`.
  */
-export function ioSpinner(io: Io, text: string, stream: SpinnerStream = process.stderr): Spinner {
+export function ioSpinner(
+  io: { json: boolean; quiet: boolean },
+  text: string,
+  stream: SpinnerStream = process.stderr,
+): Spinner {
   return new Spinner({
     text,
     stream,
@@ -272,6 +274,69 @@ export function ioSpinner(io: Io, text: string, stream: SpinnerStream = process.
 /**
  * The short `mola` (no arguments) banner — two lines, honest, no box drawing.
  */
+/** `-v` / `--verbose` (the bin strips it before handlers see their own argv). */
+export function verboseRequested(argv: string[] = process.argv): boolean {
+  return argv.some((a) => a === "-v" || a === "--verbose" || /^-vv+$/.test(a));
+}
+
+/** Compact duration for the one-line run summary. Missing values stay "-". */
+export function formatDuration(ms: number | undefined): string {
+  if (ms === undefined || !Number.isFinite(ms) || ms < 0) return "-";
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 10_000) return `${(ms / 1000).toFixed(1)}s`;
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  const m = Math.floor(ms / 60_000);
+  const s = Math.round((ms % 60_000) / 1000);
+  return `${m}m${s}s`;
+}
+
+function isPlain(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
+
+/** One cell: never JSON. Nested values become `k=v` pairs or comma lists. */
+function inline(v: unknown): string {
+  if (v == null) return "-";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (Array.isArray(v)) return v.length === 0 ? "-" : v.map((x) => inline(x)).join(", ");
+  if (typeof v === "object") {
+    const parts = Object.entries(v as Record<string, unknown>).map(([k, val]) => `${k}=${inline(val)}`);
+    return parts.length === 0 ? "-" : parts.join(" ");
+  }
+  return String(v);
+}
+
+/**
+ * Human rendering of a handler's `io.data()` when the handler wrote nothing.
+ * A table or a key/value list — never raw JSON (B2e).
+ */
+export function formatValue(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "(none)";
+    if (value.every((v) => isPlain(v))) {
+      const keys: string[] = [];
+      for (const row of value as Array<Record<string, unknown>>) {
+        for (const k of Object.keys(row)) if (!keys.includes(k)) keys.push(k);
+      }
+      return table({
+        header: keys,
+        rows: (value as Array<Record<string, unknown>>).map((row) => keys.map((k) => inline(row[k]))),
+      }).join("\n");
+    }
+    return value.map((v) => inline(v)).join("\n");
+  }
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) return "(none)";
+    return table({ rows: entries.map(([k, v]) => [k, inline(v)]) }).join("\n");
+  }
+  return String(value);
+}
+
 export function banner(p: Palette = palette(detectColor(process.stdout))): string {
   return [
     `${p.bold("mola")} ${p.dim("—")} plugin-based agent orchestration CLI`,

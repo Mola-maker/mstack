@@ -100,7 +100,7 @@ test("status: both instances healthy → exit 0, one envelope, human lines", asy
   assert.equal(layerfs.load.busy, false);
   assert.equal(layerfs.healthProblems.length, 0);
   // human form (not --json): a status line per instance
-  assert.match(io.outLines[0], /^layerfs\thttp:\/\/127\.0\.0\.1:3082\trunning\tload 1\/3 workers, 0 queued/);
+  assert.match(io.outLines[0], /layerfs\s+http:\/\/127\.0\.0\.1:3082\s+running\s+load 1\/3 workers, 0 queued/);
   assert.match(io.outLines[1], /setup ok, all health parts ready/);
 });
 
@@ -151,7 +151,7 @@ test("status: paused is a deliberate state — reported, exit 0", async () => {
   assert.equal(await runCommand(f, "superagent status", io), 0);
   const [inst] = envelopeOf(io).instances as any[];
   assert.equal(inst.paused, true);
-  assert.match(io.outLines[0], /\tPAUSED\t/);
+  assert.match(io.outLines[0], /PAUSED/);
 });
 
 test("status: unreachable instance → exit 69, still one envelope", async () => {
@@ -166,7 +166,7 @@ test("status: unreachable instance → exit 69, still one envelope", async () =>
   const bad = (data.instances as any[]).find((i) => i.name === "cad2gis");
   assert.equal(bad.reachable, false);
   assert.match(bad.error, /ECONNREFUSED/);
-  assert.match(io.outLines.join("\n"), /cad2gis\t.*UNREACHABLE/);
+  assert.match(io.outLines.join("\n"), /cad2gis\s+.*UNREACHABLE/);
 });
 
 test("status <name>: only that instance is contacted; unknown name → 66", async () => {
@@ -215,8 +215,8 @@ test("tickets: real sources sample → exit 0, per-Source state + stats + proble
   assert.equal(github.problem.code, "repositoryUnset");
   assert.equal(github.dropped.length, 0);
   const text = io.outLines.join("\n");
-  assert.match(text, /layerfs\tfeishu\tsetup\treceived=0 filtered=0 dropped=0/);
-  assert.match(text, /layerfs\tgithub\terror\t.* — repositoryUnset: The GitHub Source names no repository\./);
+  assert.match(text, /layerfs\s+feishu\s+setup\s+received=0 filtered=0 dropped=0/);
+  assert.match(text, /layerfs\s+github\s+error\s+.* — repositoryUnset: The GitHub Source names no repository\./);
 });
 
 test("tickets: unreachable → exit 69 with the instance reported", async () => {

@@ -32,7 +32,7 @@ import type {
   ToolAdapter,
   ToolProbe,
 } from "@mola/plugin-sdk";
-import { definePlugin, ExitCode, MolaError, MolaEvents, PolicyDenial } from "@mola/plugin-sdk";
+import { definePlugin, detectColor, ExitCode, MolaError, MolaEvents, palette, PolicyDenial, statusGlyph, table } from "@mola/plugin-sdk";
 import { SuperagentApi, type FetchLike, type SuperagentSource, type SuperagentState } from "./api.js";
 import { resolveInstances, type SuperagentInstance } from "./config.js";
 import { interpretState, statusExitCode, type InstanceReport, type StatusReport } from "./report.js";
@@ -222,25 +222,27 @@ const USAGE_TICKETS = "usage: mola superagent tickets [name]";
 const USAGE_PAUSE = "usage: mola superagent pause|resume [name]";
 
 function humanStatusLine(report: StatusReport): string[] {
+  const paint = palette(detectColor());
   if (!report.reachable) {
-    return [`${report.name}\t${report.url}\tUNREACHABLE — ${report.error}`];
+    return [`${statusGlyph("fail", paint)}  ${report.name}  ${report.url}  UNREACHABLE — ${report.error}`];
   }
   const r = report as InstanceReport;
+  const glyph = statusGlyph(!r.setup.ok || r.healthProblems.length > 0 ? "fail" : r.paused ? "warn" : "ok", paint);
   const lines = [
-    `${r.name}\t${r.url}\t${r.paused ? "PAUSED" : "running"}\t` +
+    `${glyph}  ${r.name}  ${r.url}  ${r.paused ? "PAUSED" : "running"}  ` +
       `load ${r.load.running ?? "?"}/${r.load.maxWorkers ?? "?"} workers, ${r.load.queued ?? 0} queued` +
       (r.load.busy ? " (busy — not broken)" : ""),
   ];
   if (!r.setup.ok) {
-    const p = r.setup.problem!;
-    lines.push(`  setup: ${p.code ?? "unknown"}${p.place ? ` (${p.place})` : ""} — ${p.detail ?? "no detail"}`);
-    lines.push(`  fix:   ${r.setup.fixHint}`);
+    const problem = r.setup.problem!;
+    lines.push(`   setup: ${problem.code ?? "unknown"}${problem.place ? ` (${problem.place})` : ""} — ${problem.detail ?? "no detail"}`);
+    lines.push(`   fix:   ${r.setup.fixHint}`);
   }
   for (const h of r.healthProblems) {
-    lines.push(`  ${h.name}: ${h.state} — ${h.detail ?? "no detail"}`);
+    lines.push(`   ${h.name}: ${h.state} — ${h.detail ?? "no detail"}`);
   }
   if (r.setup.ok && r.healthProblems.length === 0) {
-    lines.push(`  setup ok, all health parts ready`);
+    lines.push(`   setup ok, all health parts ready`);
   }
   return lines;
 }
@@ -298,19 +300,32 @@ export default definePlugin({
         }
         io.data({ instances: reports });
         if (!io.json) {
+          const paint = palette(detectColor());
+          const body: string[][] = [];
           for (const report of reports) {
             if (!report.reachable) {
-              io.out(`${report.name}\t${report.url}\tUNREACHABLE — ${report.error}`);
+              body.push([statusGlyph("fail", paint), report.name, report.url, "UNREACHABLE", report.error ?? ""]);
               continue;
             }
             for (const src of report.sources ?? []) {
-              const problem = src.problem ? ` — ${src.problem.code ?? "unknown"}: ${src.problem.detail ?? ""}` : "";
-              io.out(
-                `${report.name}\t${src.id}\t${src.state ?? "?"}\t` +
-                  `received=${src.stats?.received ?? 0} filtered=${src.stats?.filtered ?? 0} dropped=${src.dropped?.length ?? 0}` +
-                  problem,
-              );
+              const problem = src.problem
+                ? `— ${src.problem.code ?? "unknown"}: ${src.problem.detail ?? ""}`
+                : "";
+              body.push([
+                statusGlyph(src.state === "error" || src.problem ? "fail" : "ok", paint),
+                report.name,
+                src.id,
+                src.state ?? "?",
+                `received=${src.stats?.received ?? 0} filtered=${src.stats?.filtered ?? 0} dropped=${src.dropped?.length ?? 0}`,
+                problem,
+              ]);
             }
+          }
+          for (const line of table({
+            header: ["", "instance", "source", "state", "stats", "problem"],
+            rows: body,
+          })) {
+            io.out(line);
           }
         }
         return (reports.some((r) => !r.reachable) ? ExitCode.Unavailable : ExitCode.Ok) as ExitCode;

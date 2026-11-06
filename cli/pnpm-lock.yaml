@@ -109,9 +109,15 @@ importers:
 
   packages/plugins/cmd-dash:
     dependencies:
+      '@mola/core':
+        specifier: workspace:*
+        version: link:../../core
       '@mola/plugin-sdk':
         specifier: workspace:*
         version: link:../../plugin-sdk
+      '@mola/plugin-tool-superagent':
+        specifier: workspace:*
+        version: link:../tool-superagent
 
   packages/plugins/cmd-dispatch:
     dependencies:

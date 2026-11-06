@@ -137,7 +137,7 @@ test("unknown command exits 64; human mode prints help on empty argv", () => {
 test("human-mode plugin list prints id/version/kind/tier/state lines", () => {
   const r = run(["plugin", "list"], tmpHome());
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /mola-cmd-doctor 0\.1\.0 command builtin active/);
+  assert.match(r.stdout, /mola-cmd-doctor\s+0\.1\.0\s+command\s+builtin\s+active/);
 });
 
 test("run history is recorded in the state store keyed by traceId", () => {

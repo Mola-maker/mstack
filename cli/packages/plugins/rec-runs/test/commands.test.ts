@@ -75,7 +75,7 @@ test("runs list: --limit and --agent filter; human mode prints a table", async (
 
   const io = makeIo();
   await cmd.handler({ positionals: [], flags: { limit: "1" } }, io);
-  assert.match(io.outLines[0], /^started  state/);
+  assert.match(io.outLines[0], /started\s+state/);
   assert.equal(io.outLines.length, 2); // header + newest row (trace-b)
 
   const io2 = makeIo();

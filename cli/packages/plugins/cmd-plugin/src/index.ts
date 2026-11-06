@@ -26,7 +26,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { Io, PluginContext } from "@mola/plugin-sdk";
-import { definePlugin, validateManifest, MolaError, ExitCode } from "@mola/plugin-sdk";
+import { definePlugin, detectColor, palette, statusGlyph, table, validateManifest, MolaError, ExitCode } from "@mola/plugin-sdk";
 
 /**
  * The plugin lifecycle events (ADR-0004 `mola.<domain>.<verb>`). The SDK's
@@ -213,10 +213,14 @@ export default definePlugin({
         });
         io.data(rows);
         if (!io.json) {
-          for (const p of rows) {
-            const suffix = p.state === "quarantined" ? ` (quarantined: ${p.error ?? "?"})` : "";
-            const off = p.enabled === false ? " [disabled]" : "";
-            io.out(`${p.id} ${p.version} ${p.kind} ${p.tier} ${p.state}${off}${suffix}`);
+          const paint = palette(detectColor());
+          const body = rows.map((p) => {
+            const glyph = statusGlyph(p.state === "quarantined" ? "fail" : p.enabled === false ? "warn" : "ok", paint);
+            const state = p.state === "quarantined" ? `quarantined: ${p.error ?? "?"}` : p.enabled === false ? "disabled" : p.state;
+            return [glyph, p.id, p.version, p.kind, p.tier, state];
+          });
+          for (const line of table({ header: ["", "id", "version", "kind", "tier", "state"], rows: body })) {
+            io.out(line);
           }
         }
         return ExitCode.Ok;

@@ -11,7 +11,7 @@
  */
 
 import type { CheckResult, DoctorCheck, PluginContext } from "@mola/plugin-sdk";
-import { definePlugin, ExitCode } from "@mola/plugin-sdk";
+import { definePlugin, detectColor, ExitCode, palette, statusGlyph } from "@mola/plugin-sdk";
 
 function nodeCheck(): DoctorCheck {
   return {
@@ -88,8 +88,12 @@ export default definePlugin({
         }
 
         if (!io.json) {
-          for (const c of checks) {
-            io.out(`${c.ok ? "ok  " : "FAIL"}  ${c.id}${c.message ? ` — ${c.message}` : ""}`);
+          // failures first, each with a glyph; the message is the fix when one exists
+          const p = palette(detectColor());
+          const ordered = [...checks.filter((c) => !c.ok), ...checks.filter((c) => c.ok)];
+          for (const c of ordered) {
+            const glyph = statusGlyph(c.ok ? "ok" : "fail", p);
+            io.out(`${glyph}  ${c.id}${c.message ? `  ${c.message}` : ""}`);
           }
         }
         io.data({
