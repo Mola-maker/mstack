@@ -9,6 +9,16 @@ import * as path from "node:path";
 import { randomUUID } from "node:crypto";
 import { boot, toMolaError, ExitCode, type GlobalFlags } from "@mola/core";
 
+// node:sqlite is still experimental on Node 22: its one-time ExperimentalWarning on
+// stderr would break the --json contract (stderr carries exactly one error line).
+// Silence that one warning only; every other warning still prints.
+const emitWarning = process.emitWarning.bind(process);
+process.emitWarning = ((warning: string | Error, ...rest: unknown[]) => {
+  const text = typeof warning === "string" ? warning : warning?.message;
+  if (/SQLite is an experimental feature/i.test(String(text))) return;
+  return (emitWarning as (...a: unknown[]) => void)(warning, ...rest);
+}) as typeof process.emitWarning;
+
 const VERSION = "0.1.0";
 
 /** Bundled first-party plugins (tier: builtin), resolved through this package's deps. */

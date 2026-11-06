@@ -9,6 +9,11 @@ import * as path from "node:path";
 import plugin from "../src/index.js";
 import { makeFakeCtx, makeIo, type FakeAgent } from "./fake.js";
 
+// dsh is "wsl:Ubuntu" only on Windows or inside WSL; a plain Linux CI runner has it local.
+import { readFileSync as __readProc } from "node:fs";
+const insideWsl = (() => { try { return /microsoft/i.test(__readProc("/proc/version", "utf8")); } catch { return false; } })();
+const wslOrWindowsTest = process.platform === "win32" || insideWsl ? test : test.skip;
+
 // The policy layer is read from $MOLA_HOME/policy.jsonc — point it at a fake
 // home so the machine's real policy never leaks into the tests.
 const HOME = path.resolve("/fake/home"); // MOLA_HOME is resolved (E:\fake\home on Windows)
@@ -100,7 +105,7 @@ test("run: a banned route is refused before any agent runs (exit 77)", async () 
   assert.equal(agent.calls.length, 0);
 });
 
-test("run: --on pins the machine (dsh lives in WSL on Windows)", async () => {
+wslOrWindowsTest("run: --on pins the machine (dsh lives in WSL on Windows)", async () => {
   const f = activate({ agents: [okAgent("dsh"), okAgent("claude")] });
   const io = makeIo();
   const code = await f.cmd.handler({ positionals: ["task"], flags: { on: "wsl" } }, io);
