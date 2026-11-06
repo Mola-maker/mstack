@@ -7,7 +7,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import plugin, { makeClaudeAdapter, probeClaude, buildClaudeArgv, buildHookSettings, hookSinkScript, parseClaudeStream, permissionModeOf } from "@mola/plugin-agent-claude";
+import plugin, { makeClaudeAdapter, probeClaude, buildClaudeArgv, buildHookSettings, hookSinkScript, parseClaudeStream, permissionModeOf, claudeUsesMagpie } from "@mola/plugin-agent-claude";
 import { makeFakeCtx } from "./fake.js";
 import type { RunRequest } from "@mola/plugin-sdk";
 
@@ -62,6 +62,7 @@ test("buildClaudeArgv: headless stream argv from claude-help.txt flags only", ()
     "count TODOs",
     "--output-format",
     "stream-json",
+    "--verbose",
     "--include-hook-events",
     "--permission-mode",
     "acceptEdits",
@@ -123,6 +124,7 @@ linuxTest("run(): argv, hook-sink file, and the ADR-0004 events on bus + onEvent
     "count TODOs",
     "--output-format",
     "stream-json",
+    "--verbose",
     "--include-hook-events",
     "--permission-mode",
     "acceptEdits",
@@ -268,4 +270,11 @@ test("manifest: kind agent, provides agent:claude, claude+magpie exec allow-list
   assert.deepEqual(manifest.provides, ["agent:claude"]);
   assert.ok(manifest.permissions["process.exec"].includes("claude"));
   assert.ok(manifest.hooks.emit.includes("mola.session.ended"));
+});
+
+test("claudeUsesMagpie: only an ANTHROPIC_BASE_URL pointing at magpie counts", () => {
+  assert.equal(claudeUsesMagpie({}, undefined), false);
+  assert.equal(claudeUsesMagpie({ ANTHROPIC_BASE_URL: "http://127.0.0.1:3425" }, undefined), true);
+  assert.equal(claudeUsesMagpie({}, JSON.stringify({ env: { ANTHROPIC_BASE_URL: "http://localhost:3425/anthropic" } })), true);
+  assert.equal(claudeUsesMagpie({}, JSON.stringify({ env: { ANTHROPIC_BASE_URL: "https://api.anthropic.com" } })), false);
 });

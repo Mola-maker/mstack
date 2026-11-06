@@ -79,3 +79,9 @@ test("parseNdjson + firstString: lenient stream-bridge primitives", () => {
   assert.equal(firstString(events[0], ["result", "text", "message"]), "hi");
   assert.equal(firstString(events[1], ["result", "text", "message"]), undefined);
 });
+
+test("detectQuotaFailure: a bare 402 inside ids or numbers is not a quota failure; real quota errors are", () => {
+  assert.equal(detectQuotaFailure('{"session_id":"befd1-402a","total_cost_usd":0.1188402,"tokens":402}'), undefined);
+  assert.equal(detectQuotaFailure('dsh: QUOTA: 402: {"message":"DeepSeek: Insufficient Balance"}')?.status, 402);
+  assert.equal(detectQuotaFailure("HTTP 429 Too Many Requests")?.status, 429);
+});

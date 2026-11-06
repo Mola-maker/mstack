@@ -3,7 +3,7 @@
   "id": "mola-cmd-run",
   "version": "0.1.0",
   "kind": "command",
-  "displayName": "cmd-run",
+  "displayName": "cmd-run — mola run (the routing engine) + the mstack skill commands",
   "mola": ">=0.1.0 <1.0.0",
   "engine": {
     "node": ">=22"
@@ -11,11 +11,13 @@
   "entry": {
     "ts": "./dist/index.js"
   },
-  "provides": [],
+  "provides": ["cmd:run", "cmd:think", "cmd:plan", "cmd:goal", "cmd:team", "cmd:review", "cmd:ship"],
   "requires": [],
-  "capabilities": [],
+  "capabilities": ["command.run", "routing.engine", "skills.wrap"],
   "permissions": {
-    "mola": []
+    "process.exec": ["magpie"],
+    "fs.read": ["**/policy.jsonc"],
+    "mola": ["events", "commands", "config.read", "state.kv"]
   },
   "hooks": {
     "emit": [],

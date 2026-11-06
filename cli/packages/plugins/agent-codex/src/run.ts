@@ -298,7 +298,7 @@ export async function runCodex(deps: CodexRunDeps, req: RunRequest): Promise<Run
 
   const parsed = parseCodexStream(res.stdout);
   const sessionId = parsed.sessionId ?? req.sessionId;
-  const quota = detectQuotaFailure(`${res.stderr}\n${res.stdout}`, req.modelRoute);
+  const quota = res.code === 0 ? undefined : detectQuotaFailure(`${res.stderr}\n${res.stdout}`, req.modelRoute);
   // --output-last-message is the deterministic final answer; stdout stays the
   // primary source, the file only fills in when the stream carried no text
   if (!parsed.finalText && plan?.lastMessageFile && deps.fs) {

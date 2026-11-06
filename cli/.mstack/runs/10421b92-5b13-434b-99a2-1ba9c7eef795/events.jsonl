@@ -1,2 +1,0 @@
-{"id":"67d610d2-1b89-417e-af1f-860cd6491d18","ts":"2026-11-05T12:50:58.269Z","kind":"mola.command.started","source":{"runId":"10421b92-5b13-434b-99a2-1ba9c7eef795"},"data":{"traceId":"10421b92-5b13-434b-99a2-1ba9c7eef795","path":"plugin disable","argv":["mola-fake-plugin"]}}
-{"id":"28403cc6-ad5d-4fb7-ad68-710a0987f11d","ts":"2026-11-05T12:50:58.318Z","kind":"mola.command.ended","source":{"runId":"10421b92-5b13-434b-99a2-1ba9c7eef795"},"data":{"traceId":"10421b92-5b13-434b-99a2-1ba9c7eef795","path":"plugin disable","exitCode":0,"durationMs":14}}

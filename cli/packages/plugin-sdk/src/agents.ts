@@ -180,9 +180,13 @@ export function isRunnableAgent(a: AgentAdapter): a is HeadlessAgentAdapter {
  */
 export function detectQuotaFailure(text: string, route?: string): QuotaFailure | undefined {
   const t = text ?? "";
-  if (/\b402\b/.test(t)) return { provider: "magpie", route, status: 402 };
-  const m = /\b(429)\b/.exec(t);
-  if (m) return { provider: "magpie", route, status: Number(m[1]) };
+  // a bare "402" anywhere (a session id, a cost, a token count) is not a quota failure:
+  // the code must sit in an error context or next to quota wording
+  const coded = /\b(?:status|code|http|error|quota)\W{0,3}(402|429)\b/i.exec(t) ??
+    /\b(402|429)\b\W{0,3}(?:payment required|insufficient|too many requests|rate limit)/i.exec(t);
+  const worded = /(?:too many requests|payment required|rate limit|insufficient[a-z ]*)\W{0,3}(402|429)\b/i.exec(t);
+  if (!coded && worded) return { provider: "magpie", route, status: Number(worded[1]) };
+  if (coded) return { provider: "magpie", route, status: Number(coded[1]) };
   if (/rate\s*limit|quota\s*(exceeded|exhausted)|insufficient.*(quota|balance|credit)/i.test(t)) {
     return { provider: "magpie", route, status: 402 };
   }

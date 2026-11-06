@@ -116,6 +116,24 @@ export interface ClaudeRunDeps {
   fs: FsService;
   /** inject the per-run native-hook bridge (default: true) */
   nativeHooks?: boolean;
+  /**
+   * Whether this Claude Code reaches its models through magpie. When false, a
+   * magpie route (group/*, auto/*) is meaningless to it (`--model group/x` exits 1),
+   * so the route is dropped and Claude uses its own model. Default: assume routed.
+   */
+  magpieRouted?: boolean;
+}
+
+/** Does Claude Code talk to magpie? (ANTHROPIC_BASE_URL in the process env or ~/.claude/settings.json) */
+export function claudeUsesMagpie(processEnv: NodeJS.ProcessEnv, settingsText: string | undefined): boolean {
+  const viaMagpie = (u: unknown): boolean => typeof u === "string" && /(127\.0\.0\.1|localhost):3425|magpie/i.test(u);
+  if (viaMagpie(processEnv.ANTHROPIC_BASE_URL)) return true;
+  try {
+    const s = settingsText ? (JSON.parse(settingsText) as { env?: Record<string, unknown> }) : undefined;
+    return viaMagpie(s?.env?.ANTHROPIC_BASE_URL);
+  } catch {
+    return false;
+  }
 }
 
 export interface ClaudeRunPlan {
@@ -137,6 +155,8 @@ export function buildClaudeArgv(prompt: string, plan: ClaudeRunPlan): string[] {
     prompt,
     "--output-format",
     "stream-json",
+    // claude refuses `-p --output-format stream-json` without --verbose (exit 1)
+    "--verbose",
     "--include-hook-events",
     "--permission-mode",
     plan.permissionMode,
@@ -235,7 +255,7 @@ export function planClaudeRun(req: RunRequest, deps: ClaudeRunDeps, runId: strin
   const resumeId = req.sessionId && req.sessionId !== "latest" ? req.sessionId : undefined;
   const plan: ClaudeRunPlan = {
     permissionMode: permissionModeOf(req.permissionProfile),
-    ...(req.modelRoute ? { model: req.modelRoute } : {}),
+    ...(req.modelRoute && deps.magpieRouted !== false ? { model: req.modelRoute } : {}),
     ...(req.budgetUsd !== undefined ? { budgetUsd: req.budgetUsd } : {}),
     ...(req.addDirs?.length ? { addDirs: req.addDirs } : {}),
     ...(resumeId ? { resumeId } : {}),
@@ -293,7 +313,7 @@ export async function runClaude(deps: ClaudeRunDeps, req: RunRequest): Promise<R
 
   const parsed = parseClaudeStream(res.stdout);
   const sessionId = parsed.sessionId ?? req.sessionId;
-  const quota = detectQuotaFailure(`${res.stderr}\n${res.stdout}`, req.modelRoute);
+  const quota = res.code === 0 ? undefined : detectQuotaFailure(`${res.stderr}\n${res.stdout}`, req.modelRoute);
   let lastMessage = "";
   for (const text of parsed.messages) {
     if (text === lastMessage) continue;
@@ -322,7 +342,7 @@ export async function runClaude(deps: ClaudeRunDeps, req: RunRequest): Promise<R
     tap(
       envelope(
         MolaEvents.ErrorRaised,
-        { kind: quota ? "quota" : "crash", sessionId, detail: `${CLAUDE_BIN} exited ${res.code}` },
+        { kind: quota ? "quota" : "crash", sessionId, detail: (res.stderr || "").trim().split(/\r?\n/).pop() || `${CLAUDE_BIN} exited ${res.code}` },
         runId,
         sessionId,
       ),

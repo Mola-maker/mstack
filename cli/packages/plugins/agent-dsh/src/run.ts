@@ -68,8 +68,15 @@ export function dshRunScript(plan: DshRunPlan): string {
   if (plan.overlayPath) dsh += ` --patch ${shellQuote(plan.overlayPath)}`;
   dsh += " --json";
   if (plan.sessionId) dsh += ` --session-id ${shellQuote(plan.sessionId)}`;
-  if (plan.permissionMode) dsh += ` --permission-mode ${shellQuote(plan.permissionMode)}`;
   for (const dir of plan.addDirs ?? []) dsh += ` --add-dir ${shellQuote(dir)}`;
+  if (plan.permissionMode) {
+    // --permission-mode is newer than some installed dsh builds (0.2.1-rc.5 rejects it):
+    // pass it only when this dsh's help lists it
+    parts.push(
+      `PM=""; dsh --profile ${DSH_PROFILE} --help 2>/dev/null | grep -q -- --permission-mode && PM=${shellQuote(`--permission-mode ${plan.permissionMode}`)}`,
+    );
+    dsh += " $PM";
+  }
   parts.push(dsh);
   return parts.join("; ");
 }
@@ -108,6 +115,11 @@ export function parseDshStream(stdout: string): StreamParse {
   let errorDetail: string | undefined;
   for (const ev of events) {
     sessionId = firstString(ev, ["sessionId", "session_id", "id"]) ?? sessionId;
+    // {"type":"error","message":…} is dsh failing (e.g. an unknown option): the error, never an answer
+    if (ev.type === "error") {
+      errorDetail = firstString(ev, ["message", "error"]) ?? errorDetail;
+      continue;
+    }
     // {"type":"final","text":…} is the real final-answer event; the other keys
     // are the lenient fallback for older/other profiles
     const text =
@@ -235,7 +247,7 @@ export async function runDsh(deps: DshRunDeps, req: RunRequest): Promise<RunResu
 
   const parsed = parseDshStream(res.stdout);
   const sessionId = parsed.sessionId ?? req.sessionId;
-  const quota = detectQuotaFailure(`${res.stderr}\n${res.stdout}`, req.modelRoute);
+  const quota = res.code === 0 ? undefined : detectQuotaFailure(`${res.stderr}\n${res.stdout}`, req.modelRoute);
 
   let lastMessage = "";
   for (const text of parsed.messages) {

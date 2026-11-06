@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 /**
  * agent-claude (B2 — BATCHES.md, DESIGN §5, adapters-routing §2.1): the
  * HeadlessAgentAdapter for Claude Code, grounded in cli/design/inputs/
@@ -18,6 +21,7 @@ import {
   claudeListSessionsUnsupported,
   claudeSetModel,
   claudeUsage,
+  claudeUsesMagpie,
   runClaude,
 } from "./run.js";
 
@@ -31,6 +35,7 @@ export {
   hookSinkScript,
   parseClaudeStream,
   permissionModeOf,
+  claudeUsesMagpie,
   runClaude,
 } from "./run.js";
 
@@ -43,7 +48,14 @@ export interface ClaudeAdapter extends HeadlessAgentAdapter {
 }
 
 export function makeClaudeAdapter(ctx: PluginContext): ClaudeAdapter {
-  const deps = { exec: ctx.process, events: ctx.events, fs: ctx.fs };
+  // official-login Claude Code ignores magpie routes; decide once per process
+  let settingsText: string | undefined;
+  try {
+    settingsText = readFileSync(join(homedir(), ".claude", "settings.json"), "utf8");
+  } catch {
+    settingsText = undefined;
+  }
+  const deps = { exec: ctx.process, events: ctx.events, fs: ctx.fs, magpieRouted: claudeUsesMagpie(process.env, settingsText) };
   return {
     id: "claude",
     capabilities: CLAUDE_CAPABILITIES,

@@ -1,2 +1,0 @@
-{"id":"409b8603-7954-4f8a-9711-d3f952326946","ts":"2026-11-05T12:54:46.113Z","kind":"mola.command.started","source":{"runId":"0c306272-95e6-41cd-afbc-2fc6af4873c8"},"data":{"traceId":"0c306272-95e6-41cd-afbc-2fc6af4873c8","path":"completions","argv":["bash"]}}
-{"id":"9472c1cb-ab8f-4f7a-b020-f51b07091fdc","ts":"2026-11-05T12:54:46.160Z","kind":"mola.command.ended","source":{"runId":"0c306272-95e6-41cd-afbc-2fc6af4873c8"},"data":{"traceId":"0c306272-95e6-41cd-afbc-2fc6af4873c8","path":"completions","exitCode":0,"durationMs":5}}

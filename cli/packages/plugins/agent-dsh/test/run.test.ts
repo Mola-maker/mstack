@@ -226,3 +226,16 @@ linuxTest("activate: still registers the adapter and the agent.dsh doctor check"
   assert.deepEqual(f.agents.map((a) => a.id), ["dsh"]);
   assert.ok(f.checks.some((c) => c.id === "agent.dsh"));
 });
+
+test("parseDshStream: a {type:error} line is the error detail, not the answer", () => {
+  const p = parseDshStream('{"type":"error","message":"unknown option \'--permission-mode\'"}\n');
+  assert.equal(p.errorDetail, "unknown option '--permission-mode'");
+  assert.equal(p.finalText, "");
+});
+
+test("dshRunScript: --permission-mode is passed only when this dsh's help lists it", () => {
+  const s = dshRunScript({ cwdPosix: "/w", permissionMode: "workspace-write" });
+  assert.match(s, /--help 2>\/dev\/null \| grep -q -- --permission-mode && PM=/);
+  assert.match(s, /--json \$PM$/);
+  assert.doesNotMatch(dshRunScript({ cwdPosix: "/w" }), /permission-mode/);
+});
