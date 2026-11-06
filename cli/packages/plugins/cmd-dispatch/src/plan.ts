@@ -45,7 +45,7 @@ export function buildBashScript(plan: ScriptPlan): string {
  * directly — no Git Bash, no MSYS path rewriting). Inside Linux/WSL: bash -lc.
  */
 export function dispatchArgv(script: string, windows: boolean): string[] {
-  return windows ? ["wsl", "-e", "bash", "-lc", script] : ["bash", "-lc", script];
+  return windows ? ["wsl", "-u", process.env.MOLA_WSL_USER || "root", "-e", "bash", "-lc", script] : ["bash", "-lc", script];
 }
 
 export interface NdjsonResult {

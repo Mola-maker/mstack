@@ -38,7 +38,7 @@ export function dshProbeScript(): string {
 
 /** Login-shell argv that runs `script` where DSH actually lives. */
 export function dshExecArgv(script: string, windows = onWindows()): string[] {
-  return windows ? ["wsl", "-e", "bash", "-lc", script] : ["bash", "-lc", script];
+  return windows ? ["wsl", "-u", process.env.MOLA_WSL_USER || "root", "-e", "bash", "-lc", script] : ["bash", "-lc", script];
 }
 
 /** Single-quote a value for safe interpolation into a bash -lc script. */

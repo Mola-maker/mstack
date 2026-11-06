@@ -86,7 +86,7 @@ export function probeArgv(spec: AgentProbeSpec, bin: string): string[] {
   // inside WSL, ~/src/mola-dsh-stack/scripts/env.sh is what puts dsh (npm-global) on PATH
   const inner = `[ -f ~/src/mola-dsh-stack/scripts/env.sh ] && source ~/src/mola-dsh-stack/scripts/env.sh; command -v ${bin} >/dev/null 2>&1 && ${bin} --version`;
   return process.platform === "win32"
-    ? ["wsl", "-e", "bash", "-lc", inner]
+    ? ["wsl", "-u", process.env.MOLA_WSL_USER || "root", "-e", "bash", "-lc", inner]
     : ["bash", "-lc", inner];
 }
 

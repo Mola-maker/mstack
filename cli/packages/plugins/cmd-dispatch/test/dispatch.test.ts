@@ -50,7 +50,7 @@ linuxTest("script: the tested headless invocation, stdin variant without `<`", (
 });
 
 linuxTest("argv: wsl -e bash -lc on Windows, bash -lc inside Linux/WSL", () => {
-  assert.deepEqual(dispatchArgv("echo hi", true), ["wsl", "-e", "bash", "-lc", "echo hi"]);
+  assert.deepEqual(dispatchArgv("echo hi", true), ["wsl", "-u", "root", "-e", "bash", "-lc", "echo hi"]);
   assert.deepEqual(dispatchArgv("echo hi", false), ["bash", "-lc", "echo hi"]);
 });
 

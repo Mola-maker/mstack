@@ -24,7 +24,7 @@ linuxTest("platform: probe script and argv follow the tested flow", () => {
   assert.match(dshProbeScript(), /source ~\/src\/mola-dsh-stack\/scripts\/env\.sh/);
 
   const windows = dshExecArgv("echo hi", true);
-  assert.deepEqual(windows, ["wsl", "-e", "bash", "-lc", "echo hi"]);
+  assert.deepEqual(windows, ["wsl", "-u", "root", "-e", "bash", "-lc", "echo hi"]);
   // on Windows we are inside wsl already: the env script is not sourced again
   assert.doesNotMatch(windows[4], /env\.sh/);
   assert.deepEqual(winSafeArgv(["magpie", "ls"], true), ["cmd", "/d", "/c", "magpie", "ls"]);

@@ -11,6 +11,9 @@ import plugin, { makeClaudeAdapter, probeClaude, buildClaudeArgv, buildHookSetti
 import { makeFakeCtx } from "./fake.js";
 import type { RunRequest } from "@mola/plugin-sdk";
 
+// these tests exercise a magpie-routed Claude Code (the adapter reads ANTHROPIC_BASE_URL at creation)
+process.env.ANTHROPIC_BASE_URL ??= "http://127.0.0.1:3425";
+
 const linuxTest = process.platform === "win32" ? test.skip : test;
 
 const STREAM = [
@@ -118,7 +121,7 @@ linuxTest("run(): argv, hook-sink file, and the ADR-0004 events on bus + onEvent
 
   assert.equal(f.calls.length, 1);
   assert.equal(f.calls[0].argv[0], "claude");
-  assert.deepEqual(f.calls[0].argv.slice(0, 8), [
+  assert.deepEqual(f.calls[0].argv.slice(0, 9), [
     "claude",
     "-p",
     "count TODOs",

@@ -48,14 +48,14 @@ linuxTest("dshRunScript: profile, patch overlay, --json, no prompt in the script
   assert.match(script, /--patch '\.mstack\/runs\/run-1\/model-overlay\.yml'/);
   assert.match(script, /--json/);
   assert.match(script, /--session-id 'sess-9'/);
-  assert.match(script, /--permission-mode 'workspace-write'/);
+  assert.match(script, /PM='--permission-mode workspace-write'/);
   assert.doesNotMatch(script, /count TODOs/);
   // a prompt containing quotes must never reach the script (stdin instead)
   const quoted = dshRunScript({ cwdPosix: "/mnt/e/mstack" });
   assert.match(quoted, /cd '\/mnt\/e\/mstack'/);
   // argv: direct bash inside Linux/WSL, wsl -e bash -lc on Windows
   assert.deepEqual(dshRunArgv("echo hi", false), ["bash", "-lc", "echo hi"]);
-  assert.deepEqual(dshRunArgv("echo hi", true), ["wsl", "-e", "bash", "-lc", "echo hi"]);
+  assert.deepEqual(dshRunArgv("echo hi", true), ["wsl", "-u", "root", "-e", "bash", "-lc", "echo hi"]);
 });
 
 linuxTest("dshOverlayYaml: the magpie model overlay shape", () => {
@@ -213,7 +213,7 @@ linuxTest("run(): permissionProfile workspace-write maps to the captured preset;
   const f = makeFakeCtx({ exec: async () => ({ code: 0, stdout: "ok", stderr: "" }) });
   const adapter = makeDshAdapter(f.ctx);
   await adapter.run(req({ permissionProfile: "workspace-write" }));
-  assert.match(f.calls[0].argv[f.calls[0].argv.length - 1], /--permission-mode 'workspace-write'/);
+  assert.match(f.calls[0].argv[f.calls[0].argv.length - 1], /PM='--permission-mode workspace-write'/);
 
   const g = makeFakeCtx({ exec: async () => ({ code: 0, stdout: "ok", stderr: "" }) });
   await makeDshAdapter(g.ctx).run(req({ permissionProfile: "full-auto" }));
