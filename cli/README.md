@@ -22,6 +22,18 @@ The bin runs as `node packages/mola/dist/bin.js` on both Linux and Windows
 `state.json`, `logs/mola.log`, `plugins.json`); set `MOLA_HOME` to redirect it —
 the test suites do exactly that with tmp dirs.
 
+## Install the `mola` command
+
+```sh
+cd cli && pnpm install && pnpm -r build
+node scripts/install-shims.mjs        # Windows: %APPDATA%
+pm\mola(.cmd/.ps1); Linux/WSL: /usr/local/bin/mola
+mola doctor
+```
+
+The shims run this checkout's build, so `git pull && pnpm -r build` updates `mola` in place.
+WSL calls always run as `MOLA_WSL_USER` (default `root`, where the DSH stack lives), whatever WSL's default user is.
+
 ## Layout
 
 ```text
