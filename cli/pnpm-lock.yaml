@@ -38,6 +38,9 @@ importers:
       '@mola/plugin-cmd-config':
         specifier: workspace:*
         version: link:../plugins/cmd-config
+      '@mola/plugin-cmd-dash':
+        specifier: workspace:*
+        version: link:../plugins/cmd-dash
       '@mola/plugin-cmd-dispatch':
         specifier: workspace:*
         version: link:../plugins/cmd-dispatch
@@ -99,6 +102,12 @@ importers:
         version: link:../../plugin-sdk
 
   packages/plugins/cmd-config:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
+  packages/plugins/cmd-dash:
     dependencies:
       '@mola/plugin-sdk':
         specifier: workspace:*
