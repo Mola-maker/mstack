@@ -48,10 +48,21 @@ test("skills install --dry-run plans the dsh symlinks and the codex copies", asy
   const root = fakeMstack();
   const f = activate({ "skills.source": root });
   const io = makeIo({ yes: true });
-  const code = await commandOf(f, "skills install").handler(
-    { positionals: [], flags: { "dry-run": true } },
-    io,
-  );
+  // isolate HOME: the plan depends on what already exists in ~/.dsh and ~/.codex
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "mola-userhome-"));
+  const prev = { USERPROFILE: process.env.USERPROFILE, HOME: process.env.HOME };
+  process.env.USERPROFILE = home;
+  process.env.HOME = home;
+  let code: number;
+  try {
+    code = await commandOf(f, "skills install").handler(
+      { positionals: [], flags: { "dry-run": true } },
+      io,
+    );
+  } finally {
+    if (prev.USERPROFILE === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = prev.USERPROFILE;
+    if (prev.HOME === undefined) delete process.env.HOME; else process.env.HOME = prev.HOME;
+  }
   assert.equal(code, 0);
   const data = io.dataValue as any;
   assert.equal(data.dryRun, true);

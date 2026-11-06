@@ -3,7 +3,7 @@
   "id": "mola-tool-superagent",
   "version": "0.1.0",
   "kind": "tool",
-  "displayName": "tool-superagent",
+  "displayName": "dsh-superagent control: status, tickets, pause/resume, retry/stop",
   "mola": ">=0.1.0 <1.0.0",
   "engine": {
     "node": ">=22"
@@ -11,14 +11,36 @@
   "entry": {
     "ts": "./dist/index.js"
   },
-  "provides": [],
+  "provides": [
+    "tool:superagent",
+    "cmd:superagent"
+  ],
   "requires": [],
-  "capabilities": [],
+  "capabilities": [
+    "tool.superagent",
+    "doctor.check"
+  ],
   "permissions": {
-    "mola": []
+    "net.connect": [
+      "127.0.0.1:3082",
+      "127.0.0.1:3083"
+    ],
+    "mola": [
+      "commands",
+      "config.read",
+      "doctor",
+      "tools.register",
+      "events"
+    ]
   },
   "hooks": {
-    "emit": [],
-    "listen": []
+    "emit": [
+      "mola.tool.after",
+      "mola.approval.granted",
+      "mola.approval.denied"
+    ],
+    "listen": [
+      "mola.tool.before"
+    ]
   }
 }
