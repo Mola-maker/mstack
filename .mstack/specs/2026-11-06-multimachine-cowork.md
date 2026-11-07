@@ -131,7 +131,12 @@
 | The cloud VMs are reachable over SSH (not measured: blocked by the permission check) | mola-infra docs | — |
 | A private GitHub repo is fast enough for the state repo | Small state is KB-sized | Reversible (add a Gitee/Gitea mirror) |
 
-## decisions-pending
+## Decisions (2026-11-06, user)
+1. jlu-pc 是常驻权威执行机（可长期开机）；腾讯云 4c4g 只做协调和信箱。
+2. molamaker.cn 已备案：在阿里云 2c2g 上自建 DERP `derp.molamaker.cn:443`（`--verify-clients`）。
+3. 状态仓库：新建私有 `Mola-maker/mola-state`，只放状态，提交前扫密钥。
+
+## decisions-pending（已全部决定，见上）
 1. Can jlu-pc stay on (shared lab, power cuts)? This decides where the authoritative executor lives.
 2. Which machine and domain to use for the self-hosted DERP (you need to confirm that molamaker.cn is filed and that a subdomain can be added).
 3. State repo: a new private `Mola-maker/mola-state`, or put it in the existing `mola-infra`.
