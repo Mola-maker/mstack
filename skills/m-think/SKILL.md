@@ -1,6 +1,6 @@
 ---
 name: m-think
-description: "Before building: attack the premise, ≤3 questions, design spec; wild mode thinks from all angles. Use for 先想想/梳理一下/发散/全方位想."
+description: "Think before any design decision: premise attack, ≤3 questions, spec; wild mode for 全方位/往死里想/发散/brainstorm/先想想."
 whenToUse: "Before any creative or new work, whenever a request is vague or exploratory, or when the user says \"先想想\", \"brainstorm一下\", \"这个想法怎么样\"."
 ---
 
