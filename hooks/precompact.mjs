@@ -12,9 +12,9 @@ const MAX_STATUS_CHARS = 4000;
 // Two git calls per run; each must be short so the hook stays well under 1 s.
 const TIMEOUT_MS = 300;
 
-const git = (args, cwd) => {
+const git = (args, cwd, timeout = TIMEOUT_MS) => {
   try {
-    return execFileSync("git", args, { cwd, encoding: "utf8", timeout: TIMEOUT_MS, stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return execFileSync("git", args, { cwd, encoding: "utf8", timeout, stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
     return null;
   }
@@ -74,7 +74,8 @@ try {
   if (!existsSync(join(cwd, ".mstack"))) process.exit(0);
 
   const branch = branchOf(cwd);
-  const status = git(["status", "--short"], cwd);
+  // git status runs while compaction loads the machine: 300 ms was too tight in real use (snapshot said "git status failed")
+  const status = git(["status", "--short"], cwd, 800);
   const statusText = status === null ? "(git status failed)" : status.slice(0, MAX_STATUS_CHARS);
 
   const dir = join(cwd, ".mstack");
