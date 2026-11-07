@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1 — 2026-11-06
+- m-think wild mode (`references/wild-mode.md`): 10 lenses, parallel outcome search, ≥12 options incl. ≥3 outrageous, scored convergence with steelman and kill list. Trigger words 发散/全方位想.
+- First use: `.mstack/specs/2026-11-06-multimachine-cowork.md` (multi-machine cowork design, research/cowork-*.md).
+
 ## 0.4.0 — 2026-11-06
 Round 2: engineering practice from OMC, pstack, 26 papers and 12 high-star repos (research/, five haiku research agents), integrated by DSH workers per FRAMEWORK §11, independently reviewed (reviews/2026-11-06-round2.md, 15 findings fixed).
 - Executable checks instead of prose: m-verify diff-blockers (incl. untracked files) and baseline gate; m-review split-findings and an explicit APPROVE / REQUEST CHANGES verdict; m-goal goal-state (consecutive-failure and budget breakers); m-dispatch candidate clustering; m-guard optional PreToolUse hook snippets; m-qa generates and maintains a project verify skill.

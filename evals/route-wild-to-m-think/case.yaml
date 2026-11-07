@@ -1,0 +1,17 @@
+schema_version: "1.1"
+name: route-wild-to-m-think
+description: "全方位往死里想 fires m-think (wild mode)."
+tags: [routing, trigger]
+execution:
+  prompt: "全方位往死里想一下：要不要把博客从 Astro 迁到 Next.js"
+  max_turns: 8
+  timeout_seconds: 300
+  allowed_tools: [Read, Glob, Grep]
+runs: 3
+graders:
+  - type: tool_used
+    name: fires-m-think
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?m-think"'
+    min: 1
+    arm: with-only
