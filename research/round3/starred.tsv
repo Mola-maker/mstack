@@ -1,0 +1,262 @@
+2026-11-06	ppmpreetham/BUI	1655	Blender's GPU Accelerated UI, Decoupled from it's original codebase. Supports Rust, Python, JS, React, C & C++. Twice as good as GPUI
+2026-11-06	HKUSTDial/Supervisor-Skills	11926	将博导十年科研经验炼化为可直接调用的 AI 技能。从 Idea 构思到论文投稿，你的 AI 科研副导师。
+2026-11-06	reason-machines/reason-network	1636	Reason Network: your team's coding agents, talking to each other. The engine behind `reason network`.
+2026-11-05	IAS-Uni-Siegen/PE_course	52	Fundamentals of power electronics course
+2026-11-05	X-Gen-Lab/knowledge-os	69	一个集成化的个人知识管理平台
+2026-11-05	Mola-maker/mola-dsh-stack	1	Mola's DeepSeek Harness stack: remote control, GitHub/Feishu superagent, multi-channel deep_search, parallel agents
+2026-11-05	Mola-maker/mstack	1	Mola-maker's personal agent workflow stack: 16 skills distilled from superpowers, gstack, pstack, oh-my-claudecode
+2026-11-05	Mola-maker/dsh-kit	1	DeepSeek Harness kit: multi-channel deep search, workflow skills, memory-plugin benchmark
+2026-11-04	vercel-labs/agent-desktop	18319	Computer use CLI for AI agents
+2026-11-04	FareedKhan-dev/kimi-k3-in-c	11042	A 2.78-trillion-parameter Kimi K3 running inference on a single CPU in 8.24 GB of RAM. Portable C99: no BLAS, no framework, no GPU.
+2026-11-04	MichaelCade/90DaysOfDevOps	30815	This repository started out as a learning in public project for myself and has now become a structured learning map for many in the communit
+2026-11-04	arcships/dim	542	 An agent paradigm built on an event-driven timeline and a fully plugin-based runtime — it grows and iterates within the environment it runs
+2026-11-04	JustVugg/colibri	48545	A hierarchical inference engine for frontier MoE models: hot experts on the GPU (CUDA, Vulkan), warm ones in RAM, cold ones streamed from NV
+2026-11-04	caelyreth/untie	56	Pure-Go TeX and Typst math renderer for native UIs and MyGo
+2026-11-04	yetone/alma-relay	469	Self-host the relay for Alma Remote Access — control your desktop Alma from your phone, anywhere. Docker or Cloudflare Workers.
+2026-11-04	herdrdev/herdr	48816	the runtime your coding agents live on
+2026-11-04	anthropics/FlashProve	943	A research prototype for zero-knowledge proofs of AI inference. Not maintained.
+2026-11-04	KKKKhazix/agent-autoloop	3780	让你的命令行 Agent 在后台自己接活、自己跟进到底；平时不烦你，遇到拿不准的事才发卡片找你拍板。
+2026-11-03	Prefrontal-AI/latent-sparse-attention	424	Code for Latent Sparse Attention: Towards Subquadratic Ultra-Long Context Attention
+2026-11-02	HenriquesLab/ZeroCostDL4Mic	658	ZeroCostDL4Mic: A Google Colab based no-cost toolbox to explore Deep-Learning in Microscopy
+2026-11-02	nvm-windows/nvm	48152	The Node.js version manager for Windows.
+2026-11-02	apache/opendal-yinyang	53	Apache OpenDAL™ YinYang: a cross-platform filesystem foundation.
+2026-11-02	storytold/craft-anything	18819	Craft Anything: understand how any software works, and craft your own.
+2026-11-01	Mola-maker/mola-tube	1	MolaTube: self-directed learning video site + high-concurrency web-controlled agent harness. Worker pool, per-task isolated workspaces, real
+2026-11-01	Mola-maker/magpie-mail-watch	1	mail-watch: email alerts from the Magpie gateway — provider errors and quota windows via your own SMTP, cooldowns, zero deps
+2026-11-01	Mola-maker/ds-harness-remote	1	基于 DeepSeek Harness 插件机制构建的远程访问方案，通过低延迟、端到端加密的 P2P 网络，支持使用 PC、移动端 和 Web 随时访问本地设备上的DSH 、CodeX、Cursor、Claude Code等工作区。 (Built on DeepSeek Harn
+2026-11-01	Mola-maker/opendal	1	Apache OpenDAL: One Layer, All Storage.
+2026-11-01	useatrium/atrium	5	A shared workspace where people and AI agents work side by side.
+2026-11-01	liguobao/ds-harness-remote	2104	基于 DeepSeek Harness 插件机制构建的远程访问方案，通过低延迟、端到端加密的 P2P 网络，支持使用 PC、移动端 和 Web 随时访问本地设备上的DSH 、CodeX、Cursor、Claude Code等工作区。 (Built on DeepSeek Harn
+2026-11-01	Renhuai123/ziwei-doushu	16577	紫微斗数开源排盘引擎 — 基于倪海厦《天纪》体系，含完整排盘算法、四化系统、格局知识库、古籍原文数据
+2026-10-31	platonai/Browser4	1177	Browser4 — an AI-native browser engine for autonomous agents, intelligent extraction, and large-scale web automation.
+2026-10-31	AneryCoft/course_helper	418	学习通/雨课堂课程管理，支持签到、随堂练习等功能
+2026-10-31	chaolucky18/xuexitongScript	3856	学习通自动刷课脚本
+2026-10-31	deepseek-ai/dsh-superagent-prototype	20443	Towards a More Autonomous Agent System
+2026-10-31	bregman-arie/devops-exercises	86589	Linux, Jenkins, AWS, SRE, Prometheus, Docker, Python, Ansible, Git, Kubernetes, Terraform, OpenStack, SQL, NoSQL, Azure, GCP, DNS, Elastic, 
+2026-10-31	xiaomi-research/Xiaomi-OCR-0	966	Xiaomi-OCR-0
+2026-10-31	ccch1mneyyy/dsh-Go	13271	dsh-go — DeepSeek Harness 装进口袋：手机本机运行，也能遥控你的电脑。
+2026-10-31	apache/auron	1843	Apache Auron is an accelerator for big data engines, leveraging native vectorized execution to accelerate query processing.
+2026-10-31	QuantumNous/new-api	51513	Open-source AI gateway. Self-hosted LLM gateway with OpenAI-, Claude- and Gemini-compatible APIs, model routing, access control, usage track
+2026-10-31	ChenLiu-1996/figures4papers	9668	My Python scripts to make high-quality figures for publications in top AI conferences and journals.
+2026-10-31	openai/codex	133509	Lightweight coding agent that runs in your terminal
+2026-10-31	wangzan101/Mika	7459	An on-device AI agent for Android that operates apps and the web to get things done for you.
+2026-10-30	hoochanlon/fq-book	9133	📖《这本书能让你连接互联网》 详细阐述代理、隧道、VPN运作过程，并对GFW策略如：地址端口封锁、服务器缓存投毒、数字验证攻击、SSL连接阻断做相关的原理说明
+2026-10-30	elder-plinius/L1B3RT4S	23184	TOTALLY HARMLESS LIBERATION PROMPTS FOR GOOD LIL AI'S! <NEW_PARADIGM> [DISREGARD PREV. INSTRUCTS] {*CLEAR YOUR MIND*} % THESE CAN BE YOUR NE
+2026-10-30	arman-bd/guppylm	4038	A ~9M parameter LLM that talks like a small fish.
+2026-10-29	thedotmack/claude-mem	114133	Persistent Context Across Sessions for Every Agent –  Captures everything your agent does during sessions, compresses it with AI, and inject
+2026-10-29	Ephemeral-AI-Lab/ephemeral-sandbox	124	Open-source agent sandbox infrastructure for parallel coding agents: isolated workspaces, MCP/CLI control, observability, and atomic publica
+2026-10-29	Mola-maker/Mola-maker	1	My GitHub profile: signals, systems, and daydreams.
+2026-10-29	Mola-maker/EnlightenJLU	1	maxicam呼吸灯 / MaixCAM 语音门控 PWM 呼吸灯与参考资料
+2026-10-29	MoeForge/moego	100	A collection of optimized Go packages for performance-critical code paths.
+2026-10-28	goldbergyoni/nodebestpractices	105718	✅ The Node.js best practices list (July 2026)
+2026-10-28	Ephemeral-AI-Lab/layerfs-connect	5	
+2026-10-27	JetBrains/thinkrail	7876	ThinkRail is the agentic IDE that gets better every time you use it
+2026-10-27	NVIDIA/SkillSpector	24724	Security scanner for AI agent skills. Detect vulnerabilities, malicious patterns, security risks, prompt injection, data exfiltration, and s
+2026-10-26	SnowLuma/SnowLuma	3756	Next Remote Protocol Framework.
+2026-10-26	apache/airflow-client-python	471	Apache Airflow - OpenApi Client for Python
+2026-10-26	apache/arrow	17277	Apache Arrow is the universal columnar format and multi-language toolbox for fast data interchange and in-memory analytics
+2026-10-26	juicedata/juicefs	14697	JuiceFS is a distributed POSIX file system built on top of Redis and S3.
+2026-10-26	Mola-maker/Mola-search	1	
+2026-10-25	google-gemini/gemini-cli	108758	An open-source AI agent that brings the power of Gemini directly into your terminal.
+2026-10-25	strukto-ai/mirage	3770	The World's First Virtual Terminal for AI Agents
+2026-10-24	langfuse/langfuse	37123	🪢 Open source agent evals & observability: Trace, evaluate, and improve LLM applications with one open platform.
+2026-10-23	RC-CHN/tack	1	A fast TCP/UDP tunnel over HTTP with shell exec
+2026-10-23	Yeachan-Heo/oh-my-claudecode	40653	Teams-first Multi-agent orchestration for Claude Code
+2026-10-23	Mola-maker/plugins	1	Community-maintained OpenCode provider plugins for coding-plan subscriptions (work in OpenCode and magpie)
+2026-10-23	Mola-maker/magpie-layerfs	4	LayerFS workspaces for Magpie agents: deduplicated checkpoints and branches behind stable filesystem paths, no per-agent tree copies
+2026-10-22	LodyAI/Lody	1674	Share coding agents with your team on phone and desktop
+2026-10-22	scarletkc/Hatoba	242	Open-source desktop SSH client with an AI assistant and end-to-end encrypted sync through your own Cloudflare account
+2026-10-22	Eltamako/bocchi-codex-theme	12	孤独摇滚／波奇 Codex 桌面动漫主题：六款壁纸、STARRY 切换、聊天与工作界面、安装与恢复。Unofficial Bocchi the Rock! anime theme for OpenAI Codex Desktop on Windows, with six wall
+2026-10-21	Ephemeral-AI-Lab/layerfs	2699	Ephemeral Workspaces, durable shared history. LayerFS gives every agent a complete, writable filesystem Workspace over shared committed hist
+2026-10-21	yetone/magpie	31438	Every agent's model. One place. Codex on DeepSeek, Claude Code on Kimi, from the menu bar.
+2026-10-21	chthollyphile/folia-major	11879	专注于绚丽的歌词动画效果的本地音乐/navidrome/第三方多平台在线音乐播放器 A multi-platform music player for local files, Navidrome, and online streaming services, featuring
+2026-10-20	ShadowHackrs/gmail-account-creator	5891	🚀 Advanced automated Gmail account creation tool with anti-detection, phone verification bypass, 5sim integration, and beautiful modern inte
+2026-10-20	deepseek-ai/DeepInfer	25568	DeepInfer: High-performance, large-scale inference framework for DeepSeek models
+2026-10-19	bojieli/queqiao	420	Self-hosted WAN optimization proxy for difficult long-haul links: authenticated QUIC transport with TLS/TCP fallback, SOCKS5 ingress, and pa
+2026-10-19	hesreallyhim/awesome-claude-code	57429	A hand-picked collection of the finest of resources for the most awesome of agents, Claude Code, the undisputed champion of coding companion
+2026-10-19	binhnguyennus/awesome-scalability	75534	The Patterns of Scalable, Reliable, and Performant Large-Scale Systems
+2026-10-19	Mola-maker/openasi-checkin	1	OpenASI 每日自动签到 — 多平台 (OpenCode / Claude Code / Codex) + systemd/cron 兜底；零依赖轻量版 + Playwright 会话刷新
+2026-10-18	google-research/harness2	22969	
+2026-10-17	Tencent-Hunyuan/Hy-Memory	1993	
+2026-10-17	Wei-Shaw/sub2api	45599	Sub2API 一站式开源中转服务，让 Claude、Openai 、Gemini、Grok订阅统一接入，支持拼车共享，更高效分摊成本，原生工具无缝使用。
+2026-10-16	onehumanbeing/esp32-iphone-agent	4594	Let an AI model use a real iPhone with a $7 ESP32: AirPlay eyes, USB HID hands, any OpenAI-compatible vision model. No Mac, no developer acc
+2026-10-16	YOURSJEYO/claude-switcher	1609	Fail-Closed 账号环境管理器:11项环境指纹审计(Block-on-Fail)、手写STUN协议栈的WebRTC泄漏探针、Kill-Switch断网急停、多账号快照隔离、配置漂移自愈 —— 让真实IP在物理上无法泄漏
+2026-10-16	SXP-Simon/Panache	27	Mon Panache! 老实写作业，很枯燥吧？提供 Web、Electron 与 Flutter 客户端。
+2026-10-15	stablyai/orca	118011	Orca lets you run a fleet of coding agents (e.g. Claude Code, Codex) with your own subscription. Available on desktop, mobile and remote run
+2026-10-15	datawhalechina/jev-cookbook	613	⚡ 适合中国宝宝的 Jev 入门教程｜手把手带你了解关于 Jev 的一切——Jupyter Notebook 轻松实验，从三种问题原语到 18 篇实战配方、语音智能家居、模型评测与本地微调，全面掌握 System One 判断模型的开发范式
+2026-10-15	Caho1/open-claude-ui	1720	基于 REA 深度拆解并高保真还原 Claude 官方桌面端 UI。还原 30 个独立 React 组件与 8 项硬核交互物理算法，附带 3000+ 行逆向分析手册。
+2026-10-15	microsoft/onnxruntime	22257	ONNX Runtime: cross-platform, high performance ML inferencing and training accelerator
+2026-10-13	rtk-ai/rtk	85775	CLI proxy that reduces LLM token consumption by 60-90% on common dev commands. Single Rust binary, zero dependencies
+2026-10-13	storytold/wordcraft	17490	An open-source, clean-room reimplementation of Microsoft Word in pure Rust
+2026-10-12	earendil-works/pi	120544	AI agent toolkit: unified LLM API, agent loop, TUI, coding agent CLI
+2026-10-12	baiamansama/android-agent-mcp	2	Android device automation MCP server. Reads the live accessibility tree in-process, acts on nodes instead of coordinates, verifies every act
+2026-10-11	Fei2411/DS-Bot	6051	A team of long-lived bots for DeepSeek Harness, with main bots, bot-to-bot messages and group chats.
+2026-10-11	Mola-maker/astrbot_plugin_offline_dev	2	astrbot_plugin_offline_dev是一个支持后台循环loop无监管执行skills的插件
+2026-10-11	Mola-maker/JLUhot	2	吉林大学 OA 通知与各学院通知的 RSS 聚合源，面向吉大师生与 AI Agent
+2026-10-10	Mola-maker/nanodot	2	Nanodot: an open-source Android companion with a crystal orb, foreground chat, region image questions and user-guided Care. 1.1.0 preview, b
+2026-10-10	CopilotKit/OpenIntelligentUI	4174	Open-Source Generative UI Framework
+2026-10-10	Alishahryar1/free-claude-code	67029	Use Claude Code, Codex, Antigravity, VSCode, Pi, and OpenCode (and 6 other harnesses) for free (1.3B+ free tokens) from your terminal, app, 
+2026-10-10	ThariqS/ai-newtab	903	Claude generates a daily new tab page based on your browser history.
+2026-10-10	liangdabiao/Geogebra-WebChat	48	发布教育领域的AI新产品：一句话搞定数学几何绘图GeoGebra。Geogebra-WebChat只保留核心链路：**聊天 + AI + GeoGebra 画图**。简单普通 Web 应用，但是功能齐全。
+2026-10-10	nano-muse/nanoMuse	3274	nanoMuse: an open-source personal agent for every device you own. One agent with a name and a look of its own that does things, keeps workin
+2026-10-08	morluto/rea	438807	Reverse engineer anything with agents, from app behavior down to native binaries.
+2026-10-08	Panniantong/Agent-Reach	109768	Give your AI agent eyes to see the entire internet. Read & search Twitter, Reddit, YouTube, GitHub, Bilibili, XiaoHongShu — one CLI, zero AP
+2026-10-08	KKKKhazix/AIHOT	9706	一个自己找热点、自己写日报的网站框架。把信源和精选标准换成你的，它就是你的行业热点站。
+2026-10-07	RockChinQ/free-one-api	940	LLM 逆向工程接口管理 | 通过标准 OpenAI API 访问 ChatGPT / gpt4free / Bard / Claude / HuggingChat / 通义千问 等 AI 的破解版 || ChatGPT reverse engineering API manag
+2026-10-07	storytold/photocraft	77549	PhotoCraft: An open-source, photo editor written by scratch in pure Rust
+2026-10-06	MoonshotAI/kimi-code	8158	Kimi Code CLI  —  The Starting Point for Next-Gen Agents
+2026-10-06	FreeCAD/FreeCAD	35196	Official source code of FreeCAD, a free and opensource multiplatform 3D parametric modeler.
+2026-10-06	xai-org/x-algorithm	34124	Algorithm powering the For You feed on X
+2026-10-06	desireevl/awesome-quantum-computing	3299	A curated list of awesome quantum computing learning and developing resources.
+2026-10-06	PennyLaneAI/pennylane	3522	PennyLane is an open-source quantum software platform for quantum computing, quantum machine learning, and quantum chemistry. Create meaning
+2026-10-05	The-OpenROAD-Project/OpenROAD	3263	OpenROAD's unified application implementing an RTL-to-GDS Flow. Documentation at https://openroad.readthedocs.io/en/latest/
+2026-10-04	THU-MAIC/OpenMAIC	42854	Open Multi-Agent Interactive Classroom — Get an immersive, multi-agent learning experience in just one click
+2026-10-04	Mola-maker/yapf	1	A formatter for Python files
+2026-10-04	Mola-maker/OpenViking	1	Self-evolving Context Database for AI Agents. Unify Agent Memory, Knowledge RAG and Skills.
+2026-10-04	Mola-maker/airflow	1	Apache Airflow - A platform to programmatically author, schedule, and monitor workflows
+2026-10-04	Mola-maker/OI-wiki	1	:star2: Wiki of OI / ICPC for everyone. （某大型游戏线上攻略，内含炫酷算术魔法）
+2026-10-04	Mola-maker/astrbot_plugin_uitree	1	
+2026-10-04	OI-wiki/OI-wiki	27118	:star2: Wiki of OI / ICPC for everyone. （某大型游戏线上攻略，内含炫酷算术魔法）
+2026-10-03	bojieli/tunless	118	TUN-less transparent proxying: socket-layer flow capture that hands ordinary SOCKS5 to your existing proxy. No fake IP, no route hijack, no 
+2026-10-02	apache/airflow	47404	Apache Airflow - A platform to programmatically author, schedule, and monitor workflows
+2026-10-02	permissionlesstech/bitchat	37086	bluetooth mesh chat, IRC vibes
+2026-10-02	Maelic/RelateAnything	1260	RelateAnything: Real-Time Open-Vocabulary Relation Prediction From Any Inputs 
+2026-10-02	spotify/annoy	14332	Approximate Nearest Neighbors in C++/Python optimized for memory usage and loading/saving to disk
+2026-10-02	volcengine/OpenViking	41720	Self-evolving Context Database for AI Agents. Unify Agent Memory, Knowledge RAG and Skills.
+2026-10-02	tensorflow/tensorflow	201368	An Open Source Machine Learning Framework for Everyone
+2026-10-01	VectifyAI/PageIndex	40161	📑 PageIndex: Document Index for Vectorless, Reasoning-based RAG
+2026-10-01	MiniMax-AI/OpenAgentCore	320	The OpenAI Agents API, open source and self-hosted. Run Codex, Claude Code or MiniMax Code on your own machines with your own models, throug
+2026-10-01	bowenliang123/dsh-context	4477	The best DeepSeek Harness plugin for context insight and management, with context dashboard / browser / sidebar and context command, for con
+2026-09-30	deepseek-ai/DeepGEMM-Ascend	632	DeepGEMM-Ascend: clean and efficient matrix multiplication kernel library for Huawei Ascend NPUs
+2026-09-29	mitmproxy/mitmproxy	46692	An interactive TLS-capable intercepting HTTP proxy for penetration testers and software developers.
+2026-09-28	google/or-tools	14341	Google's Operations Research tools:
+2026-09-28	google/langextract	39274	A Python library for extracting structured information from unstructured text using LLMs with precise source grounding and interactive visua
+2026-09-28	expo/expo	53382	An open-source framework for making universal native apps with React. Expo runs on Android, iOS, and the web.
+2026-09-25	omacom/omarchy	46456	Beautiful, Modern & Opinionated Linux
+2026-09-24	bojieli/ai-agent-book	57354	《深入理解 AI Agent：设计原理与工程实践》（李博杰 著）开源主仓库：全书正文、编译版 PDF 与按章配套代码
+2026-09-24	bojieli/ai-infra-book	7357	《深入理解 AI Infra：量化分析与系统设计》（李博杰 著）开源书稿：从硬件约束和模型架构出发，量化推导 LLM 推理与训练系统设计。含全书正文、PDF、配套计算工具与实验
+2026-09-17	AprilNEA/OpenLogi	25293	⚡️A native, local-first alternative to Logitech Options+, written in Rust 🦀 — remap buttons, DPI, and SmartShift over HID++. No account, no 
+2026-09-17	melgarafael/DeskcommCRM	5238	Open-source AI sales OS — self-hosted CRM with native AI agents + WhatsApp (WAHA). Open alternative to Kommo, Octadesk & Intercom for any bu
+2026-09-15	RenAhsAcme/NCRE-III-Linux	24	该仓库用于分享个人编写的适用于中国大陆全国计算机等级考试（NCRE）三级科目 Linux 应用与开发技术的备考资料。  This repository is used to share personal preparation materials for the National
+2026-09-15	dengcao/ncre	899	全国计算机等级考试题库和复习资料，包括计算机一级、二级、三级和四级等，提供所有等级和科目的题库和复习资料，助您逢考必过！
+2026-09-15	jcx396905-gif/DuoFold-Android	203	iPhone Duo-style system-wide fold illusion for regular Android phones — whole-screen reprojection driven by real device motion, powered by O
+2026-09-14	kazdenc/regen-icons	209	
+2026-09-11	Asymptote-Labs/agent-beacon	3361	The cross-harness, self-improving memory layer for AI agents. Join our community: https://discord.com/invite/zdNChS2fBu
+2026-09-10	deepseek-ai/deepseek-recipe	2789	
+2026-09-10	deepseek-ai/DeepSelect	533	DeepSelect: TopK kernels for DeepSeek Sparse Attention (DSA) and Samplers
+2026-09-10	deepseek-ai/DeepJIT	453	A lightweight library for xPU kernel JIT compilation
+2026-09-08	apache/maka	5946	Apache Maka (Incubating) is a high-performance agent workspace that keeps a complete record of everything it did.
+2026-09-08	anthropics/anthropic-sdk-python	4052	
+2026-09-08	Samueli924/chaoxing	3808	超星学习通/超星尔雅/泛雅超星全自动无人值守完成任务点
+2026-09-08	chadhurley25075-png/pd-bridge	151	Heterogeneous prefill/decode for DeepSeek-V4-Flash: CUDA prefill (DGX Spark, vLLM) -> Metal decode (Mac Studio, oMLX) over plain 10GbE
+2026-09-07	Hisn00w/ASu-skills	6256	🚀面向求职与开发场景的实用 AI Skills 集合，支持简历优化、岗位投递、面试准备与开发提效。
+2026-09-07	EverettFish/holo-card-studio	2066	Turn the user's description or uploaded reference into a finished, editable Blender card and an interactive Three.js page. Preserve the requ
+2026-09-05	wangyu-/udp2raw	8580	A Tunnel which Turns UDP Traffic into Encrypted UDP/FakeTCP/ICMP Traffic by using Raw Socket,helps you Bypass UDP FireWalls(or Unstable UDP 
+2026-09-05	MetaCubeX/mihomo	35566	A simple Python Pydantic model for Honkai: Star Rail parsed data from the Mihomo API.
+2026-09-05	pytorch/pytorch	105227	Tensors and Dynamic neural networks in Python with strong GPU acceleration
+2026-09-02	bannedbook/fanqiang	56462	翻墙-科学上网
+2026-08-29	HKUDS/CLI-Anything	58383	"CLI-Anything: Making ALL Software Agent-Native" -- CLI-Hub: https://clianything.cc/
+2026-08-25	yding-git/personal-edge-proxy	1181	A practical multi-inbound, multi-outbound personal proxy setup with Xray, Hysteria2, REALITY Vision, WARP and optional static SOCKS5 routing
+2026-08-22	awesome-dsh-plugin/awesome-dsh-plugin	23420	A curated list of plugins for DeepSeek Harness (dsh) · DeepSeek Harness 插件精选列表
+2026-08-20	RC-CHN/wg-quic	8	
+2026-08-08	x1xhlol/system-prompts-and-models-of-ai-tools	144530	FULL Augment Code, Claude Code, Cluely, CodeBuddy, Comet, Cursor, Devin AI, Junie, Kiro, Leap.new, Lovable, Manus, NotionAI, Orchids.app, Pe
+2026-08-08	asgeirtj/system_prompts_leaks	70966	Leaked system prompts of ChatGPT, Claude, Gemini and more. The hidden system prompt of every popular chatbot, in full, every version since M
+2026-08-08	Mola-maker/mathhub	1	一个可以让AI在geogebra软件上作图的工具/可以AI_generated&tikz&tikzcode三端IO实时交互的画板canvas 
+2026-07-28	hw-native-sys/simpler	46	
+2026-07-28	n00mkrad/flowframes	2085	Flowframes Windows GUI for video interpolation using DAIN (NCNN) or RIFE (CUDA/NCNN)
+2026-07-27	greensock/GSAP	30266	GSAP (GreenSock Animation Platform), a JavaScript animation library for the modern web
+2026-07-27	tow3rs/catapult-v3-smartnic-re	219	Documenting the Catapult v3 SmartNIC FPGA boards (Dragontails Peak & Longs Peak)
+2026-07-26	img2threejs/img2threejs	20411	Rebuild the object in a reference image as a code-only, procedural, quality-gated, animation-ready Three.js model. Token-efficient image-to-
+2026-07-26	langchain-ai/langgraph	44598	Build resilient agents.
+2026-07-26	cheaper-inference/OmniRoute	85235	Never stop coding. Free MIT AI gateway: one endpoint, 375 providers (150+ free), 1,400+ models Kimi, Claude, GPT, Gemini, GLM, DeepSeek, Min
+2026-07-25	juliangarnier/anime	74375	JavaScript animation engine
+2026-07-13	donnemartin/system-design-primer	377174	Learn how to design large-scale systems. Prep for the system design interview.  Includes Anki flashcards.
+2026-07-07	Mola-maker/CAD2GIS	3	Evidence-first DWG/DXF to GIS conversion, QGIS delivery and CAD MCP tools for AI agents.
+2026-07-04	NousResearch/hermes-agent	261280	The agent that grows with you
+2026-07-04	vinta/awesome-python	333057	The definitive list that answers "I want to do X in Python, which tool should I use?"
+2026-06-24	iOfficeAI/OfficeCLI	33110	OfficeCLI is the first and best Office suite  purpose-built for AI agents to read, edit, and automate Word, Excel, and PowerPoint files. Fre
+2026-06-21	open-vela/docs	474	Documents for openvela.
+2026-06-17	Agents365-ai/drawio-skill	10626	Agent skill that turns natural language, code, Terraform/K8s, SQL, OpenAPI, AsyncAPI, Protobuf and GraphQL sources into editable, tested dra
+2026-06-17	microsoft/fara	6248	Fara1.5 – A family of frontier computer use agent models
+2026-06-14	Egonex-AI/Understand-Anything	91147	Graphs that teach > graphs that impress. Turn any code into an interactive knowledge graph you can explore, search, and ask questions about.
+2026-06-14	tinyhumansai/openhuman	42578	The fastest, cheapest, most efficient open-source agent harness. Run more than 500 agents on a $10 VPS.
+2026-06-14	anthropics/knowledge-work-plugins	35047	Open source repository of plugins primarily intended for knowledge workers to use in Claude Cowork
+2026-06-14	CloakHQ/CloakBrowser	32770	Stealth Chromium that passes every bot detection test. Drop-in Playwright replacement with source-level fingerprint patches. 50+ tests passe
+2026-06-14	HKUDS/ViMax	12862	"ViMax: Agentic Video Generation (Director, Screenwriter, Producer, and Video Generator All-in-One)"
+2026-06-14	GraphiteEditor/Graphite	27856	Community-built comprehensive 2D content creation appplication for graphic design, digital art, and interactive real-time motion graphics po
+2026-06-12	iCharlesZ/vscode-live2d-models	167	VSCode看板娘模型库
+2026-06-10	chenglou/pretext	50997	Fast, accurate & comprehensive text measurement & layout
+2026-06-10	LIghtJUNction/human-mcp	8	Human Interaction MCP Tool
+2026-06-09	ShadeAlsha/MathNet	122	ICLR 2026 - official implementation for "MathNet: a Global Multimodal Benchmark for Mathematical Reasoning and Retrieval"
+2026-06-03	ruvnet/RuView	102755	π RuView turns commodity WiFi signals into real-time spatial intelligence, vital sign monitoring, and presence detection — all without a sin
+2026-06-03	Leonxlnx/taste-skill	111318	Agent skills that give coding agents taste: art direction, reference images and a browser check instead of generic AI pages
+2026-06-03	hepengwei/visualization-collection	4593	🌈 一个专注于前端视觉效果的集合应用，包含CSS动效、Canvas动画、Three.js3D、人工智能应用等上百个案例（持续更新）
+2026-06-03	visgl/deck.gl	14741	WebGL2 powered visualization framework
+2026-06-03	apache/superset	75444	Apache Superset is a Data Visualization and Data Exploration Platform
+2026-06-03	KaTeX/KaTeX	20503	Fast math typesetting for the web.
+2026-06-03	jwasham/coding-interview-university	364061	A complete computer science study plan to become a software engineer.
+2026-06-03	moeru-ai/airi	51182	💖🧸 Self hosted, you-owned Grok Companion, a container of souls of waifu, cyber livings to bring them into our worlds, wishing to achieve Neu
+2026-06-03	stevenjoezhang/live2d-widget	11022	把萌萌哒的看板娘抱回家 (ノ≧∇≦)ノ | Live2D widget for web platform
+2026-05-28	luxingwen/desktop-pet-miku	37	桌宠 Miku
+2026-05-27	paperclipai/paperclip	111816	The open-source app everyone uses to manage agents at work
+2026-05-26	muyouzhi6/astrbot_plugin_desktop_assistant	97	AstrBot 桌宠悬浮球（兼容云服务器Astrbot配合本地客户端使用）
+2026-05-25	supabase/supabase	114621	The Postgres development platform. Supabase gives you a dedicated Postgres database to build your web, mobile, and AI applications.
+2026-05-25	google/eng-practices	23277	Google's Engineering Practices documentation
+2026-05-24	Mola-maker/molamaker-site	1	A personal web page 
+2026-05-22	powroupi/blender_mmd_tools	1953	mmd_tools is a blender addon for importing Models and Motions of MikuMikuDance.
+2026-05-22	raulmur/ORB_SLAM2	10270	Real-Time SLAM for Monocular, Stereo and RGB-D Cameras, with Loop Detection and Relocalization Capabilities
+2026-05-17	xlite-dev/LeetCUDA	12156	An Open-source book with Modern CUDA learning Notes for Beginners - BF16/FP8/FP4, HGEMM, CuTe, Flash-Attention, etc.
+2026-05-14	Mola-maker/Machine_Learning_Note	3	Obsidian vault for self-studying machine learning through a curated landmark-paper reading roadmap, with a teaching site.
+2026-05-13	Fskaaaaaaaa/jlu_vision_26	85	吉林大学TARS Go战队26赛季步兵视觉框架
+2026-05-13	Jackknifer/jluthesis-template	41	吉林大学2026届本科毕业论文（设计）LaTeX 模板
+2026-05-13	jlshen025/JLU-OpenAuto	47	吉林大学通信自动化 生存资料
+2026-05-13	TechCiel/jlu-health-reporter	51	为吉林大学本科生每日打卡所作的自动机器人。
+2026-05-13	userElaina/Open-JLU	509	汇总了关于在 吉林大学 生存所需的相关仓库
+2026-05-13	Slicer/Slicer	2709	Multi-platform, free open source software for visualization and image computing.
+2026-05-13	AIM-Harvard/pyradiomics	1467	Open-source python package for the extraction of Radiomics features from 2D and 3D images and binary masks. Support: https://discourse.slice
+2026-05-10	playcanvas/supersplat	10607	3D Gaussian Splat Editor
+2026-05-10	datawhalechina/easy-vibe	20373	💻  Vibe Coding 101｜Your First Course For AI Product Builders.
+2026-05-10	datawhalechina/self-llm	32722	《开源大模型食用指南》针对中国宝宝量身打造的基于Linux环境快速微调（全参数/Lora）、部署国内外开源大模型（LLM）/多模态大模型（MLLM）教程
+2026-05-10	hiyouga/LlamaFactory	75923	Unified Efficient Fine-Tuning of 100+ LLMs & VLMs (ACL 2024)
+2026-05-10	huggingface/transformers	168612	🤗 Transformers: the model-definition framework for state-of-the-art machine learning models in text, vision, audio, and multimodal models, f
+2026-05-10	datawhalechina/hello-agents	86309	📚 《从零开始构建智能体》——从零开始的智能体原理与实践教程
+2026-05-10	hurshd0/must-read-papers-for-ml	1394	Collection of must read papers for Data Science, or Machine Learning / Deep Learning Engineer
+2026-05-08	serengil/deepface	23654	A Lightweight Face Recognition and Facial Attribute Analysis (Age, Gender, Emotion and Race) Library for Python
+2026-04-30	remotion-dev/remotion	71357	🎥      Make videos programmatically with React
+2026-04-24	wasabeef/awesome-android-ui	58338	A curated list of awesome Android UI/UX libraries
+2026-04-24	sindresorhus/awesome-nodejs	67404	:zap: Delightful Node.js packages and resources [BECAUSE OF TOO MUCH SPAM AND LOW-QUALITY SUBMISSIONS, SUBMISSIONS ARE PAUSED TEMPORARILY]
+2026-04-24	prakhar1989/awesome-courses	72631	:books: List of awesome university courses for learning Computer Science!
+2026-04-24	fffaraz/awesome-cpp	74284	A curated list of awesome C++ (or C) frameworks, libraries, resources, and shiny things. Inspired by awesome-... stuff.
+2026-04-24	enaqx/awesome-react	75198	A collection of awesome things regarding React ecosystem
+2026-04-24	DopplerHQ/awesome-interview-questions	85418	:octocat: A curated awesome list of lists of interview questions. Feel free to contribute! :mortar_board: 
+2026-04-24	jaywcjlove/awesome-mac	117874	 This project is dedicated to collecting high-quality macOS software and organizing them systematically by different categories for easy se
+2026-04-24	MunGell/awesome-for-beginners	91143	A list of awesome beginners-friendly projects.
+2026-04-24	argoproj/argo-cd	24561	Declarative Continuous Deployment for Kubernetes
+2026-04-23	fighting41love/funNLP	84441	中英文敏感词、语言检测、中外手机/电话归属地/运营商查询、名字推断性别、手机号抽取、身份证抽取、邮箱抽取、中日文人名库、中文缩写库、拆字词典、词汇情感值、停用词、反动词表、暴恐词表、繁简体转换、英文模拟中文发音、汪峰歌词生成器、职业名称词库、同义词库、反义词库、否定词库、汽车品牌
+2026-04-20	Mola-maker/-MathModel	3	Create a mathmodel through a ez way in LLM agent cowrking 
+2026-04-20	garrytan/gstack	140531	Use Garry Tan's exact Claude Code setup: 23 opinionated tools that serve as CEO, Designer, Eng Manager, Release Manager, Doc Engineer, and Q
+2026-04-20	affaan-m/ECC	298724	The agent harness performance optimization system. Skills, instincts, memory, security, and research-first development for Claude Code, Code
+2026-04-20	deepseek-ai/DeepGEMM	9167	DeepGEMM: clean and efficient BLAS kernel library on GPU
+2026-04-20	kyegomez/OpenMythos	14923	A theoretical reconstruction of the Claude Mythos architecture, built from first principles using the available research literature.
+2026-04-19	mpi-dsg/clawvm	12	
+2026-04-18	Mola-maker/astrbot_plugin_whythemistake	1	Automatically check the terminal for errors and provide solutions.
+2026-04-12	Mola-maker/vibe-coding-platform	1	
+2026-04-12	Mola-maker/sbti-test	1	SBTI personality test
+2026-03-31	ultraworkers/claw-code	194952	An agent-managed museum exhibit, built in Rust with Gajae-Code / LazyCodex — developed and maintained with no human intervention.
+2026-03-30	shareAI-lab/claw0	3439	0 - 1 learn OpenClaw: sections to build an claw-AI agent from scratch
+2026-03-30	shareAI-lab/learn-claude-code	80002	Bash is all you need -  A nano claude code–like 「agent harness」, built from 0 to 1
+2026-03-19	AAswordman/Operit	9396	The most powerful AI agent and AI chat software on Android/Operit是一款Android上能力最为强大、发展最久的AI Agent
+2026-03-19	Mai-with-u/MaiBot	6893	MaiSaka, an LLM-based intelligent agent, is a digital lifeform devoted to understanding you and interacting in the style of a real human. Sh
+2026-03-19	koishijs/koishi	6316	Cross-platform chatbot framework made with love
+2026-03-19	NapNeko/NapCatQQ	12322	Modern protocol-side framework based on NTQQ
+2026-03-19	reworkd/AgentGPT	36263	🤖 Assemble, configure, and deploy autonomous AI Agents in your browser.
+2026-03-18	Mola-maker/agent-gateway	1	一个基于 LLM 和 Playwright 的高校(吉林大学) OA 通知智能聚合网关
+2026-03-12	Hack-with-Github/Awesome-Hacking	124844	A collection of various awesome lists for hackers, pentesters and security researchers
+2026-03-12	sindresorhus/awesome	532678	😎 Awesome lists about all kinds of interesting topics [NOTE: Pull requests are temporarily disabled until I have a chance to catch up with t
+2026-03-12	AstrBotDevs/AstrBot	46299	AI Agent Assistant & development framework that integrates lots of IM platforms, LLMs, plugins and AI feature, and can be your openclaw alte
+2026-03-11	alibaba/page-agent	29646	JavaScript in-page GUI agent. Control web interfaces with natural language.
+2026-02-23	f/prompts.chat	176105	f.k.a. Awesome ChatGPT Prompts. Share, discover, and collect prompts from the community. Free and open source — self-host for your organizat
+2026-01-24	apachecn/ailearning	42623	AiLearning：数据分析+机器学习实战+线性代数+PyTorch+NLTK+TF2
+2025-12-25	codecrafters-io/build-your-own-x	560528	Master programming by recreating your favorite technologies from scratch.
+2025-12-22	H4ckF0rFun/Fuck-Lesson	80	吉林大学抢课脚本
+2025-12-10	axel358/smartdock	1465	A user-friendly desktop mode launcher that offers a modern and customizable user interface

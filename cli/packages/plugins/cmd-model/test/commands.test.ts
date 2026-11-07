@@ -37,11 +37,11 @@ function activatedCtx(opts: { exec?: Script["exec"] } = {}): { ctx: FakeCtx; cal
   return { ctx, calls: script.calls };
 }
 
-test("activate registers model show|set|routes", () => {
+test("activate registers model show|set|routes and models rank", () => {
   const { ctx } = activatedCtx();
   assert.deepEqual(
     ctx.commands.registered.map((c) => c.path.join(" ")),
-    ["model show", "model set", "model routes"],
+    ["model show", "model set", "models rank", "model routes"],
   );
 });
 
@@ -223,5 +223,84 @@ test("model commands exit 69 when magpie is unreachable", async () => {
       },
       path,
     );
+  }
+});
+
+// ---- models rank (FRAMEWORK §12.3) -------------------------------------------------
+
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+
+function withRoutingFile<T>(json: unknown, fn: () => Promise<T>): Promise<T> {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mola-rank-"));
+  const file = path.join(dir, "model-routing.json");
+  fs.writeFileSync(file, JSON.stringify(json));
+  const before = process.env.MOLA_ROUTING_FILE;
+  process.env.MOLA_ROUTING_FILE = file;
+  return fn().finally(() => {
+    if (before === undefined) delete process.env.MOLA_ROUTING_FILE;
+    else process.env.MOLA_ROUTING_FILE = before;
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+}
+
+const RANK_FILE = {
+  updated: "2026-11-06",
+  tasks: {
+    debug: { desc: "bugs", picks: ["auto/claude-opus-5-5", "deepseek/deepseek-chat"], evidence: "Coding #5" },
+    explore: { picks: ["auto/gemini-3.8-flash"], unverified: true },
+  },
+};
+
+test("models rank <kind> --json lists the picks in order with the whitelist verdict", async () => {
+  await withRoutingFile(RANK_FILE, async () => {
+    const { ctx } = activatedCtx();
+    const io = fakeIo(true);
+    const code = await commandOf(ctx, ["models", "rank"]).handler({ positionals: ["debug"], flags: {} }, io);
+    assert.equal(code, 0);
+    const data = io.datas[0] as any;
+    assert.equal(data.tasks.length, 1);
+    assert.deepEqual(
+      data.tasks[0].picks.map((p: any) => [p.rank, p.route, p.allowed, p.reason]),
+      [
+        [1, "auto/claude-opus-5-5", true, undefined],
+        [2, "deepseek/deepseek-chat", false, "banned"],
+      ],
+    );
+  });
+});
+
+test("models rank without a kind prints every kind as a table", async () => {
+  await withRoutingFile(RANK_FILE, async () => {
+    const { ctx, calls } = activatedCtx();
+    const io = fakeIo(false);
+    await commandOf(ctx, ["models", "rank"]).handler({ positionals: [], flags: {} }, io);
+    const text = io.outs.join("\n");
+    assert.match(text, /debug\s+1\s+\S+\s+auto\/claude-opus-5-5\s+Coding #5/);
+    assert.match(text, /explore\s+1\s+\S+\s+auto\/gemini-3\.8-flash\s+\(unverified\)/);
+    assert.equal(calls.length, 0, "rank is offline: magpie is never called");
+  });
+});
+
+test("models rank: an unknown kind is a usage error, a missing file is NO_INPUT", async () => {
+  await withRoutingFile(RANK_FILE, async () => {
+    const { ctx } = activatedCtx();
+    await assert.rejects(
+      () => commandOf(ctx, ["models", "rank"]).handler({ positionals: ["zzz"], flags: {} }, fakeIo()),
+      /unknown task kind "zzz"/,
+    );
+  });
+  const before = process.env.MOLA_ROUTING_FILE;
+  process.env.MOLA_ROUTING_FILE = path.join(os.tmpdir(), "does-not-exist-routing.json");
+  try {
+    const { ctx } = activatedCtx();
+    await assert.rejects(
+      () => commandOf(ctx, ["models", "rank"]).handler({ positionals: [], flags: {} }, fakeIo()),
+      /cannot read/,
+    );
+  } finally {
+    if (before === undefined) delete process.env.MOLA_ROUTING_FILE;
+    else process.env.MOLA_ROUTING_FILE = before;
   }
 });

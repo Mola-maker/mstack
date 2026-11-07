@@ -14,46 +14,50 @@ Use for "keep going until done", multi-phase or multi-session work, or anything 
 
 ## Procedure
 
-1. **Write the goal file.** Create `.mstack/goals/<slug>.md` (layout: `references/goal-file-format.md`) containing: the objective in one testable sentence, the ordered sub-goals (outcome first, not list order), each sub-goal's acceptance criteria, the per-task attempt cap, the stop conditions, and empty `## Amendments` / `## Closeout` placeholders. Break the brief into the smallest sub-goals that each end in a check (principle 3). Then, before the first edit: save the m-verify baseline — run the suite once and write one signature line per already-failing test to `.mstack/verify/baseline.txt` (format and rules in `m-verify`'s `references/verify-gates.md`; a green suite means an empty file) — and record the commit that baseline belongs to:
-   `node "<this skill dir>/scripts/goal-state.mjs" init .mstack/goals <slug> --start-commit <sha>`
-   `<this skill dir>` is the directory this SKILL.md was loaded from (Claude Code shows it as the skill base directory; in the mstack repo it is `skills/m-goal`). If that script file cannot be found, do this step by hand and say so in the report. `<sha>` is `git rev-parse HEAD`, or `none` when the repo has no commits yet.
-2. **Order by risk.** Architectural decisions and core abstractions first, integration points next, spikes/unknowns, then polish and quick wins last — fail fast on risky work.
-3. **Loop per sub-goal.** Pick the first not-done sub-goal; implement; verify each acceptance criterion with fresh evidence (run it, read the output — principle 4); only mark done when all criteria pass, not when the diff "looks right". Spend extra budget on several attempts plus selection between them, never on one bigger single pass; at a task's attempt cap, stop retrying and either route around it or escalate.
-4. **Checkpoint after each sub-goal.** Append one row to the goal file's checkpoint table — fixed 5 columns `ts / decision / why / evidence / result`, append-only (a wrong entry is superseded by a new row, never edited). Then update the loop state `.mstack/goals/<slug>.state.json` with this exact command (`<this skill dir>`: see step 1):
-   `node "<this skill dir>/scripts/goal-state.mjs" record .mstack/goals <slug> [--fail <signature>] [--progress] [--tokens N] [--budget PCT] [--status active|done|failed]`
-   Pass `--fail <signature>` for every error signature that failed this round and `--progress` only when a sub-goal verifiably advanced (`result: pass`); `--progress` resets the consecutive-failure counters. `--tokens` and `--budget` are your own estimate against the cap declared in the goal file — no harness reports them. Read the printed verdict at every checkpoint: the same error signature failing 3 times **in a row**, or the budget at 100%, stops the loop; 90% warns. The script prints `ok` / `warn` / `stop` and exits 1 on `stop`. Exit 2 means the state file is unreadable or malformed: repair it by hand and rerun — never delete it to start the counters over.
-5. **Final gate, fixed order.** When every sub-goal passes: run `m-deslop` on the changed files only, then `m-verify`, then `m-review`. A rejected review appends a new sub-goal and the loop continues — a goal is never marked done with review findings open.
-6. **Write the closeout (mandatory).** Fill the `## Closeout` section of the same goal file (`.mstack/goals/<slug>.md`) — including the `gate` block and the Attention section, see Output — then stop.
+Using m-goal: <one-line objective> — say this first, before any tool call.
 
-Do not stall on the human for reversible decisions: proceed with a default, record it, and let them course-correct. Stop only for an irreversible or external action. If the same error recurs 3 times in a row, stop the loop, change the hypothesis (principle 9), and report — the state file's consecutive counters are what make "3 in a row" a count, not a memory.
+**Iron Law: NO `done` STATUS WITHOUT A WRITTEN CLOSEOUT, A PASSING GATE, AND AT LEAST THE MINIMUM ROUNDS.**
+No exceptions: do not write the closeout "after one more try", in a second file, or from memory of the run; do not loosen a criterion to reach it (amend it, step 6); do not stop on a first lucky pass; do not replace the counter script with your recollection.
+
+| You will be tempted to think… | Reality |
+|---|---|
+| "I'll write the closeout when I've finished the last fix." | The loop dies where you do not expect (a freeze hook denied the write; the session ended). The closeout is written on the exit path, not after it (reviews/2026-11-06-round2.md #10). |
+| "The state script is not at that path, so I'll count failures myself." | A memory count is no count; the 3-in-a-row rule then does not exist (round2 #1). Find the script from the skill dir, or do it by hand and say so in the report. |
+| "The suite is red already, I'll save the baseline after my first edits." | A late baseline bakes your own failures in; no baseline blocks the task forever (round2 #6). Save it before the first edit. |
+| "The review had one unconfirmed finding, so the review failed." (or "so it is fine") | Neither: pass means no confirmed in-scope finding and no axis `issues` (round2 #7). Anything else is a Ruling line. |
+| "The metric hit target once, we are done." | One lucky run ends the loop early; the stop predicate is target AND min-rounds (research/round3/pstack-craft.md T5). |
+| "The closeout can go in its own file." | Resume reads only the goal file and re-does a finished goal (reviews/2026-11-04-acceptance.md #4). |
+
+Red flags — you are breaking the skill now: you typed "done" with no `## Closeout` status line; the state file's `rounds` is below the minimum and you are writing `done`; you are on a fourth attempt at the same signature; you rewrote a checkpoint row; you edited an acceptance line in place.
+
+1. **Write the goal file.** Create `.mstack/goals/<slug>.md` (layout: `references/goal-file-format.md`) containing: the objective in one testable sentence, the ordered sub-goals (outcome first), each sub-goal's acceptance criteria, the per-task attempt cap, the **minimum rounds** (default 3; a number you set before starting), the stop conditions, and empty `## Amendments` / `## Closeout` placeholders. Break the brief into the smallest sub-goals that each end in a check (principle 3). Then, before the first edit: save the m-verify baseline — run the suite once and write one signature line per already-failing test to `.mstack/verify/baseline.txt` (format in `m-verify`'s `references/verify-gates.md`; a green suite means an empty file) — and record the commit that baseline belongs to:
+   `node "<this skill dir>/scripts/goal-state.mjs" init .mstack/goals <slug> --start-commit <sha> --min-rounds <N>`
+   `<this skill dir>` is the directory this SKILL.md was loaded from (Claude Code shows it as the skill base directory). If the script cannot be found, do this step by hand and say so in the report. `<sha>` is `git rev-parse HEAD`, or `none` when the repo has no commits.
+2. **Order by risk.** Architectural decisions and core abstractions first, integration points next, spikes/unknowns, then polish last — fail fast on risky work.
+3. **Loop per sub-goal.** Pick the first not-done sub-goal; implement; verify each acceptance criterion with fresh evidence (run it, read the output — principle 4); mark done only when all criteria pass. Spend extra budget on several attempts plus selection between them, never on one bigger single pass; at a task's attempt cap, route around it or escalate.
+4. **Checkpoint after each sub-goal.** Append one row to the checkpoint table — fixed 5 columns `ts / decision / why / evidence / result`, append-only (a wrong entry is superseded by a new row). Then update the loop state with this exact command:
+   `node "<this skill dir>/scripts/goal-state.mjs" record .mstack/goals <slug> [--round] [--fail <signature>] [--progress] [--tokens N] [--budget PCT] [--status active|done|failed]`
+   Pass `--round` once per completed verify pass over the acceptance criteria (a round is that, not a record call); pass `--fail <signature>` for every error signature that failed this round and `--progress` only when a sub-goal verifiably advanced (`result: pass`); `--progress` resets the consecutive counters. `--tokens` and `--budget` are your own estimate against the cap in the goal file. The script prints `ok` / `warn` / `stop` plus `rounds=N min=M`, and exits 1 on `stop`, including when `--status done` is rejected for rounds below the minimum; read it every time. Exit 2 means the state file is unreadable: repair it by hand, never delete it to reset the counters.
+5. **Final gate, fixed order.** Only when every sub-goal passes and `rounds` is at least the minimum: `m-deslop` on the changed files only, then `m-verify`, then `m-review`. A failed review appends a new sub-goal and the loop continues.
+6. **Write the closeout (mandatory).** Fill `## Closeout` in the same goal file with the fields in `references/closeout.md` (including the `gate` block and Attention), then stop. A criterion proven wrong is amended there, never edited in place.
+
+Ruling record: any decision this skill does not cover becomes one line `Ruling: decision | reason | cost if wrong` in the checkpoint table (see `references/closeout.md`). Reversible decisions never wait for the user: take the default, record it, continue.
+
+Gate function — before writing `done` or any success claim:
+
+| claim | evidence required | evidence that is NOT enough |
+|---|---|---|
+| objective met | each acceptance command run this round, output read | the diff looks right; an earlier round passed |
+| loop may stop | target met AND `rounds` ≥ minimum in the script line | one lucky pass; your own tally |
+| gate passed | one proving command per `m-deslop` / `m-verify` / `m-review` | "no complaints"; a sub-agent said ok |
 
 ## Output
 
-`.mstack/goals/<slug>.md` (goal, sub-goals, checkpoints) plus `.mstack/goals/<slug>.state.json` (loop counters), with the closeout written as a `## Closeout` section inside the goal file. Give the user the standard report: one-line conclusion → what changed with evidence → what was not done / risks.
-
-### Closeout content (written on every exit path)
-
-The `## Closeout` section always contains these fields, in order:
-
-- **status** — `done`, `failed`, `interrupted`, or `budget-exhausted`.
-- **objective** — the goal's one-line objective.
-- **result** — what was actually achieved against the acceptance criteria, with the evidence (commands + output) for each.
-- **unfinished** — every sub-goal or criterion still open, and why.
-- **known-issues** — errors that survived retries, one line each (what broke, what was tried).
-- **lessons** — repeatable traps or decisions worth encoding in structure (principle 10); write nothing if there are none.
-- **gate** — one line each for `m-deslop` / `m-verify` / `m-review`: pass or fail plus the proving command. A goal with a failed gate is not `done`.
-- **Attention** — filled by a different model than the one that ran the loop: anything the next session must not miss. `无` is a valid entry.
-- **resume-hint** — for `failed`/`interrupted`/`budget-exhausted`: what to read to resume (the goal file path, last checkpoint, blocker).
-
-### Amend, never rewrite
-
-Acceptance criteria can be amended but never silently edited. A refuted criterion stays verbatim under `## Amendments`, with the reason and the measured evidence that refuted it; an amendment without evidence is invalid. The closeout is checked against the active criteria only.
-
-If the outcome was `done`, mark all sub-goals complete and note the reviewer verdict. If not, leave the goal file intact so a later `m-goal` resume or `m-handoff` continues from the last checkpoint. Never claim completion without a written closeout. m-handoff only links to this closeout; it never writes one.
+`.mstack/goals/<slug>.md` (goal, sub-goals, checkpoints, `## Closeout`) plus `.mstack/goals/<slug>.state.json` (loop counters). Closeout fields, in order, and the amend rule are in `references/closeout.md`. Report in the standard shape: one-line conclusion → what changed with evidence → what was not done / risks. If the outcome was `done`, mark all sub-goals complete and note the reviewer verdict; if not, leave the goal file intact so a later resume or `m-handoff` continues from the last checkpoint. Never claim completion without a written closeout. m-handoff only links to the closeout; it never writes one.
 
 ## Stop conditions
 
-Write the closeout and stop when the objective is met, or the user says stop/cancel, or the state file shows the same error signature 3 times in a row, or the budget hits 100% (warn at 90%). Ask the user only for an irreversible, external, or genuinely-undecidable choice (principle 8); every reversible decision gets a recorded default instead.
+Write the closeout and stop when: the objective is met AND `rounds` ≥ minimum; the user says stop/cancel; one error signature fails 3 times in a row; or the budget reaches 100% (warn at 90%). Fewer rounds than the minimum with the objective met means run another verification round, not stop. Ask the user only for an irreversible, external, or genuinely-undecidable choice (principle 8). After the third identical failure change the hypothesis (principle 9) — there is no fourth try.
 
 ## Harness notes
 

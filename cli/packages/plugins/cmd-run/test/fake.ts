@@ -20,6 +20,9 @@ import type {
   StateNamespace,
 } from "@mola/plugin-sdk";
 
+// legacy behaviour unless a test points MOLA_ROUTING_FILE at a real table
+process.env.MOLA_ROUTING_FILE ??= "/nonexistent/model-routing.json";
+
 export const nullLog: Logger = {
   level: "error",
   child: () => nullLog,

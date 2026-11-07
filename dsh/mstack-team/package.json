@@ -1,0 +1,19 @@
+{
+  "name": "mstack-team-preset",
+  "description": "Opt-in DSH bundle: experimental Agent Teams tools for mstack m-team, keeping subagent enabled",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "files": ["cordis.patch.yml", "README.md"],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-experimental-agent-team": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-experimental-tool-agent-team": "0.2.2-alpha.2",
+    "@deepseek-ai/dsh-experimental-client-ui-agent-team": "0.2.2-alpha.2"
+  }
+}

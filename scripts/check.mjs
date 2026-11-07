@@ -46,6 +46,34 @@ for (const name of expected) {
   }
 }
 
+// agents/*.md: plugin agent frontmatter; read-only agents must deny Write, Edit and NotebookEdit
+if (existsSync(join(root, "agents"))) {
+  for (const f of readdirSync(join(root, "agents")).filter((x) => x.endsWith(".md"))) {
+    const text = readFileSync(join(root, "agents", f), "utf8");
+    const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (!fm) { err(`agents/${f}: no frontmatter`); continue; }
+    for (const k of ["name", "description", "model"]) if (!new RegExp(`^${k}:\\s*\\S`, "m").test(fm[1])) err(`agents/${f}: frontmatter missing ${k}`);
+    if (/\(.*read-only.*\)|read-only/i.test(fm[1].match(/^description:.*$/m)?.[0] ?? "")) {
+      const deny = fm[1].match(/^disallowedTools:\s*(.*)$/m)?.[1] ?? "";
+      for (const t of ["Write", "Edit", "NotebookEdit"]) if (!deny.includes(t)) err(`agents/${f}: read-only agent does not deny ${t}`);
+    }
+    if (text.split("\n").length > 120) err(`agents/${f}: over 120 lines`);
+  }
+}
+
+// config/model-routing.json: valid JSON, only magpie routes (group/*, auto/*), never deepseek/* direct
+if (existsSync(join(root, "config", "model-routing.json"))) {
+  try {
+    const r = JSON.parse(readFileSync(join(root, "config", "model-routing.json"), "utf8"));
+    for (const [kind, t] of Object.entries(r.tasks ?? {})) {
+      if (!Array.isArray(t.picks) || t.picks.length === 0) err(`model-routing: task ${kind} has no picks`);
+      for (const p of t.picks ?? []) if (!/^(group|auto)\//.test(p)) err(`model-routing: task ${kind} pick ${p} is not a magpie route`);
+      if (!t.evidence) err(`model-routing: task ${kind} has no evidence`);
+    }
+    if (!r.families || !Object.keys(r.families).length) err("model-routing: no families");
+  } catch (e) { err(`model-routing: invalid JSON (${e.message})`); }
+}
+
 // evals/<case>/case.yaml (claude plugin eval): required keys present, and every skill named in a should-fire grader exists
 if (existsSync(join(root, "evals"))) {
   for (const c of readdirSync(join(root, "evals")).filter((d) => !d.startsWith(".") && d !== "results" && statSync(join(root, "evals", d)).isDirectory())) {

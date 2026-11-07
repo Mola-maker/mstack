@@ -1,0 +1,30 @@
+# mstack-team: opt-in DSH patch that turns on the experimental Agent Teams tools for m-team.
+# Apply after dsh-base. Pinned to DSH agent-team 0.2.2-alpha.2 (see package.json).
+#
+# Differences from the stock agent-team-profile, on purpose:
+#   - tool-subagent and tool-subagent-fork stay ENABLED. m-dispatch needs `subagent` (it takes
+#     a cwd, which is the only way to isolate a code-changing child in a worktree).
+#   - only tool-subagent-control is disabled, because it defines send_message, list_agents and
+#     interrupt_agent under the same names as the team tools.
+# Not run end to end. Smoke test: dsh/mstack-team/README.md.
+
+- id: tool-subagent-control
+  disabled: true
+
+- insert:
+    - id: agent-team
+      name: '@deepseek-ai/dsh-experimental-agent-team'
+      config:
+        maxMembers: 8
+        maxTasks: 256
+        maxMessageBytes: 65536
+        disposalTimeoutMs: 5000
+
+    - id: tool-agent-team
+      name: '@deepseek-ai/dsh-experimental-tool-agent-team'
+      config:
+        freshProvider: spawn
+        forkProvider: fork
+
+    - id: ui-agent-team
+      name: '@deepseek-ai/dsh-experimental-client-ui-agent-team'

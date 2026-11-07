@@ -7,7 +7,7 @@
   "mola": ">=0.1.0 <1.0.0",
   "engine": { "node": ">=22" },
   "entry": { "ts": "./dist/index.js" },
-  "provides": ["cmd:model"],
+  "provides": ["cmd:model", "cmd:models"],
   "requires": [],
   "capabilities": ["command.model"],
   "permissions": {

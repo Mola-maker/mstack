@@ -78,9 +78,24 @@ import {
   type EventSink,
 } from "./stream.js";
 import { probeVisibleRoutesFor } from "./visible.js";
+import {
+  adaptPrompt,
+  inferKind,
+  loadRouting,
+  loadRoutingFile,
+  planRoutes,
+  policyKindOf,
+  routingKindOf,
+  type PromptAdapter,
+  type RoutePlan,
+  type RoutingTable,
+} from "./routing.js";
 
 const RUN_USAGE =
-  'usage: mola run "<task>" [--agent <id>] [--on <machine>] [--route <id>] [--json]';
+  'usage: mola run "<task>" [--agent <id>] [--on <machine>] [--route <id>] [--kind <task-kind>] [--json]';
+
+export type KindSource = "--kind" | "guessed" | "skill";
+export type RouteSource = "flag" | "policy" | "picks" | "default";
 
 /** The task kind of a bare `mola run` — no skill wraps it. */
 const DEFAULT_TASK_KIND: TaskKind = "implement";
@@ -89,6 +104,8 @@ interface RunFlags {
   agent?: string;
   on?: string;
   route?: string;
+  /** the model-routing task kind (config/model-routing.json); inferred from the prompt when absent */
+  kind?: string;
 }
 
 /** The flags every mola run / skill command accepts. */
@@ -97,6 +114,7 @@ export function readRunFlags(flags: Record<string, string | boolean>): RunFlags 
   if (typeof flags.agent === "string" && flags.agent.trim()) out.agent = flags.agent.trim();
   if (typeof flags.on === "string" && flags.on.trim()) out.on = flags.on.trim();
   if (typeof flags.route === "string" && flags.route.trim()) out.route = flags.route.trim();
+  if (typeof flags.kind === "string" && flags.kind.trim()) out.kind = flags.kind.trim();
   return out;
 }
 
@@ -114,6 +132,19 @@ interface PreparedRun {
   approval: "interactive" | "batch-approved";
   budgetUsd?: number;
   visibleRoutes: Map<string, string[]>;
+  /** which source chose the primary route */
+  routeSource: RouteSource;
+  /** the model layer: present when config/model-routing.json was found */
+  routing?: {
+    table: RoutingTable;
+    kind: string;
+    /** how the kind was chosen: the user's --kind, a guess from the prompt, or the skill command */
+    kindSource: KindSource;
+    /** the plan from the picks list; null when no pick survived the whitelist */
+    plan: RoutePlan | null;
+    /** the routes the quota ladder walks after the primary one */
+    ladder: string[];
+  };
 }
 
 /**
@@ -130,9 +161,27 @@ export async function prepareRun(
     policy: Policy;
     visibleRoutes?: Map<string, string[]>;
     detect?: boolean;
+    /** the model-routing table; defaults to the checkout's config/model-routing.json */
+    routing?: RoutingTable | null;
+    /** the routing task kind (from --kind, a skill command, or inferred) */
+    routingKind?: string;
+    /** how `routingKind` was chosen (recorded in decision.json) */
+    kindSource?: KindSource;
   },
 ): Promise<PreparedRun> {
   const policy = opts.policy;
+  const table = opts.routing === undefined ? loadRouting() : opts.routing;
+  const routingKind =
+    opts.routingKind ?? opts.flags.kind ?? inferKind(opts.prompt, table, routingKindOf(opts.taskKind));
+  const kindSource: KindSource = opts.kindSource ?? (opts.flags.kind ? "--kind" : "guessed");
+  if (table && !table.tasks[routingKind]) {
+    throw new MolaError(
+      "USAGE_ERROR",
+      `unknown task kind "${routingKind}" (known: ${Object.keys(table.tasks).join(", ")})`,
+      ExitCode.Usage,
+      { kind: routingKind, known: Object.keys(table.tasks) },
+    );
+  }
   const visibleRoutes = opts.visibleRoutes ?? new Map<string, string[]>();
 
   const adapters = runnableAdapters(ctx.agents.list());
@@ -175,8 +224,23 @@ export async function prepareRun(
     );
   }
 
-  // the route: the pinned one, else the policy row for this task kind
-  const primaryRoute = opts.flags.route ?? routeForTaskKind(opts.taskKind, policy, "group/smart-split");
+  // The route, by precedence: --route; else the user's own policy row for this
+  // task kind (a policy row OVERRIDES the picks — it is the user's explicit
+  // choice); else the first whitelisted pick of the model layer; else the policy
+  // default. A policy row only applies when it belongs to the kind in play: a
+  // kind guessed from the prompt never borrows the row of the default kind.
+  const plan = table ? planRoutes(table, routingKind, policy.modelRoutes) : null;
+  const rowApplies = !table || policyKindOf(routingKind) === opts.taskKind;
+  const policyRow = rowApplies ? policy.routes.byTaskKind[opts.taskKind]?.route : undefined;
+  const primaryRoute =
+    opts.flags.route ?? policyRow ?? plan?.route ?? routeForTaskKind(opts.taskKind, policy, "group/smart-split");
+  const routeSource: RouteSource = opts.flags.route
+    ? "flag"
+    : policyRow
+      ? "policy"
+      : plan
+        ? "picks"
+        : "default";
   const verdict = checkRoute(primaryRoute, policy.modelRoutes);
   if (!verdict.ok) {
     throw new MolaError(
@@ -232,10 +296,29 @@ export async function prepareRun(
     policy,
     adapter: best.adapter,
     route: primaryRoute,
+    routeSource,
     permissionProfile: permissionProfileFor(opts.taskKind, policy),
     approval: req.approval,
     ...(req.budgetUsd !== undefined ? { budgetUsd: req.budgetUsd } : {}),
     visibleRoutes: visible,
+    ...(table
+      ? {
+          routing: {
+            table,
+            kind: routingKind,
+            kindSource,
+            plan,
+            // the picks after the primary, then the policy's alternateRoutes;
+            // deduped and whitelist-filtered
+            ladder: dedupe(
+              allowedAlternates(policy, [
+                ...(plan ? [plan.route, ...plan.ladder] : []),
+                ...policy.fallback.alternateRoutes,
+              ]),
+            ).filter((r) => r !== primaryRoute),
+          },
+        }
+      : {}),
   };
 }
 
@@ -297,6 +380,10 @@ export function makeRunStream(opts: { write?: (line: string) => void } = {}): Ev
  * there. `switch-route` walks every allowed alternate route; `switch-agent`
  * walks every fallback agent of the decision.
  */
+function dedupe(routes: string[]): string[] {
+  return routes.filter((r, i) => routes.indexOf(r) === i);
+}
+
 export async function runLadder(opts: {
   attempt: (agent: string, route: string) => Promise<RunResult>;
   primary: { agent: string; route: string };
@@ -304,11 +391,15 @@ export async function runLadder(opts: {
   policy: Policy;
   wait: (provider: string, timeoutSec: number) => Promise<{ ok: boolean; detail?: string }>;
   quotaTimeoutSec?: number;
+  /** the ladder routes of the model layer (picks, then the policy's alternateRoutes); when given they replace the policy's list */
+  alternates?: string[];
 }): Promise<{ result?: RunResult; attempts: LadderAttempt[]; exhausted: boolean }> {
   const { attempt, primary, policy } = opts;
   const attempts: LadderAttempt[] = [];
   const plan = planLadder(policy, opts.fallbacks.map((f) => f.agent), primary.route);
-  const alternates = allowedAlternates(policy, plan.alternateRoutes);
+  const alternates = allowedAlternates(policy, opts.alternates ?? plan.alternateRoutes).filter(
+    (r) => r !== primary.route,
+  );
 
   const succeeded = (result: RunResult): boolean =>
     result.exitCode === 0 && !result.quotaFailure;
@@ -407,12 +498,23 @@ export default definePlugin({
         const policy = loadPolicy(ctx.fs, io.cwd);
         for (const warning of policy.warnings) io.note(`mola: ${warning}`);
 
+        const loaded = loadRoutingFile();
+        if (loaded.warning) io.note(`mola: routing file: ${loaded.warning} — routing by policy only`);
+        const table = loaded.table;
+        // the guess only picks the model route; the permission/approval row
+        // follows the default kind unless the user named one with --kind
+        const routingKind = flags.kind ?? inferKind(task, table, routingKindOf(DEFAULT_TASK_KIND));
+        const kindSource: KindSource = flags.kind ? "--kind" : "guessed";
+        io.note(`mola: kind: ${routingKind} (${kindSource})`);
         const prepared = await prepareRun(ctx, {
-          taskKind: DEFAULT_TASK_KIND,
+          taskKind: flags.kind ? policyKindOf(routingKind) : DEFAULT_TASK_KIND,
           prompt: task,
           flags,
           cwd: io.cwd,
           policy,
+          routing: table,
+          routingKind,
+          kindSource,
         });
 
         return executeRun(ctx, io, {
@@ -459,12 +561,17 @@ export default definePlugin({
             statePaths: resolveStatePaths(spec, path_),
           });
 
+          const loaded = loadRoutingFile();
+          if (loaded.warning) io.note(`mola: routing file: ${loaded.warning} — routing by policy only`);
           const prepared = await prepareRun(ctx, {
             taskKind: spec.taskKind,
             prompt,
             flags,
             cwd: io.cwd,
             policy,
+            routing: loaded.table,
+            routingKind: flags.kind ?? routingKindOf(spec.taskKind),
+            kindSource: flags.kind ? "--kind" : "skill",
           });
 
           return executeRun(ctx, io, {
@@ -488,6 +595,7 @@ function flagArgs(flags: RunFlags): string[] {
   if (flags.agent) out.push("--agent", flags.agent);
   if (flags.on) out.push("--on", flags.on);
   if (flags.route) out.push("--route", flags.route);
+  if (flags.kind) out.push("--kind", flags.kind);
   return out;
 }
 
@@ -522,7 +630,7 @@ export async function executeRun(
   opts: ExecuteRunOptions,
 ): Promise<ExitCode> {
   const { prepared, runId } = opts;
-  const { decision, policy, adapter } = prepared;
+  const { decision, policy, adapter, routing } = prepared;
   const t0 = Date.now();
   // NDJSON on stderr only for --json and -v. Human mode gets a spinner instead.
   const streamEvents = io.json || verboseRequested();
@@ -541,6 +649,12 @@ export async function executeRun(
     yes: io.yes,
   })) as { modelRoute: string };
   const route = approved.modelRoute ?? decision.modelRoute;
+  // the prompt adapter of the first route (the family style); the ladder may
+  // change route, and runOnce re-adapts the ORIGINAL prompt for each one
+  const adaptedFor = (modelRoute: string): { prompt: string; adapter: PromptAdapter } =>
+    adaptPrompt(routing?.table ?? null, modelRoute, opts.prompt);
+  const firstAdapter = adaptedFor(route).adapter;
+  const adaptersUsed: PromptAdapter[] = [];
 
   // BRIEF #7: full-auto needs an approval; without one it is downgraded and
   // the downgrade is said out loud (never silently).
@@ -578,9 +692,25 @@ export async function executeRun(
       permissionProfile: gated.profile,
       approval: prepared.approval,
       reason: decision.reason,
+      ...(routing
+        ? { taskKind: routing.kind, kindSource: routing.kindSource, routeSource: prepared.routeSource, promptAdapter: firstAdapter, ladderRoutes: routing.ladder }
+        : {}),
       ...(opts.skill ? { skill: opts.skill.skill } : {}),
     },
   });
+  const decisionExtras = (): Record<string, unknown> =>
+    routing
+      ? {
+          taskKind: routing.kind,
+          kindSource: routing.kindSource,
+          routeSource: prepared.routeSource,
+          picks: routing.plan ? [routing.plan.route, ...routing.plan.ladder] : [],
+          ladderRoutes: routing.ladder,
+          promptAdapter: adaptersUsed[adaptersUsed.length - 1] ?? firstAdapter,
+          promptAdapters: adaptersUsed.length ? adaptersUsed : [firstAdapter],
+        }
+      : {};
+  if (routing) recordDecisionExtras(ctx, io.cwd, runId, decisionExtras());
   ctx.events.emit(
     MolaEvents.SessionStarted,
     routingEnvelope.data,
@@ -622,8 +752,10 @@ export async function executeRun(
         ExitCode.NoInput,
       );
     }
+    const adapted = adaptedFor(modelRoute);
+    adaptersUsed.push(adapted.adapter);
     const req = buildRunRequest({
-      prompt: opts.prompt,
+      prompt: adapted.prompt,
       cwd: io.cwd,
       modelRoute,
       permissionProfile: gated.profile,
@@ -656,11 +788,14 @@ export async function executeRun(
       fallbacks: decision.fallbacks,
       policy,
       wait: makeQuotaWaitRunner(ctx.process).wait,
+      ...(routing ? { alternates: routing.ladder } : {}),
     });
     attempts = walk.attempts;
     exhausted = walk.exhausted;
     if (walk.result) result = walk.result;
   }
+
+  if (routing) recordDecisionExtras(ctx, io.cwd, runId, decisionExtras());
 
   // success wins: an agent that exited 0 delivered, whatever its output mentioned
   const exitCode: ExitCode =
@@ -684,6 +819,7 @@ export async function executeRun(
     modelRoute: route,
     exitCode: result.exitCode,
     eventKinds: kinds,
+    ...(routing ? { taskKind: routing.kind, promptAdapter: adaptersUsed[adaptersUsed.length - 1] ?? firstAdapter } : {}),
     ...(opts.skill ? { skill: opts.skill.skill } : {}),
   });
 
@@ -703,6 +839,20 @@ export async function executeRun(
     reason: decision.reason,
     ranked: decision.ranked,
     fallbacks: decision.fallbacks,
+    ...(routing
+      ? {
+          taskKind: routing.kind,
+          kindSource: routing.kindSource,
+          routeSource: prepared.routeSource,
+          routingFile: routing.table.file,
+          picks: routing.plan ? [routing.plan.route, ...routing.plan.ladder] : [],
+          droppedPicks: routing.plan?.dropped ?? [],
+          ladderRoutes: routing.ladder,
+          // the adapter of the first attempt, then the one of every retry
+          promptAdapter: firstAdapter,
+          promptAdapters: adaptersUsed,
+        }
+      : {}),
     exitCode: result.exitCode,
     sessionId: result.sessionId ?? null,
     finalText: finalTextOf(result),
@@ -723,6 +873,32 @@ export async function executeRun(
     io.note(`${decision.agent} · ${decision.machine} · ${route} · ${formatDuration(Date.now() - t0)} · ${runId}`);
   }
   return exitCode;
+}
+
+/**
+ * Put the model-layer facts into `.mstack/runs/<runId>/decision.json`. The
+ * rec-runs recorder copies only its own fields from the bus events but keeps
+ * every other field already in the file, so the extras are merged in here.
+ * Best effort: a run is never failed by its own bookkeeping.
+ */
+function recordDecisionExtras(
+  ctx: PluginContext,
+  cwd: string,
+  runId: string,
+  extras: Record<string, unknown>,
+): void {
+  const file = path.join(cwd, ".mstack", "runs", runId, "decision.json");
+  try {
+    let current: Record<string, unknown> = {};
+    try {
+      current = JSON.parse(ctx.fs.readFile(file)) as Record<string, unknown>;
+    } catch {
+      // first write
+    }
+    ctx.fs.writeFile(file, JSON.stringify({ ...current, ...extras }, null, 2) + "\n");
+  } catch (err) {
+    ctx.log.debug("cmd-run: could not record the decision extras", { error: String(err) });
+  }
 }
 
 /** One line of human progress from a run event. Never more than one line. */
@@ -778,5 +954,7 @@ export {
   ndjsonSink,
   recordingSink,
 };
+export { adaptPrompt, classifyKind, inferKind, loadRouting, loadRoutingFile, planRoutes, routingFilePath } from "./routing.js";
+export type { RoutingTable, RoutePlan, PromptAdapter } from "./routing.js";
 export type { Policy, TaskKind, RouteDecision, RouteRequest, SkillSpec, LadderAttempt };
 export type { EventSink } from "./stream.js";

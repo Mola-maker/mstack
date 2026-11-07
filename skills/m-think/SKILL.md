@@ -48,4 +48,5 @@ Stop for approval before building anything beyond reading, exploring, or a ≤30
 ## Harness notes
 
 - Question tool: Claude Code `AskUserQuestion`; DSH has no native ask tool, so ask inline with numbered choices and recommended defaults.
+- Wild-mode outcome search: spawn `mstack:m-researcher` (one channel per agent, Claude Code `subagent_type`) for web channels and `mstack:m-explorer` for repo or local evidence; in DSH use `subagent` with the same names as labels.
 - Keep questions in chat text so they survive across Claude Code / DSH / Codex.

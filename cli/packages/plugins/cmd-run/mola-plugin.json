@@ -16,7 +16,8 @@
   "capabilities": ["command.run", "routing.engine", "skills.wrap"],
   "permissions": {
     "process.exec": ["magpie"],
-    "fs.read": ["**/policy.jsonc"],
+    "fs.read": ["**/policy.jsonc", "**/.mstack/runs/**"],
+    "fs.write": ["**/.mstack/runs/**"],
     "mola": ["events", "commands", "config.read", "state.kv"]
   },
   "hooks": {

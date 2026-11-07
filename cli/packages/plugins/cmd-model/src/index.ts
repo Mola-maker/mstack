@@ -12,6 +12,8 @@
  *   locally (same rule as the policy plugin: group/*, auto/* allowed;
  *   deepseek/* banned — ROUTE_BANNED, exit 77), then runs `magpie <agent>
  *   <route>` verbatim. It never writes a config file itself.
+ * - `models rank [kind] [--json]`: the ranked routes per task kind from
+ *   config/model-routing.json (FRAMEWORK §12.3), each with its whitelist verdict.
  * - `model routes`: the route ids `magpie models` knows, each marked with
  *   whether the whitelist allows it.
  */
@@ -31,6 +33,7 @@ import {
   classifyRoute,
   stripMagpiePrefix,
 } from "./whitelist.js";
+import { loadRankTable } from "./routing.js";
 
 const runners = new WeakMap<PluginContext, MagpieRunner>();
 
@@ -161,6 +164,56 @@ export default definePlugin({
     });
 
     ctx.commands.register({
+      path: ["models", "rank"],
+      description: "ranked model routes per task kind (config/model-routing.json)",
+      async handler(args, io) {
+        const loaded = loadRankTable();
+        if (typeof loaded === "string") {
+          throw new MolaError("NO_INPUT", loaded, ExitCode.NoInput);
+        }
+        const kind = args.positionals[0];
+        if (kind && !loaded.tasks[kind]) {
+          throw new MolaError(
+            "USAGE_ERROR",
+            `unknown task kind "${kind}" (known: ${Object.keys(loaded.tasks).join(", ")})`,
+            ExitCode.Usage,
+            { kind, known: Object.keys(loaded.tasks) },
+          );
+        }
+        const { allowed, banned } = routeLists(ctx);
+        const kinds = kind ? [kind] : Object.keys(loaded.tasks);
+        const rows = kinds.map((k) => {
+          const task = loaded.tasks[k];
+          return {
+            kind: k,
+            desc: task.desc,
+            unverified: task.unverified === true,
+            evidence: task.evidence,
+            ...(task.note ? { note: task.note } : {}),
+            picks: task.picks.map((route, i) => {
+              const verdict = classifyRoute(route, allowed, banned);
+              return { rank: i + 1, route, allowed: verdict.ok, ...(verdict.ok ? {} : { reason: verdict.reason }) };
+            }),
+          };
+        });
+        if (io.json) {
+          io.data({ file: loaded.file, updated: loaded.updated, allowed, banned, tasks: rows });
+          return ExitCode.Ok;
+        }
+        const paint = palette(detectColor());
+        const body: string[][] = [];
+        for (const row of rows) {
+          row.picks.forEach((p, i) => {
+            const glyph = statusGlyph(p.allowed ? "ok" : "fail", paint);
+            body.push([i === 0 ? row.kind : "", String(p.rank), glyph, p.route, i === 0 ? `${row.unverified ? "(unverified) " : ""}${row.evidence ?? ""}` : ""]);
+          });
+        }
+        for (const line of table({ header: ["kind", "#", "", "route", "evidence"], rows: body })) io.out(line);
+        return ExitCode.Ok;
+      },
+    });
+
+    ctx.commands.register({
       path: ["model", "routes"],
       description: "the route ids magpie knows, with the whitelist verdict for each",
       async handler(_args, io) {
@@ -202,6 +255,7 @@ export default definePlugin({
 });
 
 export { classifyRoute, globToRegExp, stripMagpiePrefix } from "./whitelist.js";
+export { loadRankTable, routingFilePath } from "./routing.js";
 export { DEFAULT_ALLOWED_ROUTES, DEFAULT_BANNED_ROUTES } from "./whitelist.js";
 export {
   createMagpieRunner,

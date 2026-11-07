@@ -22,7 +22,7 @@ Run every lens. A lens that yields nothing gets one line saying so; skipping is 
 ## 2. Outcome search (search before you invent)
 
 Look for outcomes, not opinions: post-mortems, benchmarks, migrations away, issue threads where it broke, abandoned projects and why.
-- Fan the search out in parallel (`m-research`, or one subagent per angle; a cheap model is fine). Use ≥3 independent channels and cite every claim.
+- Fan the search out in parallel (`m-research`, or one subagent per angle: `m-researcher` per channel, `m-explorer` for repo evidence). Use ≥3 independent channels and cite every claim.
 - Each searcher returns: what was tried, what happened (with numbers when available), why it worked or failed, source URL.
 - Mark single-source claims. An outcome you could not verify is an assumption, not evidence.
 

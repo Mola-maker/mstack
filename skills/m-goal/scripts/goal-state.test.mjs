@@ -17,7 +17,7 @@ const state = (dir) => JSON.parse(readFileSync(join(dir, "demo.state.json"), "ut
 
 test("record creates state file and reports ok", () => {
   const dir = mkdtempSync(join(tmpdir(), "goal-state-"));
-  const r = run(["record", dir, "demo", "--progress", "--tokens", "1200", "--budget", "40"]);
+  const r = run(["record", dir, "demo", "--round", "--progress", "--tokens", "1200", "--budget", "40"]);
   if (r.code !== 0) throw new Error(`exit ${r.code}: ${r.err}`);
   if (!r.out.startsWith("ok ")) throw new Error(`unexpected verdict: ${r.out}`);
   const s = state(dir);
@@ -70,7 +70,8 @@ test("budget 90 warns, 100 stops", () => {
 
 test("record --status sets the status; status prints it without mutating", () => {
   const dir = mkdtempSync(join(tmpdir(), "goal-state-"));
-  run(["record", dir, "demo"]);
+  run(["init", dir, "demo", "--start-commit", "abc1234", "--min-rounds", "1"]);
+  run(["record", dir, "demo", "--round"]);
   const done = run(["record", dir, "demo", "--status", "done"]);
   if (done.code !== 0 || !done.out.includes("status=done")) throw new Error(`expected status=done: ${done.out}`);
   if (state(dir).status !== "done") throw new Error("status flag not persisted");
@@ -98,4 +99,45 @@ test("unknown flag or bad --status exits 2", () => {
   if (run(["record", dir, "demo", "--status", "paused"]).code !== 2) throw new Error("expected 2 for bad status");
   if (run(["record"]).code !== 2) throw new Error("expected 2 for missing args");
   if (run(["init", dir, "demo"]).code !== 2) throw new Error("init without --start-commit must exit 2");
+});
+
+test("rounds go up only with --round; failures, tokens and progress notes do not count (bug regression)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "goal-state-"));
+  run(["record", dir, "demo", "--fail", "E_X"]);
+  run(["record", dir, "demo", "--tokens", "10"]);
+  run(["record", dir, "demo", "--progress"]);
+  if (state(dir).rounds !== 0) throw new Error(`plain records raised rounds to ${state(dir).rounds}`);
+  const r = run(["record", dir, "demo", "--round"]);
+  if (state(dir).rounds !== 1 || !r.out.includes("rounds=1")) throw new Error(`expected rounds=1: ${r.out}`);
+});
+
+test("--status done is rejected below min rounds, accepted at min (bug regression)", () => {
+  const dir = mkdtempSync(join(tmpdir(), "goal-state-"));
+  run(["init", dir, "demo", "--start-commit", "abc1234"]);
+  if (state(dir).minRounds !== 3) throw new Error("default minRounds should be 3");
+  // Two no-op checkpoints without --round must not satisfy the minimum.
+  run(["record", dir, "demo"]);
+  run(["record", dir, "demo"]);
+  const early = run(["record", dir, "demo", "--status", "done"]);
+  if (early.code !== 1 || !early.out.includes("rejected")) throw new Error(`expected rejection at 0 rounds, got ${early.code}: ${early.out}`);
+  if (state(dir).status !== "active") throw new Error("status changed despite rejection");
+  run(["record", dir, "demo", "--round"]);
+  run(["record", dir, "demo", "--round"]);
+  const two = run(["record", dir, "demo", "--status", "done"]);
+  if (two.code !== 1 || state(dir).status !== "active") throw new Error(`2 rounds < 3 must reject: ${two.out}`);
+  // The boundary and the status may arrive in one call.
+  const ok = run(["record", dir, "demo", "--round", "--status", "done"]);
+  if (ok.code !== 0 || state(dir).status !== "done") throw new Error(`expected done at 3 rounds: ${ok.code} ${ok.out}`);
+});
+
+test("--status failed is allowed below min rounds; --min-rounds validates", () => {
+  const dir = mkdtempSync(join(tmpdir(), "goal-state-"));
+  run(["init", dir, "demo", "--start-commit", "abc1234", "--min-rounds", "5"]);
+  if (state(dir).minRounds !== 5) throw new Error("min rounds not stored");
+  const f = run(["record", dir, "demo", "--status", "failed"]);
+  if (f.code !== 0 || state(dir).status !== "failed") throw new Error(`failed should be allowed: ${f.out}`);
+  for (const bad of ["0", "x", "-1"]) {
+    const d2 = mkdtempSync(join(tmpdir(), "goal-state-"));
+    if (run(["init", d2, "demo", "--start-commit", "a", "--min-rounds", bad]).code !== 2) throw new Error(`--min-rounds ${bad} must exit 2`);
+  }
 });

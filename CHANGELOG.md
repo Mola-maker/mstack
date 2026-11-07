@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0 — 2026-11-07
+Round 3, after owner feedback ("prompts rough, agents weak, no model-based assignment, teams invisible in DSH"). Research: research/round3/ (six haiku agents: superpowers craft, OMC agents, pstack craft, Arena routing, DSH team, 262 starred repos). Built by DSH workers r1–r5 on auto/claude-sonnet-5-5 (group/smart-split was switched off in magpie); independent review reviews/2026-11-07-round3.md (15 findings) fixed by g1–g3.
+- **Model layer**: `config/model-routing.json` — 11 task kinds → ranked magpie routes with Arena evidence (2026-11-06), 9 model families with prompt-adapter rules. Shared by skills (m-dispatch/references/model-routing.md) and mola: `mola run` guesses the task kind (printed and recorded; `--kind` overrides), picks the route, adapts the prompt per family without adding instructions, and walks picks + policy fallbacks on quota failure; `mola models rank [kind]`.
+- **Agents**: 7 plugin agents (m-explorer, m-implementer, m-debugger, m-verifier, m-reviewer, m-critic, m-researcher) with model tiers, read-only tool denials and output contracts matched to the skills' parsers.
+- **Prompt craft**: iron laws with closed loopholes, cited rationalization tables, red flags, countable stops and Ruling records, claim→evidence gate tables, "Using m-xxx" announce lines across the core skills.
+- **DSH-native teams**: m-team/m-dispatch drive spawn_teammate, team_task_*, wait_agent, create_goal/update_goal, workflow agent() with schema; shared-cwd isolation trap documented; optional pinned preset `dsh/mstack-team`.
+- check.mjs validates agents (frontmatter, read-only denials) and the routing file (magpie routes only, evidence per task). Removed stale compiled files committed under cli/packages/plugin-sdk/src in B1.
+
 ## 0.4.1 — 2026-11-06
 - m-think wild mode (`references/wild-mode.md`): 10 lenses, parallel outcome search, ≥12 options incl. ≥3 outrageous, scored convergence with steelman and kill list. Trigger words 发散/全方位想.
 - First use: `.mstack/specs/2026-11-06-multimachine-cowork.md` (multi-machine cowork design, research/cowork-*.md).

@@ -24,6 +24,14 @@ Do not use it (hand off instead):
 
 ## Procedure
 
+First line you say: `Using m-review: find defects another context can reproduce.`
+
+```
+NO FINDING WITHOUT A REPRO COMMAND AND ITS OUTPUT.
+```
+
+Closed loopholes: "looks risky", a finding about a line the diff did not add, a verdict formed after reading the author's rationale, and extra findings added because the list looks short. None of them is a finding. Breaking the letter of this rule is breaking its spirit.
+
 1. **Establish scope.** Take `git diff <base>...HEAD`, or `git diff` plus `git ls-files --others --exclude-standard`. Untracked files are in scope. Name the base and the plan or spec. Read the whole diff before commenting.
 2. **Apply the scope rules** in `references/review-template.md` before any reviewer starts. Report only lines the diff adds or replaces. An intentional break whose blast radius is explicit goes under Cleared. Pre-existing code outside the diff is out of scope.
 3. **Census consumers.** List exported symbols, protocols, and data formats the diff adds, changes, or removes, plus callers outside the diff. Attach one command you ran and its output. An empty search is a result; do not invent a caller.
@@ -47,15 +55,27 @@ Also include:
 - To the author: one line for the problem, one line for the fix. Push back with `file:line` or a test when a finding is wrong.
 - **Verdict (last line).** `APPROVE` when no confirmed in-scope finding remains and no axis is `issues`. `REQUEST CHANGES` otherwise; under it list each blocking finding as `file:line` and each axis marked `issues`. Unconfirmed and Cleared do not block. `not-assessed` and `not-applicable` do not block by themselves. The caller gates on this line.
 
+### Rationalizations seen in this repo
+
+| You will be tempted to think… | Reality |
+|---|---|
+| "The diff is empty, so there is nothing to flag in the new file." | Untracked files are in scope; the classifier once dropped every finding in them (reviews/2026-11-06-round2.md #3). |
+
+**Red flags, check the repro before you write it down:** the finding has no command output; it is about code outside the diff; your reviewer prompt names the author or says the answer; you are agreeing because the other writeup is longer.
+
 ## Stop conditions
 
-- The base or the diff cannot be established → stop and ask.
-- No plan or spec to judge intent against → mark intent `not-assessed` and ask. Do not invent criteria.
-- A finding does not reproduce → Unconfirmed. Do not pad the list.
-- Reviewer and refuter still disagree after one refute pass → report both sides. Do not call it confirmed.
+Exactly three things end the review early, and each produces output instead of a question:
+
+1. The base or the diff cannot be established → write `REVIEW BLOCKED: <what failed>` and end.
+2. Intent has no criterion to judge against → intent `not-assessed`, quote what is missing. Standards and defect review continue.
+3. Reviewer and refuter still disagree after one refute pass → report both sides marked `disputed`. Never promote a disputed finding to confirmed.
+
+Everything else is decided inside the review and logged in the report file as `Ruling: decision | reason | cost if wrong`. Cap the loop at 5 review rounds per change; after that, report the open findings and stop.
 
 ## Harness notes
 
+- Matching agent: `m-reviewer` (Claude Code `subagent_type: "mstack:m-reviewer"`, opus, no Write/Edit). Pick a judge from a family other than the author's.
 - Claude Code: spawn with `Agent`. Prefer a type that denies Write and Edit. Locally installed reviewer definitions for `code-reviewer` and `verifier` set `disallowedTools: Write, Edit` (read from those files, not from a live tool call). Pass the type string the session actually lists. A stock install may reject the bare name — say so, and use a listed type with the same deny list (`explore` has it in that same set). Bash is not in the deny list, so the prompt must forbid shell writes. Set `model` to the tier (`sonnet` or `opus`); if the tool rejects the slug, report the error and use the closest slug it names. Use `run_in_background` when the tool offers it. `gh` for PR context.
 - DSH: `subagent` / `subagent_fork`. No tool-deny flag is documented for those calls; forbid edits in the prompt and do not give the reviewer a writable worktree. For a high-risk refuter, use another model family (`subagent_codex` or `subagent_claude_code`) when one is available. If it is not, say so and continue with a different context (see `references/decisions.md`).
 - Codex: `codex exec "<task>"` with the diff path inside the prompt. No further flags are documented here.

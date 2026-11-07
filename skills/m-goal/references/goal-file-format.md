@@ -8,7 +8,7 @@ Read this when m-goal step 1 creates the goal file, and when writing the closeou
 # Goal: <one testable sentence>
 
 - Created: <ISO timestamp>
-- Budget: attempt cap <N> per task, round cap <N>, token budget <N or "none">
+- Budget: attempt cap <N> per task, min rounds <N, default 3>, round cap <N>, token budget <N or "none">
 - Stop conditions: <what ends the loop besides "objective met">
 
 ## Sub-goals (ordered by risk)
@@ -28,7 +28,7 @@ Read this when m-goal step 1 creates the goal file, and when writing the closeou
 
 ## Closeout
 
-(filled on every exit path — see SKILL.md "Closeout content")
+(filled on every exit path — fields in references/closeout.md)
 ```
 
 ## Rules that the layout enforces
@@ -47,6 +47,7 @@ Updated at every checkpoint by `scripts/goal-state.mjs` (exact commands in SKILL
   "slug": "<slug>",
   "status": "active",
   "startCommit": "<sha of HEAD when the baseline was saved, or null>",
+  "minRounds": 3,
   "rounds": 0,
   "tokensUsed": 0,
   "budgetPct": 0,
@@ -61,5 +62,6 @@ Updated at every checkpoint by `scripts/goal-state.mjs` (exact commands in SKILL
 - `failures` counts **consecutive** occurrences of each error signature (a short stable string: the failing command + key error line). A `--progress` record resets every counter to 0, so a signature that failed, then passed, then failed again is back at 1 — matching principle 9's "3 in a row", not a lifetime total. Any signature reaching 3 consecutive stops the loop.
 - `budgetPct` is the agent's own estimate of the declared budget consumed (no harness reports tokens consumed). `tokensUsed` is the same kind of estimate. Warn at ≥90, stop at ≥100.
 - `lastProgressAt` moves only on a `--progress` record (a checkpoint with `result: pass`); a stalled timestamp means the loop is spinning.
+- `rounds` counts only `record --round` calls, one per completed verify pass over the acceptance criteria; other records never raise it. `minRounds` is set by `init --min-rounds N` (default 3) and must match the goal file. `record --status done` exits 1 and leaves the status unchanged while `rounds` < `minRounds`; `failed` and `budget-exhausted` are not limited.
 - Verdict at each checkpoint: `stop` if any signature ≥3 consecutive or `budgetPct` ≥100; `warn` if `budgetPct` ≥90; otherwise `ok`.
 - A state file that exists but cannot be parsed is an error (the script exits 2 and changes nothing). Repair it by hand — never start the counters over, which would erase the strikes already counted.

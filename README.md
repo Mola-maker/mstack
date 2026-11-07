@@ -98,10 +98,23 @@ CI（`.github/workflows/check.yml`）在每次 push 时跑前两类检查。有 
 
 主会话（Claude）写 [FRAMEWORK.md](FRAMEWORK.md) 规格和每个 worker 的任务书（`tasks/w*.md`），用 `tasks/dispatch.sh` 把任务派给 DSH headless worker（WSL，`mola-cli` profile，magpie 路由 `group/smart-split`）并行写 skill，主会话再审查、修正、跑验收。改 skill 时照这个流程：改规格 → 派 worker 或直接改 → `check.mjs` → push → `claude plugin marketplace update mstack && claude plugin update mstack@mstack`。
 
+## Agents
+
+插件根目录 `agents/` 带 7 个子 agent（Claude Code 里用 `subagent_type: "mstack:<name>"` 调用）：
+
+- `m-explorer`（haiku，只读）：快速找文件、符号、调用关系，返回绝对路径 + 行号。
+- `m-implementer`（sonnet）：在指定 worktree 内做一个子任务的最小改动，并跑计划里的验证命令。
+- `m-debugger`（sonnet）：先复现、列竞争假设、在根因处修一次；3 个假设失败就停。
+- `m-verifier`（sonnet，只读）：自己跑真命令，返回 PASS / FAIL / INCOMPLETE 和证据表。
+- `m-reviewer`（opus，只读）：按严重度列 findings，末行给 APPROVE / REQUEST CHANGES。
+- `m-critic`（opus，只读）：先攻前提、预测风险，再给 APPROVE / REVISE / REJECT。
+- `m-researcher`（sonnet）：一个 agent 只走一个调研渠道，每条结论带来源，单源结论单列。
+
 ## 仓库结构
 
 ```
 .claude-plugin/              plugin.json（插件清单）+ marketplace.json（本仓库即 marketplace）
+agents/m-*.md                7 个子 agent
 skills/<name>/SKILL.md       16 个 skill（≤150 行，细节放 references/）
 FRAMEWORK.md                 规格：画像 → 约束、来源映射、格式、共享约定、验收标准、§9 m-team
 docs/source-map.md           每个来源文件 → 归入哪个 m-skill

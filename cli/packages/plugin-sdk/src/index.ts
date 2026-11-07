@@ -5,3 +5,4 @@ export * from "./types.js";
 export * from "./argv.js";
 export * from "./agents.js";
 export * from "./ui.js";
+export * from "./routing.js";

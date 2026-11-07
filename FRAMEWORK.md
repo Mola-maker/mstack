@@ -274,3 +274,56 @@ Claude Code 会把**与插件同名的 skill**（`mstack:mstack`）的 descripti
 - `evals/`：用 `claude plugin eval` 跑的路由用例（case.yaml schema 1.1，见 research/evals.md），先覆盖 m-start、m-review、m-verify、m-debug、m-ship，包括应该触发和不该触发两类。本地运行，不进默认 CI，因为要花钱。
 - `check.mjs` 新增检查：SKILL.md ≤12000 字节；`skills/<name>/` 下只允许 SKILL.md、references/、scripts/；description ≤1024 字符；evals 文件能解析。
 - 仓库根加一个约 20 行的 `AGENTS.md`：验证命令和仓库约定。
+
+## 12. Round 3: prompt craft, agents, model layer, DSH-native teams (0.5.0, 2026-11-07)
+
+Owner feedback: the prompts are rough, the agents are weak, nothing is assigned by model strength, and the team capability barely shows in DSH. Research: `research/round3/` (superpowers-craft, omc-agents, pstack-craft, arena-routing, dsh-team, starred-gaps).
+
+### 12.1 Prompt craft (applies to every SKILL.md you touch; from superpowers-craft.md)
+- **Iron Law + loophole list.** Each discipline skill opens its Procedure with one absolute rule in a line by itself, followed by the specific ways agents try to get around it, each one closed off explicitly.
+- **Rationalization table.** `| You will be tempted to think… | Reality |`, 4–8 rows, drawn from real failures in this repo's history (reviews/, logs, lessons) and research — never invented filler.
+- **Red flags.** A short list of observable signs that you are breaking the skill right now ("you wrote 'should work'", "you are about to edit a test to make it pass").
+- **Countable stop conditions + Ruling record.** Stops are numbers ("3 consecutive", "2 fixes on the same premise", "5 review rounds"); every judgement call not covered becomes one line `Ruling: decision | reason | cost if wrong` in the skill's state file.
+- **Gate function.** Before any success claim: `| claim | evidence required | evidence that is NOT enough |`.
+- **Form by failure type.** Discipline failures get prohibitions; shape failures get a positive recipe. No nuance clauses that reopen the rule.
+- Announce on use: the first line the agent says when a skill starts is `Using m-xxx: <one-line purpose>`.
+
+### 12.2 Agents (from omc-agents.md): ship `agents/*.md` in the plugin
+Seven agents. Frontmatter is `name`, `description`, `model`, `disallowedTools`. The body follows OMC's anatomy: Role, Why it matters, Success criteria, Constraints, Protocol, Output contract, Failure modes, Final checklist.
+
+| agent | model | tools | spawned by |
+|---|---|---|---|
+| m-explorer | haiku | no Write/Edit | m-think, m-plan, m-debug, m-research fan-out |
+| m-implementer | sonnet | all; works only in its assigned worktree | m-dispatch |
+| m-debugger | sonnet | all; stops after 3 failed hypotheses | m-debug |
+| m-verifier | sonnet | no Write/Edit | m-verify, m-ship; returns PASS / FAIL / INCOMPLETE with an evidence table |
+| m-reviewer | opus | no Write/Edit | m-review; returns APPROVE / REQUEST CHANGES |
+| m-critic | opus | no Write/Edit | m-plan, m-think wild-mode convergence |
+| m-researcher | sonnet | no Write/Edit except its report file | m-research, one channel per agent |
+
+Skills name these agents in their Harness notes (Claude Code: `subagent_type: "mstack:m-reviewer"`).
+
+### 12.3 Model layer (from arena-routing.md): `config/model-routing.json`
+- `tasks` maps a task kind to ranked magpie routes, with evidence. `families` maps a model family to its prompt-adapter rules.
+- mstack: `m-dispatch/references/model-routing.md` explains how to pick a route per subtask and how to adapt the brief per family. m-team and m-review pick the judge from a different family than the author.
+- mola: `mola run` chooses the route from `tasks[kind].picks` (kind inferred, or `--kind`). Before calling the agent it rewrites the prompt with the family adapter (XML for claude, markdown sections for others). `mola models rank [kind]` prints the table. Quota failures walk down the picks list (the ladder). The data comes from one file shared by both.
+
+### 12.4 DSH-native teams (from dsh-team.md)
+- In DSH, m-team and m-dispatch drive native tools:
+  - roles: `spawn_teammate`
+  - task board: `team_task_create`, `team_task_list`, `team_task_update` (`write_scopes` is the file-ownership table)
+  - waiting: `wait_agent`
+  - rounds: `create_goal` (`max_goal_rounds`) and `update_goal`
+  - wake-ups: `schedule_create`
+  - scripted fan-out: `workflow` with `agent(prompt, {schema, label, phase, provider})`, using a JSON schema as the RETURN contract.
+- Isolation trap: teammates and workflow agents share the lead's cwd. Changes that need isolation go to `subagent` (it takes a cwd), or the lead creates the worktree first and names it in the prompt.
+- Ship an optional DSH preset under `dsh/` (`mstack-team`) that enables the experimental agent-team profile. It is opt-in and its version is pinned. Do not disable `subagent` globally.
+
+### 12.5 From pstack-craft and starred-gaps (this round)
+- m-dispatch: before re-dispatching, confirm the previous worker has stopped (`git status` in its worktree). Never message an idle worker to ask for progress.
+- m-debug: if two fixes on the same premise fail, stop and write the premise down, then test it.
+- m-ship: a CI flake gets exactly one fresh run; failing the same way twice means it is not a flake. A failure outside the diff means first checking the base with merge-base.
+- m-goal: a stop predicate also needs a minimum number of rounds, so a lucky run cannot end the loop early.
+- Panels span families, and the judge comes from a family not used by any candidate.
+- m-guard: scanning before a skill or plugin install is mandatory (SkillSpector when available), not optional.
+- Queued for mola B3/B4 (design notes only this round): automatic cross-session memory with a review gate; per-worker working/blocked/idle status in `mola dash`; idempotency keys and receipts for multi-machine messages.

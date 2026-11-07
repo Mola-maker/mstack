@@ -53,6 +53,6 @@ Report in Chinese:
 
 ## Harness notes
 
-- DSH: use the `deep_search` tool — one call fans 2–8 queries out to web/exa/tavily/github in parallel, merges by URL, and its `channels` field counts how many independent channels agree; use `fetch_top` for excerpts and full-page fetches for originals. Fan sub-questions out with `subagent`.
-- Claude Code: combine WebSearch + WebFetch with `gh search repos|code|issues` and `gh api` (read-only); use the Agent tool for parallel sub-questions.
+- DSH: use the `deep_search` tool — one call fans 2–8 queries out to web/exa/tavily/github in parallel, merges by URL, and its `channels` field counts how many independent channels agree; use `fetch_top` for excerpts and full-page fetches for originals. Fan sub-questions out with `subagent`, using the names `m-researcher` (one channel each) and `m-explorer` (repo mapping) as labels.
+- Claude Code: fan-out agents are `subagent_type: "mstack:m-researcher"`, one channel per agent (web, exa, GitHub, docs), with its report path in the prompt; repo mapping uses `"mstack:m-explorer"`. Combine WebSearch + WebFetch with `gh search repos|code|issues` and `gh api` (read-only); use the Agent tool for parallel sub-questions.
 - Codex: `gh` CLI plus whatever web tool is configured; keep queries read-only.
