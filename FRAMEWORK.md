@@ -327,3 +327,63 @@ Skills name these agents in their Harness notes (Claude Code: `subagent_type: "m
 - Panels span families, and the judge comes from a family not used by any candidate.
 - m-guard: scanning before a skill or plugin install is mandatory (SkillSpector when available), not optional.
 - Queued for mola B3/B4 (design notes only this round): automatic cross-session memory with a review gate; per-worker working/blocked/idle status in `mola dash`; idempotency keys and receipts for multi-machine messages.
+
+## 13. mstack 1.0：从"规则库"到"产品"（2026-11-08）
+
+Owner verdict after three rounds: still hard to use. Measured: no direct mstack invocation in the last 400 prompts; 16 skills = 112 KB the user must know by name. Owner picked the pains: **don't know which to call**, **can't see what it is doing**, **not automatic enough**. So the product is: one entry point, live visibility, unattended runs. Skills become internal stages, not the user interface.
+
+### 13.1 One entry point (M1)
+- **Claude Code**: `/go <intent>` (plugin `commands/go.md`). `/go` classifies the intent and runs the pipeline end to end:
+  - stages: think (only if vague) → scout → plan → implement → verify → review → ship (only if asked or if the intent says "提PR/ship");
+  - each stage spawns the mstack agents (m-explorer, m-researcher, m-implementer, m-verifier, m-reviewer, m-critic);
+  - it stops only for irreversible or outward actions.
+  It uses Claude Code's own todo list for live progress and writes `.mstack/runs/<id>/progress.json` through `scripts/go-progress.mjs` after every stage (stage, status, agents, cost, next step). At the end, or when blocked on the user, it sends a notification (PushNotification when the harness has it, otherwise `mola notify`).
+- **CLI**: `mola go "<intent>" [--auto] [--until <stage>]` runs the same pipeline headless. Each stage is a `mola run` with its own task kind, so the model layer picks the model per stage (plan→opus, implement→sonnet, explore→flash, review→a different family from the implementer). It emits the same progress.json and events, and supports `mola go --resume <id>`.
+- The 16 skills stay available, but the user should never need their names; `m-start` routes a whole task stated in one sentence to `/go`.
+
+### 13.2 Live visibility (M1 + M2)
+- **Status line** (M1): `mola statusline` prints one line for Claude Code's statusLine hook. It reads the current run's progress.json: `go ▸ verify (4/6) · 3 agents · $0.42 · 6m`. Installing it is an explicit `mola statusline install` that shows the settings.json diff and asks first; never silent. It wraps the existing HUD command instead of replacing it.
+- **Per-worker status** (M1): dash shows each worker as working / blocked / idle / done / failed, with its stage, model, elapsed time and cost, derived from progress.json.
+- **`mola web`** (M2): a zero-dependency `node:http` server on 127.0.0.1 (optionally the Tailscale IP, with a token) serving one page. It shows live runs over SSE (stages, workers, models, costs, logs tail) and has an approvals panel with approve/deny buttons that unblock `mola go`. It is phone-friendly.
+
+### 13.3 Unattended (M3, next round)
+Triggers (GitHub issue/PR/CI through the superagents, schedules, file watch); approval cards pushed to the phone, with the run resuming on approve; automatic memory distillation after each run, with a review gate.
+
+### 13.4 Branch guard: no agent touches a protected branch without a review receipt (M1, owner request 2026-11-08)
+
+Evidence (logs/git-scan*.txt, tasks/scan-gh.sh):
+- All 31 commits on mstack `master` since 2026-11-05 landed without a PR. The orchestrator (Claude) committed DSH worker output straight to master.
+- In the LayerFS worktrees, DSH workers committed 20+ times before any reviewer subagent had returned.
+- `policy-approval` only gates commands that mola itself runs; it never sees the git an agent runs inside DSH.
+- **2026-11-08 incident, while this guard was being built:** worker h3 ran in the shared working tree. A failed `cd` in a test command chain made `git reset --hard` and `git push --all` run in the real repo. Every worker's uncommitted edits to tracked files were wiped, and `main` and `mstack-1.0` were pushed to origin. This is the strongest argument for rule 1: workers never share the orchestrator's working tree.
+
+Design: plugin `policy-guard`, defence in depth, reusing the superagent pattern (PATH shim plus a dedicated gitconfig):
+1. **Branch rule.** Agents work only on `agent/<run-id>` branches, each in its own worktree. Commit, merge, rebase, reset --hard and push on a protected ref (`main`, `master`, `release/*`, `layerfs_v2_0_0`, plus config `guard.protected`) are refused. `--no-verify`, `-c core.hooksPath=`, `push --all/--mirror` and force pushes are refused everywhere.
+2. **Review receipt.** `.mstack/receipts/<tree-sha>.json` holds the reviewer id, reviewer model family, author family, verdict, FINDING counts and verify commands. It is bound to the exact tree hash, so any later change voids it. It counts only if the reviewer family differs from the author family and no blocking FINDING is open.
+3. **Enforcement layers.**
+   - (a) A `git` shim on the worker PATH plus GIT_CONFIG_GLOBAL with core.hooksPath pointing at guard hooks (pre-commit, pre-push, reference-transaction). mola applies these to every DSH/Codex worker it starts.
+   - (b) A Claude Code PreToolUse hook in the mstack plugin, for the orchestrator itself.
+   - (c) GitHub branch protection on the default branch: outward-facing, applied only after the owner says yes.
+4. **`mola land <branch>`** is the only path to a protected branch. It requires a receipt for the branch tip's tree plus green verify, then opens a PR (default) or fast-forward merges locally with `--local`. Push and PR creation still go through approval.
+
+### 13.5 Scout: search and reuse before writing (M1, owner request 2026-11-08)
+
+Pain: agents write from scratch instead of finding the best existing code.
+
+Plugin `cmd-scout` adds `mola scout "<need>"`. It is also the first working stage of `mola go` and `/go`; it runs before plan and is skipped only for fixes that already point at file:line.
+- **Channels, in parallel:**
+  - this repo and sibling repos (ripgrep for existing helpers);
+  - the owner's GitHub stars (starred.tsv, refreshed via gh);
+  - `gh search repos` and `gh search code`;
+  - package registries (npm, crates.io);
+  - Context7 docs and Exa/Tavily web search, when the agent has them.
+- **Harvest.** Shallow sparse clone of the top 3 candidates into `.mstack/scout/<id>/<repo>`. Read the files that implement the need and extract the pattern. Record license, stars, last push and size.
+- **Output** `reuse.md`: a candidates table, then a decision per need (`reuse` a dependency / `adapt` code with attribution and license OK / `write` with the reason none fit). The plan must cite it. The reviewer raises `FINDING … reinvented` when the diff re-implements something reuse.md marked reusable.
+
+### 13.6 TUI and web, both plugins (M1)
+
+- `cmd-web` (`mola web`): the phone page.
+- `cmd-tui` (`mola tui`): a full-screen terminal UI over the same progress contract, with zero dependencies (ANSI plus raw stdin; it reuses plugin-sdk ui.ts).
+  - Panes: runs list | stage pipeline | workers (status, model, cost, elapsed) | live log tail of the selected run.
+  - Keys: ↑↓/jk select, enter details, a approve, d deny, s stop, g new `mola go` prompt, r refresh, q quit.
+  - It falls back to a plain frame when stdout is not a TTY.

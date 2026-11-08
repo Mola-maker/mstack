@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "mola-cmd-go",
+  "version": "0.1.0",
+  "kind": "command",
+  "displayName": "cmd-go",
+  "mola": ">=0.1.0 <1.0.0",
+  "engine": {
+    "node": ">=22"
+  },
+  "entry": {
+    "ts": "./dist/index.js"
+  },
+  "provides": ["cmd:go", "cmd:statusline", "cmd:notify"],
+  "requires": [],
+  "capabilities": ["command.go", "pipeline.run", "statusline", "notify"],
+  "permissions": {
+    "process.exec": ["magpie"],
+    "fs.read": ["**/policy.jsonc"],
+    "fs.write": [],
+    "mola": ["events", "commands", "config.read"]
+  },
+  "hooks": {
+    "emit": ["mola.go.started", "mola.go.stage", "mola.go.blocked", "mola.go.done"],
+    "listen": []
+  }
+}

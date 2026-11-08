@@ -40,6 +40,11 @@ const BUILTIN_PLUGIN_PACKAGES = [
   "@mola/plugin-cmd-run",
   "@mola/plugin-tool-superagent",
   "@mola/plugin-cmd-dash",
+  "@mola/plugin-cmd-go",
+  "@mola/plugin-cmd-web",
+  "@mola/plugin-policy-guard",
+  "@mola/plugin-cmd-scout",
+  "@mola/plugin-cmd-tui",
 ];
 
 function parseGlobalFlags(argv: string[]): { flags: GlobalFlags; rest: string[] } {

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "mola-cmd-web",
+  "version": "0.1.0",
+  "kind": "command",
+  "displayName": "cmd-web",
+  "mola": ">=0.1.0 <1.0.0",
+  "engine": {
+    "node": ">=22"
+  },
+  "entry": {
+    "ts": "./dist/index.js"
+  },
+  "provides": ["cmd:web"],
+  "requires": [],
+  "capabilities": ["command.web"],
+  "permissions": {
+    "fs.read": ["**/.mstack/runs/**"],
+    "fs.write": ["**/.mstack/runs/**"],
+    "mola": ["commands", "config.read"]
+  },
+  "hooks": {
+    "emit": [],
+    "listen": []
+  }
+}

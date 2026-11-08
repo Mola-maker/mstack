@@ -36,6 +36,7 @@ A review that praises, nitpicks style, or only reads the diff lets real defects 
 3. Read the changed code with callers and tests next to it.
 4. Reproduce suspected defects with the cheapest command; emit the REPRO line, or leave it off.
 5. Check for missing pieces: tests, error paths, migration, docs, version bump.
+   Also check for reinvention. If the run has a `reuse.md` (scout stage), any new code that re-implements something it marked `reuse` or `adapt` is a `FINDING path:line | reinvented: <candidate> already does this | <cost of keeping two copies>`. Without reuse.md, `rg` the repo for an existing helper with the same job before you accept a new one.
 6. Order findings by impact; merge duplicates. Severity words are optional prose, not the gate.
 7. State the verdict on the last line.
 

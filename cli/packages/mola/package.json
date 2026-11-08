@@ -39,6 +39,11 @@
     "@mola/plugin-rec-runs": "workspace:*",
     "@mola/plugin-cmd-run": "workspace:*",
     "@mola/plugin-tool-superagent": "workspace:*",
-    "@mola/plugin-cmd-dash": "workspace:*"
+    "@mola/plugin-cmd-dash": "workspace:*",
+    "@mola/plugin-cmd-go": "workspace:*",
+    "@mola/plugin-cmd-web": "workspace:*",
+    "@mola/plugin-policy-guard": "workspace:*",
+    "@mola/plugin-cmd-scout": "workspace:*",
+    "@mola/plugin-cmd-tui": "workspace:*"
   }
 }

@@ -36,11 +36,12 @@ Red flags — stop and route: you edited a file before naming a skill; you cite 
    - A goal file whose `## Closeout` contains no `status:` line, while its `state.json` is missing, counts as abnormally interrupted (the loop died before writing either). A `## Closeout` that holds only the placeholder text from creation is not a closeout.
    - A team run (`.mstack/team/<slug>/`) is stale when the newest `v<N>.md` has no `status:` line and its mtime is older than 2 hours. `status: active|done|failed` is written into each round file's round-close block (`m-team` owns that line); resume from that file plus `history.md`.
    - `done` and `failed` are terminal and never stale. Anything you cannot read, say you could not read.
-3. Classify the request against the 10 core principles (below) and the skill one-liners. Report which skill you picked and why, in one line, then load that skill's SKILL.md and follow it.
-4. If `.mstack/` shows work in progress, resume it: trust the state files over your memory; do not redo steps already marked done.
-5. If no single skill obviously applies, prefer `m-think` for anything new or ambiguous; prefer `m-debug` for a broken behavior; route "提PR/提交/发布" to `m-ship`, "review一下/审一下" to `m-review`, "分派/并行" to `m-dispatch`, "组队/team/一直优化/卡在局部最优" to `m-team`.
-6. Any judgement the steps do not cover (two skills tie, state unreadable) becomes one line in your routing report: `Ruling: decision | reason | cost if wrong`.
-7. Follow the reporting format (one-line conclusion → what changed with file:line → how it was verified → what you did not do / risks) in Chinese, matching the user's language.
+3. A whole task stated as one sentence ("做X", "修好Y", "加个Z，提PR") with no stage named → run the `/go` pipeline (the plugin's `commands/go.md`): it picks the stages itself and writes `.mstack/runs/<id>/progress.json` so the user can watch. Also resume any run there with status running or blocked before starting new work.
+4. Otherwise classify the request against the 10 core principles (below) and the skill one-liners. Report which skill you picked and why, in one line, then load that skill's SKILL.md and follow it.
+5. If `.mstack/` shows work in progress, resume it: trust the state files over your memory; do not redo steps already marked done.
+6. If no single skill obviously applies, prefer `m-think` for anything new or ambiguous; prefer `m-debug` for a broken behavior; route "提PR/提交/发布" to `m-ship`, "review一下/审一下" to `m-review`, "分派/并行" to `m-dispatch`, "组队/team/一直优化/卡在局部最优" to `m-team`.
+7. Any judgement the steps do not cover (two skills tie, state unreadable) becomes one line in your routing report: `Ruling: decision | reason | cost if wrong`.
+8. Follow the reporting format (one-line conclusion → what changed with file:line → how it was verified → what you did not do / risks) in Chinese, matching the user's language.
 
 ### The 10 core principles (other skills cite these by number)
 

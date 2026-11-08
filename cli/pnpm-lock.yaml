@@ -47,6 +47,9 @@ importers:
       '@mola/plugin-cmd-doctor':
         specifier: workspace:*
         version: link:../plugins/cmd-doctor
+      '@mola/plugin-cmd-go':
+        specifier: workspace:*
+        version: link:../plugins/cmd-go
       '@mola/plugin-cmd-model':
         specifier: workspace:*
         version: link:../plugins/cmd-model
@@ -59,9 +62,21 @@ importers:
       '@mola/plugin-cmd-run':
         specifier: workspace:*
         version: link:../plugins/cmd-run
+      '@mola/plugin-cmd-scout':
+        specifier: workspace:*
+        version: link:../plugins/cmd-scout
+      '@mola/plugin-cmd-tui':
+        specifier: workspace:*
+        version: link:../plugins/cmd-tui
+      '@mola/plugin-cmd-web':
+        specifier: workspace:*
+        version: link:../plugins/cmd-web
       '@mola/plugin-policy-approval':
         specifier: workspace:*
         version: link:../plugins/policy-approval
+      '@mola/plugin-policy-guard':
+        specifier: workspace:*
+        version: link:../plugins/policy-guard
       '@mola/plugin-rec-runs':
         specifier: workspace:*
         version: link:../plugins/rec-runs
@@ -131,6 +146,15 @@ importers:
         specifier: workspace:*
         version: link:../../plugin-sdk
 
+  packages/plugins/cmd-go:
+    dependencies:
+      '@mola/plugin-cmd-run':
+        specifier: workspace:*
+        version: link:../cmd-run
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
   packages/plugins/cmd-model:
     dependencies:
       '@mola/plugin-sdk':
@@ -158,7 +182,31 @@ importers:
         specifier: workspace:*
         version: link:../../plugin-sdk
 
+  packages/plugins/cmd-scout:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
+  packages/plugins/cmd-tui:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
+  packages/plugins/cmd-web:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
   packages/plugins/policy-approval:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
+  packages/plugins/policy-guard:
     dependencies:
       '@mola/plugin-sdk':
         specifier: workspace:*
