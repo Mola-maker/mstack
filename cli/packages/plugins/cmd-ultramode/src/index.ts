@@ -49,6 +49,12 @@ import {
   type ShipRecord,
   type ShipVerdict,
 } from "./ship.js";
+import {
+  RSI_DEFAULT_ROUND_CAP,
+  makeCmdRunPass,
+  runRsiLoop,
+  type RsiRunPass,
+} from "./rsi.js";
 
 const MODE_VERSION = "0.1.0";
 
@@ -418,6 +424,78 @@ function recordShipOutcome(
 const GRANT_USAGE = "usage: mola ultramode grant <slug>";
 const REVOKE_USAGE = "usage: mola ultramode revoke <slug>";
 const SHIP_USAGE = "usage: mola ultramode ship <slug> | mola ultramode ship --check <slug>";
+const RSI_USAGE = "usage: mola ultramode rsi <slug> [--rounds N] [--budget-tokens N] [--agent <id>] [--route <id>]";
+
+/**
+ * `rsi <slug>` (unit 5): the RSI loop for an existing goal — search,
+ * interrogate, refine, repeat until saturation, the round cap, a denied
+ * route, or a failed round. Every research pass is a routed run through
+ * prepareRun / executeRun (see makeCmdRunPass); the loop never blocks
+ * waiting for a human and never retries a failed round.
+ */
+async function runRsiCommand(
+  ctx: PluginContext,
+  io: Io,
+  slug: string,
+  flags: Record<string, string | boolean>,
+): Promise<ExitCode> {
+  const cwd = io.cwd;
+  // readGoalText falls back to the slug when the file is missing; the
+  // goal file must actually exist, otherwise there is nothing to refine.
+  try {
+    ctx.fs.readFile(goalPaths(cwd, slug).goalPath);
+  } catch {
+    throw new MolaError("USAGE_ERROR", `no goal file for "${slug}" — run \`mola ultramode "<goal>"\` first`, ExitCode.Usage);
+  }
+  const goalText = readGoalText(ctx, cwd, slug);
+  const roundsRaw = typeof flags.rounds === "string" ? Number(flags.rounds) : NaN;
+  const roundCap = Number.isInteger(roundsRaw) && roundsRaw > 0 ? roundsRaw : RSI_DEFAULT_ROUND_CAP;
+  const budgetRaw = typeof flags["budget-tokens"] === "string" ? Number(flags["budget-tokens"]) : NaN;
+  const budgetTokens = Number.isInteger(budgetRaw) && budgetRaw > 0 ? budgetRaw : null;
+
+  const policy = loadPolicy(ctx.fs, cwd);
+  for (const warning of policy.warnings) io.note(`mola: ${warning}`);
+  const loaded = loadRoutingFile();
+  if (loaded.warning) io.note(`mola: routing file: ${loaded.warning} — routing by policy only`);
+  const runFlags = readRunFlags(flags);
+  if (!runFlags.agent) runFlags.agent = ULTRAMODE_DEFAULT_AGENT;
+  const runPass: RsiRunPass = makeCmdRunPass(ctx, {
+    io,
+    cwd,
+    policy,
+    routing: loaded.table,
+    flags: runFlags,
+    traceId: io.traceId,
+  });
+
+  const result = await runRsiLoop(ctx, io, {
+    slug,
+    goal: goalText,
+    cwd,
+    runPass,
+    roundCap,
+    budgetTokens,
+  });
+  io.data({
+    rsi: {
+      slug,
+      goal: goalText,
+      stopReason: result.stopReason,
+      rounds: result.rounds,
+      roundCap,
+      findings: result.findings,
+      dropped: result.dropped,
+      budgetTokens,
+      tokensUsed: 0,
+    },
+  });
+  if (!io.json) {
+    io.out(
+      `ultramode rsi ${slug}: ${result.stopReason} after ${result.rounds} round(s) — ${result.findings} findings, ${result.dropped} dropped`,
+    );
+  }
+  return result.exitCode;
+}
 
 /**
  * `ship <slug>`: the real ship (unit 4). Order: review gate, branch +
@@ -686,6 +764,10 @@ async function handleSubcommand(
     if (!subArg) throw new MolaError("USAGE_ERROR", SHIP_USAGE, ExitCode.Usage);
     return runShip(ctx, io, subArg);
   }
+  if (sub === "rsi") {
+    if (!subArg) throw new MolaError("USAGE_ERROR", RSI_USAGE, ExitCode.Usage);
+    return runRsiCommand(ctx, io, subArg, flags);
+  }
   throw new MolaError("USAGE_ERROR", SHIP_USAGE, ExitCode.Usage);
 }
 
@@ -753,7 +835,7 @@ export default definePlugin({
         }
 
         const [sub, subArg] = args.positionals;
-        if (sub === "grant" || sub === "revoke" || sub === "ship") {
+        if (sub === "grant" || sub === "revoke" || sub === "ship" || sub === "rsi") {
           return handleSubcommand(ctx, io, sub, subArg, args.flags);
         }
 

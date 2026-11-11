@@ -180,6 +180,29 @@ Two sides, one stage, before any ship:
   and records the human's answers and assumptions in the goal file as
   attackable premises, not as settled facts.
 
+Unit 5, as built (`cli/packages/plugins/cmd-ultramode/src/rsi.ts`):
+
+- The three parallel research channels are the arguing routes: each runs
+  one m-researcher pass through `prepareRun` / `executeRun` on its own
+  channel (web, docs, github), so they can contradict each other. The
+  judge is one further routed pass per round over the surviving claims;
+  it returns `- DROP: <claim text>` lines, and only those claims are
+  dropped by the judge. The judge's verdict is evidence-based, not
+  model-based: a claim survives only when its citation is a URL, a file
+  path (with or without a line), or a test-output marker. A claim cited
+  by 2+ channels is confirmed; a cited claim from one channel survives
+  flagged single-source. A claim without a citation is dropped from the
+  findings and never kept as fact.
+- The judge failing never blocks the loop: the evidence verdict stands,
+  the skip is recorded in the round file, and the loop continues.
+- The grill runs once, in round 1, and asks exactly 3 premise questions
+  with recommended defaults (scope boundary, what counts as done, what
+  is out of scope), templated with the goal text. They are written into
+  the goal file under `## Assumptions (grill, round 1)` as attackable
+  premises, the defaults are assumed, and the loop never blocks waiting
+  for a human: a human amends the goal file between rounds if they
+  disagree.
+
 ## 9. RSI search (recursive self-improvement loop)
 
 Rounds: search, then interrogate, then refine the goal or plan, then search
@@ -194,6 +217,38 @@ again. Each round writes its evidence under `.mstack/`:
 Stop predicate, whichever hits first: evidence saturation (a round adds no
 new finding), a round cap, a budget cap, or the m-goal stop conditions.
 Counters live in `.mstack/goals/<slug>.state.json`.
+
+Unit 5, as built:
+
+- Entry point: `mola ultramode rsi <slug> [--rounds N]
+  [--budget-tokens N] [--agent <id>] [--route <id>]`, for a goal that
+  already has a goal file. Every pass is a routed run through
+  `prepareRun` / `executeRun` with task kind `research` (the FrontierHarness
+  dsh default still applies unless overridden); routing is never
+  re-implemented and the route whitelist is never touched.
+- Round cap: default 3 (`RSI_DEFAULT_ROUND_CAP`), `--rounds N` overrides
+  it. Saturation: a round whose post-judge survivors add no new finding
+  (a finding is new when its normalized text was not seen in any earlier
+  round). The m-goal stop conditions are the denied/failed round exits:
+  a research pass exiting non-zero, or a route denial from `prepareRun`,
+  stops the loop (77 for a denial, 1 for a failure) with a closeout and
+  no retry.
+- Budget cap: `--budget-tokens N` is accepted and recorded in the state
+  file, but it cannot be measured and therefore never fires. The router
+  reports no token usage (`executeRun` returns finalText and an exit code
+  only), so `tokensUsed` stays 0. This is a measurement limit, not
+  accounting: no token numbers are invented. A real budget cap needs the
+  router to report usage first.
+- Evidence: `.mstack/research/<slug>/round-<n>.md` per round (surviving
+  claims with sources and channel counts, uncited drops, judge drops,
+  judge skips, stop). Refinement writes the round's new findings into
+  the goal file under `## Research findings` plus one checkpoint row per
+  round pointing at the round file; that write is the recorded evidence
+  of the rewrite. Counters live in the state file under `rsi`: rounds,
+  findings (distinct), dropped (per round), `newFindingsByRound`,
+  stopReason, budgetTokens, tokensUsed, channels, roundCap.
+- Every exit path writes the closeout (same discipline as units 2-4):
+  saturation, round-cap, denied gate, failed round.
 
 ## 10. mgoal loop
 
