@@ -8,6 +8,8 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { matchesAnyGlob } from "@mola/core";
 import plugin, { slugifyGoal } from "../src/index.js";
 import {
   RSI_DEFAULT_ROUND_CAP,
@@ -194,6 +196,43 @@ test("rsi: saturation stops the loop with no further rounds, counters land in th
   assert.match(goal, /refine round 1: 2 new finding/);
 });
 
+test("rsi: a judge drop in round 2 removes the round-1 claim from findings", async () => {
+  const f = activate();
+  seedGoal(f);
+  const io = makeIo();
+  const result = await runRsiLoop(f.ctx, io, {
+    slug: SLUG,
+    goal: GOAL,
+    cwd: "/fake/ws",
+    runPass: scriptedPass(SHARED_FINDINGS, { judgeText: (round) => (round === 2 ? "- DROP: Shared claim" : "no drops") }),
+  });
+  assert.equal(result.stopReason, "saturated");
+  assert.equal(result.rounds, 2);
+  assert.equal(result.findings, 1, "the claim the judge dropped in round 2 no longer counts");
+  assert.equal(JSON.parse(f.files.get(STATE_PATH)!).rsi.findings, 1);
+  const round2 = f.files.get("/fake/ws/.mstack/research/ship-the-fix/round-2.md")!;
+  assert.match(round2, /Shared claim — dropped by the judge pass/);
+  assert.doesNotMatch(round2.split("## Findings (surviving)")[1].split("## Dropped")[0], /Shared claim/);
+});
+
+test("rsi: a checkpoint row still lands when the goal file has no ## Amendments anchor", async () => {
+  const f = activate();
+  seedGoal(f);
+  const goal = f.files.get(GOAL_PATH)!;
+  f.files.set(GOAL_PATH, goal.replace("\n\n## Amendments\n\n(none)\n", "\n"));
+  assert.doesNotMatch(f.files.get(GOAL_PATH)!, /## Amendments/);
+  const io = makeIo();
+  const result = await runRsiLoop(f.ctx, io, {
+    slug: SLUG,
+    goal: GOAL,
+    cwd: "/fake/ws",
+    runPass: scriptedPass(SHARED_FINDINGS),
+    roundCap: 1,
+  });
+  assert.equal(result.stopReason, "round-cap");
+  assert.match(f.files.get(GOAL_PATH)!, /refine round 1: 2 new finding/, "the row is appended at the end instead of dropped");
+});
+
 test("rsi: round cap stops the loop at the cap when every round adds a finding", async () => {
   const f = activate();
   seedGoal(f);
@@ -339,13 +378,20 @@ test("rsi: a failing judge never blocks the loop — the evidence verdict stands
 });
 
 test("ultramode rsi: the subcommand routes every pass through the router and saturates", async () => {
+  // 3 channels + 1 judge per round, 2 rounds: one scripted result per
+  // call (the fake throws on exhaustion rather than repeating a result).
+  const roundText = "- Shared claim — https://example.com/a\n- Other claim — https://github.com/x/y";
   const agent: FakeAgent = {
     id: "dsh",
     results: [
-      {
-        exitCode: 0,
-        finalText: "- Shared claim — https://example.com/a\n- Other claim — https://github.com/x/y",
-      },
+      { exitCode: 0, finalText: roundText },
+      { exitCode: 0, finalText: roundText },
+      { exitCode: 0, finalText: roundText },
+      { exitCode: 0, finalText: "no drops" },
+      { exitCode: 0, finalText: roundText },
+      { exitCode: 0, finalText: roundText },
+      { exitCode: 0, finalText: roundText },
+      { exitCode: 0, finalText: "no drops" },
     ],
     calls: [],
   };
@@ -403,4 +449,42 @@ test("ultramode rsi: a configured budget cap is recorded and never fires (the ro
   assert.equal(state.rsi.budgetTokens, 1000);
   assert.equal(state.rsi.tokensUsed, 0);
   assert.match(f.files.get(GOAL_PATH)!, /token accounting unavailable/);
+});
+
+test("rsi: the RSI loop writes only under the manifest fs.write globs (round files live under .mstack/research/)", async () => {
+  // The manifest sits at the package root; the compiled test is several
+  // levels deeper than the source, so walk up until it is found.
+  let dir = new URL(".", import.meta.url);
+  let manifestText: string | undefined;
+  for (let i = 0; i < 6 && manifestText === undefined; i++) {
+    try {
+      manifestText = await readFile(new URL("mola-plugin.json", dir), "utf8");
+    } catch {
+      dir = new URL("..", dir);
+    }
+  }
+  assert.ok(manifestText, "mola-plugin.json found above the test file");
+  const manifest = JSON.parse(manifestText) as { permissions: { "fs.write": string[] } };
+  const writeGlobs = manifest.permissions["fs.write"];
+  assert.ok(writeGlobs.includes("**/.mstack/research/**"), "the manifest must allow writing round files");
+  const f = activate();
+  seedGoal(f);
+  // Enforce the manifest globs on the fake fs with core's own matcher,
+  // the way core's makeFsService does in production: a write outside the
+  // globs throws instead of silently landing.
+  const realWrite = f.ctx.fs.writeFile.bind(f.ctx.fs);
+  f.ctx.fs.writeFile = (p: string, data: string) => {
+    if (!matchesAnyGlob(p, writeGlobs)) throw new Error(`mola-cmd-ultramode: fs.write does not allow "${p}"`);
+    realWrite(p, data);
+  };
+  const io = makeIo();
+  const result = await runRsiLoop(f.ctx, io, {
+    slug: SLUG,
+    goal: GOAL,
+    cwd: "/fake/ws",
+    runPass: scriptedPass(SHARED_FINDINGS),
+  });
+  assert.equal(result.stopReason, "saturated");
+  assert.ok(f.files.get("/fake/ws/.mstack/research/ship-the-fix/round-1.md"), "round 1 evidence is written");
+  assert.ok(f.files.get("/fake/ws/.mstack/research/ship-the-fix/round-2.md"), "round 2 evidence is written");
 });

@@ -51,7 +51,7 @@ export const TEST_CAPS: AgentCapabilities = {
 
 export interface FakeAgent {
   id: string;
-  /** the scripted results, one per call; the last one repeats */
+  /** the scripted results, one per call; running out throws (a repeat would mask channel exhaustion) */
   results: RunResult[];
   calls: RunRequest[];
   /** health reported by detect() */
@@ -85,10 +85,10 @@ export function makeFakeAdapter(agent: FakeAgent): HeadlessAgentAdapter {
     },
     async run(req: RunRequest): Promise<RunResult> {
       agent.calls.push(req);
-      const result = agent.results[Math.min(index, agent.results.length - 1)] ?? {
-        exitCode: 0,
-        finalText: "ok",
-      };
+      const result = agent.results[index];
+      if (!result) {
+        throw new Error(`FakeAgent ${agent.id}: no more scripted results (call ${index + 1}) — script one result per call`);
+      }
       index++;
       return { ...result, events: [] };
     },

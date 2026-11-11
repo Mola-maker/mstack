@@ -10,6 +10,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { MolaEvents, PolicyDenial } from "@mola/plugin-sdk";
 import plugin, { slugifyGoal } from "../src/index.js";
+import { grantKey } from "../src/gates.js";
 import { makeFakeCtx, makeIo, type FakeAgent } from "./fake.js";
 
 const SLUG = "ship-the-fix";
@@ -133,10 +134,27 @@ test("review gate: passes on a good review (repro evidence)", async () => {
   assert.equal((out as Record<string, unknown>).slug, SLUG);
 });
 
-test("review gate: passes on a .mstack/ path as evidence", async () => {
+test("review gate: passes on a .mstack/ path as evidence when the path exists", async () => {
   const f = activate();
+  f.files.set("/fake/ws/.mstack/runs/run-1/decision.json", JSON.stringify({ runId: "run-1" }));
   f.files.set(REVIEW_PATH, goodReview("m-reviewer", "evidence: .mstack/runs/run-1/decision.json"));
   await f.ctx.events.runWaterfall(MolaEvents.UltramodeReview, { slug: SLUG, cwd: "/fake/ws" });
+});
+
+test("review gate: passes on a .mstack/ path with a :line suffix when the file exists", async () => {
+  const f = activate();
+  f.files.set("/fake/ws/.mstack/runs/run-1/decision.json", JSON.stringify({ runId: "run-1" }));
+  f.files.set(REVIEW_PATH, goodReview("m-reviewer", "evidence: .mstack/runs/run-1/decision.json:15"));
+  await f.ctx.events.runWaterfall(MolaEvents.UltramodeReview, { slug: SLUG, cwd: "/fake/ws" });
+});
+
+test("review gate: denies when the only cited .mstack/ path does not exist on disk", async () => {
+  const f = activate();
+  f.files.set(REVIEW_PATH, goodReview("m-reviewer", "evidence: .mstack/runs/run-1/decision.json"));
+  await assert.rejects(
+    f.ctx.events.runWaterfall(MolaEvents.UltramodeReview, { slug: SLUG, cwd: "/fake/ws" }),
+    /cited evidence path "\.mstack\/runs\/run-1\/decision\.json" does not exist/,
+  );
 });
 
 test("ship gate: ship --check denies with no grant (good review present)", async () => {
@@ -173,7 +191,7 @@ test("ship gate: denies for the wrong workspace", async () => {
   const { code, io: checkIo } = await shipCheck(f, SLUG, { cwd: "/other/ws" });
   assert.equal(code, 77);
   const check = (checkIo.dataValue as Record<string, unknown>).shipCheck as Record<string, unknown>;
-  assert.match(String(check.reason), /never authorizes another workspace/);
+  assert.match(String(check.reason), /no ultramode grant/);
 });
 
 test("ship gate: denies with io.yes=true and no grant", async () => {
@@ -189,7 +207,7 @@ test("ship gate: denies with io.yes=true and no grant", async () => {
   );
 });
 
-test("ship gate: passes with a grant — waterfall got yes=true and the mode names the grant", async () => {
+test("ship gate: passes with a grant — waterfall got yes=true, and the probe emits no approval record", async () => {
   const f = activate();
   f.files.set(REVIEW_PATH, goodReview());
   const io = makeIo();
@@ -197,27 +215,57 @@ test("ship gate: passes with a grant — waterfall got yes=true and the mode nam
   const { code, io: checkIo } = await shipCheck(f, SLUG);
   assert.equal(code, 0);
   assert.deepEqual(f.seenYes, [true], "the classifier saw yes derived from the grant");
-  const granted = f.emitted.filter((e) => e.event === MolaEvents.ApprovalGranted);
   assert.ok(
-    granted.some((e) => (e.data as Record<string, unknown>).approver === "ultramode-grant:trace-test-0000-0000"),
-    "the mode emitted an approval event naming the ultramode grant",
+    !f.emitted.some(
+      (e) =>
+        e.event === MolaEvents.ApprovalGranted &&
+        String((e.data as Record<string, unknown>).approver ?? "").startsWith("ultramode-grant:"),
+    ),
+    "ship --check is a probe: it ships nothing, so the mode emits no approval record for it (the fake classifier's own --yes emission is not the mode's)",
   );
   const check = (checkIo.dataValue as Record<string, unknown>).shipCheck as Record<string, unknown>;
   assert.equal(check.ok, true);
+});
+
+test("grant: workspace-scoped — a grant in A does not authorize B, and revoke in B leaves A alone", async () => {
+  const f = activate();
+  f.files.set(REVIEW_PATH, goodReview());
+  f.files.set(`/other/ws/.mstack/reviews/${SLUG}.md`, goodReview());
+  const io = makeIo();
+  assert.equal(await f.cmd.handler({ positionals: ["grant", SLUG], flags: {} }, io), 0);
+  assert.ok(f.kv[grantKey(SLUG, "/fake/ws")], "A's grant is recorded under A's workspace key");
+  assert.equal(f.kv[grantKey(SLUG, "/other/ws")], undefined, "no grant key exists for B");
+  const { code: bCode, io: bIo } = await shipCheck(f, SLUG, { cwd: "/other/ws" });
+  assert.equal(bCode, 77, "B is not authorized by A's grant");
+  const bCheck = (bIo.dataValue as Record<string, unknown>).shipCheck as Record<string, unknown>;
+  assert.match(String(bCheck.reason), /no ultramode grant/);
+  const revokeIo = makeIo({ cwd: "/other/ws" });
+  assert.equal(await f.cmd.handler({ positionals: ["revoke", SLUG], flags: {} }, revokeIo), 0);
+  assert.equal((revokeIo.dataValue as Record<string, unknown>).hadGrant, false, "revoke in B found no grant");
+  assert.ok(f.kv[grantKey(SLUG, "/fake/ws")], "A's grant survives a revoke in B");
+  const { code: aCode } = await shipCheck(f, SLUG);
+  assert.equal(aCode, 0, "A still passes after the revoke in B");
+  // and a grant in B is a separate record that authorizes B only
+  const grantBIo = makeIo({ cwd: "/other/ws" });
+  assert.equal(await f.cmd.handler({ positionals: ["grant", SLUG], flags: {} }, grantBIo), 0);
+  assert.ok(f.kv[grantKey(SLUG, "/other/ws")], "B's grant is recorded under B's key");
+  assert.notEqual(grantKey(SLUG, "/fake/ws"), grantKey(SLUG, "/other/ws"));
+  const { code: bCode2 } = await shipCheck(f, SLUG, { cwd: "/other/ws" });
+  assert.equal(bCode2, 0, "B passes with its own grant");
 });
 
 test("grant/revoke: roundtrip records and deletes the grant key", async () => {
   const f = activate();
   const io = makeIo();
   assert.equal(await f.cmd.handler({ positionals: ["grant", SLUG], flags: {} }, io), 0);
-  const grant = f.kv[`grant:${SLUG}`] as Record<string, unknown>;
+  const grant = f.kv[grantKey(SLUG, "/fake/ws")] as Record<string, unknown>;
   assert.equal(grant.slug, SLUG);
   assert.equal(grant.workspace, "/fake/ws");
   assert.equal(grant.grantedBy, "trace-test-0000-0000");
   assert.equal(grant.scope, "ship");
   assert.ok(typeof grant.at === "string" && grant.at.length > 0);
   assert.equal(await f.cmd.handler({ positionals: ["revoke", SLUG], flags: {} }, io), 0);
-  assert.equal(f.kv[`grant:${SLUG}`], undefined);
+  assert.equal(f.kv[grantKey(SLUG, "/fake/ws")], undefined);
   const data = io.dataValue as Record<string, unknown>;
   assert.equal(data.revoked, true);
   assert.equal(data.hadGrant, true);

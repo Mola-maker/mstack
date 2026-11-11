@@ -10,8 +10,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { MolaEvents, PolicyDenial } from "@mola/plugin-sdk";
 import plugin, { runShip, slugifyGoal } from "../src/index.js";
-import { parseChecks, parsePrCreateOutput, parsePrListJson, renderCommitMessage, renderPrBody, parseReview } from "../src/ship.js";
-import { errOf, makeFakeCtx, makeIo, type FakeCtx } from "./fake.js";
+import { parseChecksJson, parsePrCreateOutput, parsePrListJson, renderCommitMessage, renderPrBody, parseReview } from "../src/ship.js";
+import { makeFakeCtx, makeIo, type FakeCtx } from "./fake.js";
 
 const SLUG = "ship-the-fix";
 const GOAL = "ship the fix";
@@ -67,8 +67,20 @@ interface Scenario {
   pushCode?: number;
   prList?: string;
   prCreateOut?: string;
+  /** `gh pr checks --json` payload (string) or a function of the call number */
   checks?: string | ((call: number) => string);
+  checksCode?: number;
+  checksStderr?: string;
 }
+
+function checksJson(entries: Array<{ name: string; state: string; bucket: string }>): string {
+  return JSON.stringify(entries.map((e) => ({ ...e, workflow: "ci" })));
+}
+
+const ALL_PASS_CHECKS = checksJson([
+  { name: "build", state: "SUCCESS", bucket: "pass" },
+  { name: "test", state: "SUCCESS", bucket: "pass" },
+]);
 
 function scriptedExec(scenario: Scenario = {}) {
   let checksCall = 0;
@@ -101,8 +113,8 @@ function scriptedExec(scenario: Scenario = {}) {
     }
     if (cmd === "gh" && sub === "pr" && rest[0] === "checks") {
       checksCall++;
-      const out = typeof scenario.checks === "function" ? scenario.checks(checksCall) : (scenario.checks ?? "build pass\ntest pass\n");
-      return { code: 0, stdout: out, stderr: "" };
+      const out = typeof scenario.checks === "function" ? scenario.checks(checksCall) : (scenario.checks ?? ALL_PASS_CHECKS);
+      return { code: scenario.checksCode ?? 0, stdout: out, stderr: scenario.checksStderr ?? "" };
     }
     throw new Error(`unscripted exec: ${argv.join(" ")}`);
   };
@@ -111,12 +123,14 @@ function scriptedExec(scenario: Scenario = {}) {
 function activate(scenario: Scenario = {}) {
   const f = makeFakeCtx({ exec: scriptedExec(scenario) });
   const seenYes: Array<boolean | undefined> = [];
+  const seenCallIds: Array<string | undefined> = [];
   f.ctx.events.hook(MolaEvents.ToolBefore, (value) => {
-    const call = (value ?? {}) as { argv?: string[]; yes?: boolean };
+    const call = (value ?? {}) as { argv?: string[]; yes?: boolean; callId?: string };
     const cmdline = (call.argv ?? []).join(" ");
     const denied = /\bgh\s+pr\s+create\b/.test(cmdline) || /\bgit\s+push\b/.test(cmdline);
     if (!denied) return value;
     seenYes.push(call.yes);
+    seenCallIds.push(call.callId);
     if (call.yes) return value;
     throw new PolicyDenial("fake classifier: outward call requires approval");
   });
@@ -135,7 +149,7 @@ function activate(scenario: Scenario = {}) {
     modelRoute: "group/smart-split",
     at: "2026-11-11T00:00:00.000Z",
   };
-  return { ...f, cmd, seenYes };
+  return { ...f, cmd, seenYes, seenCallIds };
 }
 
 async function grant(f: ReturnType<typeof activate>) {
@@ -161,6 +175,14 @@ test("ultramode ship: happy path ends shipped with the PR URL recorded", async (
   assert.equal(ship.commit, SHA);
   assert.equal(ship.pushed, true);
   assert.deepEqual(f.seenYes, [true, true], "push and pr-create each passed the ship gate with grant-derived yes");
+  assert.equal(f.seenCallIds.length, 2, "push and pr-create each carried a callId");
+  assert.ok(f.seenCallIds[0] && f.seenCallIds[1], "both callIds are present");
+  assert.notEqual(f.seenCallIds[0], f.seenCallIds[1], "push and pr-create have distinct callIds");
+  const granted = f.emitted.filter((e) => e.event === MolaEvents.ApprovalGranted);
+  assert.equal(granted.length, 2, "a real ship emits one approval record per outward action");
+  const grantedCallIds = granted.map((e) => (e.data as Record<string, unknown>).callId);
+  assert.deepEqual([...grantedCallIds].sort(), [...f.seenCallIds].sort(), "each approval names its action's callId");
+  assert.ok(granted.every((e) => (e.data as Record<string, unknown>).approver === "ultramode-grant:trace-test-0000-0000"));
   const push = f.execCalls.find((c) => c.argv.join(" ") === `git push -u origin ${BRANCH}`);
   assert.ok(push, "pushed the ultramode branch");
   const create = f.execCalls.find((c) => c.argv[0] === "gh" && c.argv[2] === "create")!;
@@ -240,7 +262,12 @@ test("ultramode ship: duplicate PR reports the existing URL and runs no pr-creat
 });
 
 test("ultramode ship: failing checks end blocked naming the failing check", async () => {
-  const f = activate({ checks: "build pass\nlint fail\n" });
+  const f = activate({
+    checks: checksJson([
+      { name: "build", state: "SUCCESS", bucket: "pass" },
+      { name: "lint", state: "FAILURE", bucket: "fail" },
+    ]),
+  });
   await grant(f);
   const io = makeIo();
   const code = await f.cmd.handler({ positionals: ["ship", SLUG], flags: {} }, io);
@@ -253,8 +280,27 @@ test("ultramode ship: failing checks end blocked naming the failing check", asyn
   assert.equal(JSON.parse(f.files.get(STATE_PATH)!).ship.verdict, "blocked");
 });
 
+test("ultramode ship: a check whose name contains 'fail' but whose bucket passes does not block", async () => {
+  const f = activate({
+    checks: checksJson([
+      { name: "failure-detector", state: "SUCCESS", bucket: "pass" },
+      { name: "error-handler-check", state: "SUCCESS", bucket: "pass" },
+    ]),
+  });
+  await grant(f);
+  const io = makeIo();
+  const code = await f.cmd.handler({ positionals: ["ship", SLUG], flags: {} }, io);
+  assert.equal(code, 0);
+  assert.equal(shipOf(io).verdict, "shipped");
+});
+
 test("ultramode ship: checks still running at the cap end running with the PR URL", async () => {
-  const f = activate({ checks: "build pending\ntest pending\n" });
+  const f = activate({
+    checks: checksJson([
+      { name: "build", state: "PENDING", bucket: "pending" },
+      { name: "test", state: "PENDING", bucket: "pending" },
+    ]),
+  });
   await grant(f);
   const io = makeIo();
   const code = await runShip(f.ctx, io, SLUG, { pollIntervalMs: 5, pollTimeoutMs: 20 });
@@ -263,6 +309,32 @@ test("ultramode ship: checks still running at the cap end running with the PR UR
   assert.equal(ship.verdict, "running");
   assert.equal(ship.prUrl, PR_URL);
   assert.match(io.outLines.join("\n"), /running — .*pull\/42/);
+});
+
+test("ultramode ship: a gh failure with no parseable JSON is an exec failure at ci-poll, never blocked/running", async () => {
+  const f = activate({ checks: "", checksCode: 1, checksStderr: "gh: failed to log in: HTTP 401 (Unauthorized)" });
+  await grant(f);
+  const io = makeIo();
+  const code = await f.cmd.handler({ positionals: ["ship", SLUG], flags: {} }, io);
+  assert.equal(code, 1);
+  const ship = shipOf(io);
+  assert.equal(ship.verdict, "failed");
+  assert.equal(ship.stage, "ci-poll");
+  assert.match(String(ship.reason), /gh pr checks failed/);
+  assert.match(f.files.get(GOAL_PATH)!, /ship failed: ci-poll/);
+});
+
+test("ultramode ship: a second ship appends a second closeout instead of dropping it", async () => {
+  const f = activate();
+  const io = makeIo();
+  assert.equal(await f.cmd.handler({ positionals: ["ship", SLUG], flags: {} }, io), 0);
+  assert.equal(shipOf(io).verdict, "prepared");
+  const io2 = makeIo();
+  assert.equal(await f.cmd.handler({ positionals: ["ship", SLUG], flags: {} }, io2), 0);
+  assert.equal(shipOf(io2).verdict, "prepared");
+  const goal = f.files.get(GOAL_PATH)!;
+  assert.equal((goal.match(/## Closeout/g) ?? []).length, 2, "the second ship outcome is appended, not dropped");
+  assert.equal((goal.match(/\| ship: prepared \|/g) ?? []).length, 2, "two ship checkpoint rows are recorded");
 });
 
 test("ultramode ship: branch cannot be created from main — stops, never pushes main", async () => {
@@ -292,30 +364,43 @@ test("ultramode ship: push failure stops with a closeout line and no PR create",
   assert.match(f.files.get(GOAL_PATH)!, /ship failed: push/);
 });
 
-test("ultramode ship: bare ship with no slug is a usage error", async () => {
+test("ultramode ship: `ship <slug>` still ships, `ship --check <slug>` still checks", async () => {
   const f = activate();
+  await grant(f);
   const io = makeIo();
-  await assert.rejects(
-    f.cmd.handler({ positionals: ["ship"], flags: {} }, io),
-    (e: unknown) => {
-      const err = errOf(e);
-      assert.equal(err.code, "USAGE_ERROR");
-      assert.equal(err.exitCode, 64);
-      return true;
-    },
-  );
+  assert.equal(await f.cmd.handler({ positionals: ["ship", SLUG], flags: {} }, io), 0);
+  assert.equal(shipOf(io).verdict, "shipped");
+  const checkIo = makeIo();
+  assert.equal(await f.cmd.handler({ positionals: ["ship"], flags: { check: SLUG } }, checkIo), 0);
+  const check = (checkIo.dataValue as Record<string, unknown>).shipCheck as Record<string, unknown>;
+  assert.equal(check.ok, true);
 });
 
 test("ultramode ship: slug is kebab-case and truncated", () => {
   assert.equal(slugifyGoal("Fix the flaky test in CI!!"), "fix-the-flaky-test-in-ci");
 });
 
-test("ship parsers: checks table, PR list, PR create output", () => {
-  assert.deepEqual(parseChecks("build pass\ntest pass\n"), { complete: true, failing: [], running: [] });
-  assert.deepEqual(parseChecks("build pass\nlint fail\n"), { complete: false, failing: ["lint"], running: [] });
-  assert.deepEqual(parseChecks("build pending\n"), { complete: false, failing: [], running: ["build"] });
-  assert.deepEqual(parseChecks("No checks reported"), { complete: true, failing: [], running: [] });
-  assert.deepEqual(parseChecks("All checks were successful"), { complete: true, failing: [], running: [] });
+test("ship parsers: checks JSON (bucket verdicts), PR list, PR create output", () => {
+  assert.deepEqual(parseChecksJson(checksJson([
+    { name: "build", state: "SUCCESS", bucket: "pass" },
+    { name: "test", state: "SUCCESS", bucket: "pass" },
+  ])), { complete: true, failing: [], running: [] });
+  assert.deepEqual(parseChecksJson(checksJson([
+    { name: "build", state: "SUCCESS", bucket: "pass" },
+    { name: "lint", state: "FAILURE", bucket: "fail" },
+  ])), { complete: false, failing: ["lint"], running: [] });
+  assert.deepEqual(parseChecksJson(checksJson([
+    { name: "build", state: "PENDING", bucket: "pending" },
+  ])), { complete: false, failing: [], running: ["build"] });
+  assert.deepEqual(parseChecksJson(checksJson([
+    { name: "build", state: "CANCELLED", bucket: "cancel" },
+  ])), { complete: false, failing: ["build"], running: [] });
+  assert.deepEqual(parseChecksJson(checksJson([
+    { name: "build", state: "SKIPPED", bucket: "skipping" },
+  ])), { complete: true, failing: [], running: [] });
+  assert.deepEqual(parseChecksJson("[]"), { complete: true, failing: [], running: [] });
+  assert.throws(() => parseChecksJson("not json"), /unparsable JSON/);
+  assert.throws(() => parseChecksJson("{}"), /not an array/);
   assert.deepEqual(parsePrListJson("[]"), undefined);
   assert.deepEqual(parsePrListJson(JSON.stringify([{ number: 7, url: "https://github.com/acme/repo/pull/7" }])), {
     number: 7,

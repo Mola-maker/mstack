@@ -83,9 +83,13 @@ The mode adds two new waterfall gates in the plugin-sdk event vocabulary
 
 - `mola.ultramode.review`: inspects evidence files before anything ships.
   Required evidence: `.mstack/reviews/<id>.md` (reviewer named, different
-  from writer), the test/check output it cites, and `decision.json` for the
-  run. Missing or failing evidence denies the ship. The gate reads files,
-  it does not trust a prompt's claim that a review happened.
+  from writer) and the test/check output it cites. The canonical run
+  evidence is the run's `.mstack/runs/<runId>/decision.json`, cited by
+  path in the review — not a separate gate input. When a `.mstack/` path
+  is the only evidence form, the gate verifies every cited path exists
+  on disk; a bare mention of a path that is not there denies. Missing or
+  failing evidence denies the ship. The gate reads files, it does not
+  trust a prompt's claim that a review happened.
 - `mola.ultramode.ship`: runs immediately before an outward action. It
   checks the recorded grant (§6) and invokes `mola.tool.before` itself
   with the exact argv, because `cmd-run` does not call that gate.
@@ -98,13 +102,18 @@ missing verdict denies), the reviewer must differ from the writer (the
 agent from the goal's last outcome; when no outcome exists the check is
 skipped, since sameness cannot be proven), and it must cite evidence: a
 `repro: <command> → <output>` line, a backticked test command, or a
-`.mstack/` file path. Any failure denies with a specific reason, and a
+`.mstack/` file path that exists on disk when it is the only evidence
+form. Any failure denies with a specific reason, and a
 denial is a stop, not a retry: the mode records the outcome, writes the
 closeout line, and returns 77.
 
-After a PR is created, the mode polls `gh pr checks`. A failed check blocks
-the "shipped" verdict. A blocked verdict is reported, not retried in a
-loop, and never auto-merged.
+After a PR is created, the mode polls `gh pr checks <n> --json
+name,state,bucket,workflow` and maps verdicts from the `bucket` field
+(pass/fail/pending/skipping/cancel), never from substring matching on
+check names. A failed check blocks the "shipped" verdict. A gh failure
+that yields no parseable JSON (auth/network error) is an exec failure at
+the ci-poll stage, never blocked/running. A blocked verdict is reported,
+not retried in a loop, and never auto-merged.
 
 ## 6. Shipping and the approval model
 
@@ -116,7 +125,15 @@ grant, scoped and recorded:
 
 - A grant is per goal and per workspace. It is recorded in `~/.mola/state`
   via `ctx.state` (machine-local, revocable), with the traceId that granted
-  it. A policy row in `.mola/policy.jsonc` may also carry it for a repo.
+  it, under the key `grant:<slug>:<workspace-hash>` (short hash of the
+  cwd), so a grant in one workspace is a separate record from the same
+  slug's grant in another: granting or revoking in B never clobbers A's
+  record. The stored workspace is checked again as defense in depth.
+  Threat model: the grant is an approval record for the mode's unattended
+  actions, not a security boundary against local code — anything with
+  state access could forge one. Workspace scoping prevents
+  cross-workspace clobber, not local forgery. A policy row in
+  `.mola/policy.jsonc` may also carry it for a repo.
 - With a grant, the mode pushes, opens the PR, and watches CI.
 - Without a grant, the mode stops at a prepared PR: branch pushed
   nowhere, PR body written, and it says so. Preparation without push is
@@ -130,7 +147,11 @@ with approver `ultramode-grant:<traceId>` — the traceId that granted it —
 so the bus record names the grant as the real authority instead of
 "--yes". `mola ultramode ship --check <slug>` exercises both gates with
 a sample `gh pr create` argv and reports pass or the denial reason,
-without any outward action.
+without any outward action. It is a probe: the ship gate still runs the
+`mola.tool.before` waterfall, but emits no `mola.approval.granted`
+record for an action that never happened. Each outward action gets a
+distinct callId (short hash of its argv), so push and PR create never
+share one audit id.
 - The ship gate never denies three times in a row. A denial is a stop
   condition: record it, write the closeout, stop. Repeated denials would
   trip the bus brake and quarantine the mode's own policy plugin.
@@ -139,7 +160,14 @@ without any outward action.
   changes are committed on it with a message from the goal, and only that
   branch is ever pushed — the mode never pushes master or main, and if the
   branch cannot be created from master or main it stops instead of forcing
-  anything. Without a grant the commit stays local and the PR body is
+  anything. Slugs keep unicode letters and numbers, so Chinese goals slug
+  distinctly instead of all collapsing to `goal`; a slug longer than 48
+  chars is cut short and carries a short hash of the full goal text
+  (total stays within 48), as does an empty slug after cleaning, so
+  distinct goals slug distinctly. A single-word goal is a goal,
+  not a subcommand: the first positional counts as a subcommand only with
+  at least 2 positionals, except `ship --check <slug>`, whose slug rides
+  in the flag. Without a grant the commit stays local and the PR body is
   written to `.mstack/goals/<slug>.pr.md` as a prepared PR.
 
 ## 7. Routing (FrontierHarness evidence)
@@ -241,12 +269,18 @@ Unit 5, as built:
   router to report usage first.
 - Evidence: `.mstack/research/<slug>/round-<n>.md` per round (surviving
   claims with sources and channel counts, uncited drops, judge drops,
-  judge skips, stop). Refinement writes the round's new findings into
+  judge skips, stop). The manifest's `fs.write` covers
+  `**/.mstack/research/**`, so the loop can write round files in
+  production (the real core enforces the manifest globs). Refinement writes the round's new findings into
   the goal file under `## Research findings` plus one checkpoint row per
   round pointing at the round file; that write is the recorded evidence
-  of the rewrite. Counters live in the state file under `rsi`: rounds,
+  of the rewrite. A checkpoint row still lands when the goal file has no
+  `## Amendments` anchor: it is appended at the end of the file instead
+  of silently dropped. Counters live in the state file under `rsi`: rounds,
   findings (distinct), dropped (per round), `newFindingsByRound`,
-  stopReason, budgetTokens, tokensUsed, channels, roundCap.
+  stopReason, budgetTokens, tokensUsed, channels, roundCap. `findings` is
+  the current surviving set: when the judge drops a claim kept in an
+  earlier round, it leaves the set.
 - Every exit path writes the closeout (same discipline as units 2-4):
   saturation, round-cap, denied gate, failed round.
 
@@ -256,6 +290,10 @@ The mode runs the m-goal loop for the whole task. Goal file
 `.mstack/goals/<slug>.md` holds the objective, sub-goals, checkpoints, and
 a `## Closeout` section. The state file holds loop counters. Every exit
 path, including a stopped loop and a denied ship, writes the closeout.
+A re-run keeps the existing goal file and state file (ship and rsi
+records survive) and appends a re-run checkpoint row instead of rewriting
+from scratch; a second closeout appends a new `## Closeout — <ts>` block
+instead of silently dropping the outcome when the placeholder is gone.
 
 ## 11. Rulings on the spike's 3 unknowns
 

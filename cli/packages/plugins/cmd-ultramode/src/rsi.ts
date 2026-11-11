@@ -327,7 +327,11 @@ function goalPaths(cwd: string, slug: string): { goalPath: string; statePath: st
 }
 
 function appendCheckpointRow(goalText: string, row: string): string {
-  return goalText.replace("\n\n## Amendments", `\n${row}\n\n## Amendments`);
+  const anchored = goalText.replace("\n\n## Amendments", `\n${row}\n\n## Amendments`);
+  if (anchored !== goalText) return anchored;
+  // No `## Amendments` anchor (a hand-written goal file): append the row
+  // at the end instead of silently dropping it.
+  return `${goalText.endsWith("\n") ? goalText : `${goalText}\n`}${row}\n`;
 }
 
 function recordFindingsInGoal(goalText: string, round: RsiRound): string {
@@ -531,6 +535,10 @@ export async function runRsiLoop(
     const actualJudgeDropped: RsiDroppedClaim[] = surviving
       .filter((c) => droppedKeys.has(normalizeClaim(c.text)))
       .map((c) => ({ text: c.text, reason: "dropped by the judge pass" }));
+    // A judge drop removes the claim from the surviving set even when it
+    // was kept in an earlier round: findings is the current survivors,
+    // not a count of everything ever kept.
+    for (const c of actualJudgeDropped) seen.delete(normalizeClaim(c.text));
     const keptNew = kept.filter((c) => !seen.has(normalizeClaim(c.text))).length;
     for (const c of kept) seen.add(normalizeClaim(c.text));
     dropped += uncited.length + actualJudgeDropped.length;

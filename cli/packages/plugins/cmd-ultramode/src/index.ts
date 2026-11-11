@@ -1,5 +1,5 @@
 /**
- * cmd-ultramode (unit 2: routing and state).
+ * cmd-ultramode — the long-run mode: one goal in, one routed pass out.
  *
  * One goal in, one routed pass out. The handler creates the m-goal state
  * (`.mstack/goals/<slug>.md` + `<slug>.state.json`), then routes and
@@ -16,6 +16,7 @@
  */
 
 import * as path from "node:path";
+import { createHash } from "node:crypto";
 import type { Io, PluginContext } from "@mola/plugin-sdk";
 import { definePlugin, ExitCode, MolaError, MolaEvents } from "@mola/plugin-sdk";
 import {
@@ -88,14 +89,45 @@ export interface UltramodeLastOutcome {
   at: string;
 }
 
-/** Kebab-case slug from the goal text, truncated to 48 chars. */
+/** Short hash of the full goal text: the disambiguator for slugs that collide. */
+function goalHash(goal: string): string {
+  return createHash("sha256").update(goal, "utf8").digest("hex").slice(0, 8);
+}
+
+/**
+ * Kebab-case slug from the goal text, truncated to 48 chars. Unicode
+ * letters and numbers are kept, so Chinese goals slug distinctly instead
+ * of all collapsing to "goal". When the slug is truncated, or empty after
+ * cleaning, a short hash of the full goal text is appended so distinct
+ * goals slug distinctly. Short ASCII slugs are unchanged.
+ */
 export function slugifyGoal(goal: string): string {
   const slug = goal
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "");
-  const cut = slug.slice(0, 48).replace(/-+$/, "");
-  return cut || "goal";
+  if (!slug) return `goal-${goalHash(goal)}`;
+  if (slug.length > 48) {
+    // Cut to 39 so the hash suffix keeps the total within 48 chars.
+    const cut = slug.slice(0, 39).replace(/-+$/, "");
+    return `${cut}-${goalHash(goal)}`;
+  }
+  return slug;
+}
+
+/** Append a checkpoint row before `## Amendments`, or at the end of the file when the anchor is gone. */
+function appendCheckpointRow(text: string, row: string): string {
+  const anchored = text.replace("\n\n## Amendments", `\n${row}\n\n## Amendments`);
+  if (anchored !== text) return anchored;
+  return `${text.endsWith("\n") ? text : `${text}\n`}${row}\n`;
+}
+
+/** Fill the `(not yet closed...)` placeholder, or append a new closeout block when it is already gone. */
+function fillOrAppendCloseout(text: string, closeout: string, at: string): string {
+  if (text.includes("(not yet closed — the loop is still running)")) {
+    return text.replace("(not yet closed — the loop is still running)", closeout);
+  }
+  return `${text.endsWith("\n") ? text : `${text}\n`}\n## Closeout — ${at}\n\n${closeout}\n`;
 }
 
 function goalPaths(cwd: string, slug: string): { goalPath: string; statePath: string } {
@@ -148,6 +180,8 @@ interface GoalStateFile {
   updatedAt: string;
   /** unit 4: the last ship attempt, if any */
   ship?: ShipRecord;
+  /** unit 5: the RSI counters, if any — preserved across re-runs */
+  rsi?: Record<string, unknown>;
 }
 
 function renderStateFile(state: GoalStateFile): string {
@@ -182,8 +216,11 @@ interface CloseoutInput {
 
 /**
  * The closeout write: appends one checkpoint row, fills `## Closeout` in
- * the goal file, and records the outcome in the state file. Runs on every
- * exit path, including a denied route and a failed agent.
+ * the goal file (or appends a new closeout block on a re-run, when the
+ * placeholder is already gone), and records the outcome in the state
+ * file — merging with the existing state, so a re-run never wipes prior
+ * ship/rsi records. Runs on every exit path, including a denied route
+ * and a failed agent.
  */
 function closeGoal(
   ctx: PluginContext,
@@ -212,26 +249,31 @@ function closeGoal(
   ].join("\n");
 
   const current = ctx.fs.readFile(goalPath);
-  const withRow = current.replace(
-    "\n\n## Amendments",
-    `\n| ${at} | closeout: ${input.outcome} | ${input.result} | exit ${input.exitCode}${input.agent ? `, agent ${input.agent}` : ""}${input.modelRoute ? `, route ${input.modelRoute}` : ""} | ${status} |\n\n## Amendments`,
+  const withRow = appendCheckpointRow(
+    current,
+    `| ${at} | closeout: ${input.outcome} | ${input.result} | exit ${input.exitCode}${input.agent ? `, agent ${input.agent}` : ""}${input.modelRoute ? `, route ${input.modelRoute}` : ""} | ${status} |`,
   );
-  const closed = withRow.replace(
-    "(not yet closed — the loop is still running)",
-    closeout,
-  );
+  const closed = fillOrAppendCloseout(withRow, closeout, at);
   ctx.fs.writeFile(goalPath, closed);
 
+  let existing: GoalStateFile | undefined;
+  try {
+    existing = JSON.parse(ctx.fs.readFile(statePath)) as GoalStateFile;
+  } catch {
+    existing = undefined;
+  }
   const state: GoalStateFile = {
+    ...(existing ?? initialState(slug, at)),
     slug,
     status,
-    startCommit: null,
-    minRounds: 1,
-    rounds: 1,
-    tokensUsed: 0,
-    budgetPct: 0,
-    failures: input.failureSignature ? { [input.failureSignature]: 1 } : {},
-    lastProgressAt: status === "done" ? at : null,
+    minRounds: existing?.minRounds ?? 1,
+    rounds: (existing?.rounds ?? 0) + 1,
+    tokensUsed: existing?.tokensUsed ?? 0,
+    budgetPct: existing?.budgetPct ?? 0,
+    failures: input.failureSignature
+      ? { ...(existing?.failures ?? {}), [input.failureSignature]: (existing?.failures?.[input.failureSignature] ?? 0) + 1 }
+      : { ...(existing?.failures ?? {}) },
+    lastProgressAt: status === "done" ? at : (existing?.lastProgressAt ?? null),
     updatedAt: at,
   };
   ctx.fs.writeFile(statePath, renderStateFile(state));
@@ -278,28 +320,27 @@ function recordShipStop(
     at,
   });
   if (current === undefined) return;
-  const withRow = current.replace(
-    "\n\n## Amendments",
-    `\n| ${at} | ${input.label} | ${input.result} | ${input.via} | failed |\n\n## Amendments`,
+  const withRow = appendCheckpointRow(
+    current,
+    `| ${at} | ${input.label} | ${input.result} | ${input.via} | failed |`,
   );
-  const closed = withRow.includes("(not yet closed — the loop is still running)")
-    ? withRow.replace(
-        "(not yet closed — the loop is still running)",
-        [
-          "- status: failed",
-          `- objective: ${slug}`,
-          `- result: ${input.result}`,
-          `- unfinished: ${input.unfinished}`,
-          `- known-issues: ${input.knownIssues}`,
-          "- lessons: none recorded in unit 3",
-          "- gate:",
-          "  - m-review: not run",
-          "  - ultramode ship: stopped",
-          "- Attention: 无",
-          `- resume-hint: read ${goalPath}, last checkpoint row; blocker: ${input.knownIssues}`,
-        ].join("\n"),
-      )
-    : withRow;
+  const closed = fillOrAppendCloseout(
+    withRow,
+    [
+      "- status: failed",
+      `- objective: ${slug}`,
+      `- result: ${input.result}`,
+      `- unfinished: ${input.unfinished}`,
+      `- known-issues: ${input.knownIssues}`,
+      "- lessons: none recorded in unit 3",
+      "- gate:",
+      "  - m-review: not run",
+      "  - ultramode ship: stopped",
+      "- Attention: 无",
+      `- resume-hint: read ${goalPath}, last checkpoint row; blocker: ${input.knownIssues}`,
+    ].join("\n"),
+    at,
+  );
   ctx.fs.writeFile(goalPath, closed);
 }
 
@@ -396,28 +437,27 @@ function recordShipOutcome(
     current = undefined;
   }
   if (current === undefined) return;
-  const withRow = current.replace(
-    "\n\n## Amendments",
-    `\n| ${at} | ship: ${record.verdict} | ${result} | ship | ${done ? "done" : "failed"} |\n\n## Amendments`,
+  const withRow = appendCheckpointRow(
+    current,
+    `| ${at} | ship: ${record.verdict} | ${result} | ship | ${done ? "done" : "failed"} |`,
   );
-  const closed = withRow.includes("(not yet closed — the loop is still running)")
-    ? withRow.replace(
-        "(not yet closed — the loop is still running)",
-        [
-          `- status: ${done ? "done" : "failed"}`,
-          `- objective: ${goalText}`,
-          `- result: ${result}`,
-          `- unfinished: ${done ? "(none — ship outcome recorded)" : "the goal itself: shipping did not complete"}`,
-          `- known-issues: ${record.verdict === "blocked" ? `failing checks: ${(record.failing ?? []).join(", ")}` : record.reason ?? "(none)"}`,
-          "- lessons: none recorded in unit 4",
-          "- gate:",
-          "  - m-review: passed",
-          `  - ultramode ship: ${record.verdict}`,
-          "- Attention: 无",
-          `- resume-hint: read ${goalPath}, last checkpoint row`,
-        ].join("\n"),
-      )
-    : withRow;
+  const closed = fillOrAppendCloseout(
+    withRow,
+    [
+      `- status: ${done ? "done" : "failed"}`,
+      `- objective: ${goalText}`,
+      `- result: ${result}`,
+      `- unfinished: ${done ? "(none — ship outcome recorded)" : "the goal itself: shipping did not complete"}`,
+      `- known-issues: ${record.verdict === "blocked" ? `failing checks: ${(record.failing ?? []).join(", ")}` : record.reason ?? "(none)"}`,
+      "- lessons: none recorded in unit 4",
+      "- gate:",
+      "  - m-review: passed",
+      `  - ultramode ship: ${record.verdict}`,
+      "- Attention: 无",
+      `- resume-hint: read ${goalPath}, last checkpoint row`,
+    ].join("\n"),
+    at,
+  );
   ctx.fs.writeFile(goalPath, closed);
 }
 
@@ -566,7 +606,7 @@ export async function runShip(
   if (add.code !== 0) {
     return fail("commit", `git add -A exited ${add.code}: ${(add.stderr || add.stdout).trim()}`);
   }
-  const grant = readGrant(ctx, slug);
+  const grant = readGrant(ctx, slug, cwd);
   const granted = !!grant && grant.workspace === cwd;
   const commitMessage = renderCommitMessage({
     goal: goalText,
@@ -671,8 +711,14 @@ export async function runShip(
     return fail("pr-create", `gh pr create did not print a PR URL: ${created.stdout.trim()}`);
   }
 
-  // 8. Poll CI. Never auto-merge.
-  const poll = await pollChecks(exec, pr.number, opts);
+  // 8. Poll CI. Never auto-merge. A gh failure that yields no parseable
+  // JSON is an exec failure at the ci-poll stage, never blocked/running.
+  let poll: Awaited<ReturnType<typeof pollChecks>>;
+  try {
+    poll = await pollChecks(exec, pr.number, opts);
+  } catch (err) {
+    return fail("ci-poll", err instanceof Error ? err.message : String(err));
+  }
   const verdict: ShipVerdict = poll.verdict;
   const record: ShipRecord = {
     slug,
@@ -711,6 +757,9 @@ async function runShipCheck(ctx: PluginContext, io: Io, slug: string): Promise<E
       slug,
       cwd: io.cwd,
       argv: SAMPLE_SHIP_ARGV,
+      // a probe: the ship gate runs the ToolBefore waterfall but emits
+      // no approval record for an action that never happened.
+      probe: true,
     });
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
@@ -743,15 +792,15 @@ async function handleSubcommand(
       at: new Date().toISOString(),
       scope: GRANT_SCOPE,
     };
-    ctx.state.set(grantKey(subArg), grant);
+    ctx.state.set(grantKey(subArg, io.cwd), grant);
     io.data({ granted: true, grant });
     if (!io.json) io.out(`ultramode grant recorded: ${subArg} (workspace ${io.cwd}, by ${io.traceId})`);
     return ExitCode.Ok;
   }
   if (sub === "revoke") {
     if (!subArg) throw new MolaError("USAGE_ERROR", REVOKE_USAGE, ExitCode.Usage);
-    const hadGrant = readGrant(ctx, subArg) !== undefined;
-    ctx.state.delete(grantKey(subArg));
+    const hadGrant = readGrant(ctx, subArg, io.cwd) !== undefined;
+    ctx.state.delete(grantKey(subArg, io.cwd));
     io.data({ revoked: true, slug: subArg, hadGrant });
     if (!io.json) io.out(`ultramode grant revoked: ${subArg}${hadGrant ? "" : " (none existed)"}`);
     return ExitCode.Ok;
@@ -835,7 +884,13 @@ export default definePlugin({
         }
 
         const [sub, subArg] = args.positionals;
-        if (sub === "grant" || sub === "revoke" || sub === "ship" || sub === "rsi") {
+        // A subcommand only when there are at least 2 positionals — a
+        // bare single word ("ship", "grant", "rsi") is a goal, not a
+        // subcommand — except `ship --check <slug>`, which carries its
+        // slug in the flag and has one positional by design.
+        const isSubcommand =
+          args.positionals.length >= 2 || (sub === "ship" && "check" in args.flags);
+        if (isSubcommand && (sub === "grant" || sub === "revoke" || sub === "ship" || sub === "rsi")) {
           return handleSubcommand(ctx, io, sub, subArg, args.flags);
         }
 
@@ -843,8 +898,36 @@ export default definePlugin({
         const slug = slugifyGoal(goal);
         const createdAt = new Date().toISOString();
         const { goalPath, statePath } = goalPaths(io.cwd, slug);
-        ctx.fs.writeFile(goalPath, renderGoalFile(goal, slug, createdAt));
-        ctx.fs.writeFile(statePath, renderStateFile(initialState(slug, createdAt)));
+        // A re-run keeps the existing goal file and state (history, ship
+        // and rsi records survive) and appends a re-run checkpoint row;
+        // only a first run writes them from scratch.
+        let existingGoal: string | undefined;
+        try {
+          existingGoal = ctx.fs.readFile(goalPath);
+        } catch {
+          existingGoal = undefined;
+        }
+        if (existingGoal === undefined) {
+          ctx.fs.writeFile(goalPath, renderGoalFile(goal, slug, createdAt));
+          ctx.fs.writeFile(statePath, renderStateFile(initialState(slug, createdAt)));
+        } else {
+          ctx.fs.writeFile(
+            goalPath,
+            appendCheckpointRow(
+              existingGoal,
+              `| ${createdAt} | re-run: goal re-entered | prior goal file and state kept, history preserved | mola ultramode "${goal}" | active |`,
+            ),
+          );
+          let state: GoalStateFile;
+          try {
+            state = JSON.parse(ctx.fs.readFile(statePath)) as GoalStateFile;
+          } catch {
+            state = initialState(slug, createdAt);
+          }
+          state.status = "active";
+          state.updatedAt = createdAt;
+          ctx.fs.writeFile(statePath, renderStateFile(state));
+        }
         ctx.state.set("activeGoal", slug);
 
         const policy = loadPolicy(ctx.fs, io.cwd);

@@ -169,6 +169,10 @@ importers:
       '@mola/plugin-sdk':
         specifier: workspace:*
         version: link:../../plugin-sdk
+    devDependencies:
+      '@mola/core':
+        specifier: workspace:*
+        version: link:../../core
 
   packages/plugins/policy-approval:
     dependencies:

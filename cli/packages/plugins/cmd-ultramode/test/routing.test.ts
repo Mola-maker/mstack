@@ -162,6 +162,81 @@ test("ultramode: status shows the active goal and its last outcome after a run",
 
 test("ultramode: slug is kebab-case and truncated", () => {
   assert.equal(slugifyGoal("Fix the flaky test in CI!!"), "fix-the-flaky-test-in-ci");
-  assert.equal(slugifyGoal("a".repeat(100)), "a".repeat(48));
-  assert.equal(slugifyGoal("!!!"), "goal");
+  // truncated slugs carry a hash of the full goal so distinct long goals stay distinct; the total stays within 48 chars
+  const longA = slugifyGoal("a".repeat(100));
+  assert.match(longA, /^a{39}-[0-9a-f]{8}$/);
+  assert.equal(longA.length, 48);
+  assert.notEqual(longA, slugifyGoal(`${"a".repeat(100)}b`));
+  // an empty slug after cleaning carries a hash instead of collapsing to "goal"
+  assert.match(slugifyGoal("!!!"), /^goal-[0-9a-f]{8}$/);
+  assert.notEqual(slugifyGoal("!!!"), slugifyGoal("???"));
+});
+
+test("ultramode: Chinese goals keep their unicode and slug distinctly", () => {
+  assert.equal(slugifyGoal("修复登录失败的问题"), "修复登录失败的问题");
+  assert.equal(slugifyGoal("优化首页加载速度"), "优化首页加载速度");
+  assert.notEqual(slugifyGoal("修复登录失败的问题"), slugifyGoal("优化首页加载速度"));
+});
+
+test("ultramode: long goals sharing a prefix slug distinctly", () => {
+  const prefix = "x".repeat(60);
+  const a = slugifyGoal(`${prefix} one`);
+  const b = slugifyGoal(`${prefix} two`);
+  assert.notEqual(a, b);
+  assert.ok(a.startsWith("x".repeat(39)), "the shared prefix is kept, the hash differs");
+  assert.equal(a.length, 48, "the hashed slug stays within 48 chars");
+});
+
+test("ultramode: quoted multi-word 'ship the docs' is a goal, not the ship subcommand", async () => {
+  const f = activate([doneAgent("dsh")]);
+  const io = makeIo();
+  const code = await f.cmd.handler({ positionals: ["ship the docs"], flags: {} }, io);
+  assert.equal(code, 0);
+  assert.ok(f.files.get("/fake/ws/.mstack/goals/ship-the-docs.md"), "goal file is written");
+  assert.match(f.files.get("/fake/ws/.mstack/goals/ship-the-docs.md")!, /# Goal: ship the docs/);
+});
+
+test("ultramode: bare single-word 'ship' is a goal named ship, not a usage error", async () => {
+  const f = activate([doneAgent("dsh")]);
+  const io = makeIo();
+  const code = await f.cmd.handler({ positionals: ["ship"], flags: {} }, io);
+  assert.equal(code, 0);
+  assert.ok(f.files.get("/fake/ws/.mstack/goals/ship.md"), "goal file is written");
+  assert.match(f.files.get("/fake/ws/.mstack/goals/ship.md")!, /# Goal: ship/);
+});
+
+test("ultramode: bare single-word 'grant' is a goal too", async () => {
+  const f = activate([doneAgent("dsh")]);
+  const io = makeIo();
+  const code = await f.cmd.handler({ positionals: ["grant"], flags: {} }, io);
+  assert.equal(code, 0);
+  assert.ok(f.files.get("/fake/ws/.mstack/goals/grant.md"), "goal file is written");
+});
+
+test("ultramode: re-running a goal keeps its history — ship/rsi records survive and a second closeout is appended", async () => {
+  const agent: FakeAgent = {
+    id: "dsh",
+    results: [
+      { exitCode: 0, finalText: "done" },
+      { exitCode: 0, finalText: "done" },
+    ],
+    calls: [],
+  };
+  const f = activate([agent]);
+  const io = makeIo();
+  assert.equal(await f.cmd.handler({ positionals: ["ship the fix"], flags: {} }, io), 0);
+  const statePath = "/fake/ws/.mstack/goals/ship-the-fix.state.json";
+  const state = JSON.parse(f.files.get(statePath)!);
+  state.ship = { slug: "ship-the-fix", verdict: "prepared", branch: "ultramode/ship-the-fix", pushed: false, at: "2026-11-11T00:00:00.000Z" };
+  state.rsi = { stopReason: "saturated", rounds: 2, findings: 2 };
+  f.files.set(statePath, JSON.stringify(state, null, 2) + "\n");
+  assert.equal(await f.cmd.handler({ positionals: ["ship the fix"], flags: {} }, makeIo()), 0);
+  const kept = JSON.parse(f.files.get(statePath)!);
+  assert.equal(kept.ship.verdict, "prepared", "the ship record survives the re-run");
+  assert.equal(kept.rsi.stopReason, "saturated", "the rsi record survives the re-run");
+  assert.equal(kept.rounds, 2, "rounds accumulate across runs");
+  const goal = f.files.get("/fake/ws/.mstack/goals/ship-the-fix.md")!;
+  assert.match(goal, /re-run: goal re-entered/, "the re-run appends a checkpoint row instead of rewriting");
+  assert.equal((goal.match(/## Closeout/g) ?? []).length, 2, "the second closeout is appended, not dropped");
+  assert.match(goal, /- status: done/);
 });

@@ -4,8 +4,8 @@
  * Data shapes first (design §5-6):
  *
  * - Grant: `{ slug, workspace, grantedBy, at, scope }`, recorded in the
- *   mode's ctx.state under `grant:<slug>`. Per goal AND per workspace: a
- *   grant for one workspace never authorizes another.
+ *   mode's ctx.state under `grant:<slug>:<workspace-hash>`. Per goal AND
+ *   per workspace: a grant for one workspace never authorizes another.
  * - Review request (waterfall value of `mola.ultramode.review`):
  *   `{ slug, cwd, reviewPath?, writer? }`. `writer` is the agent from the
  *   goal's last outcome; when unknown the reviewer-independence check is
@@ -32,6 +32,7 @@
  */
 
 import * as path from "node:path";
+import { createHash } from "node:crypto";
 import type { PluginContext } from "@mola/plugin-sdk";
 import { MolaEvents, PolicyDenial } from "@mola/plugin-sdk";
 
@@ -51,12 +52,22 @@ export interface UltramodeGrant {
   scope: string;
 }
 
-export function grantKey(slug: string): string {
-  return `grant:${slug}`;
+export function workspaceHash(workspace: string): string {
+  return createHash("sha256").update(workspace, "utf8").digest("hex").slice(0, 8);
 }
 
-export function readGrant(ctx: PluginContext, slug: string): UltramodeGrant | undefined {
-  const grant = ctx.state.get<UltramodeGrant>(grantKey(slug));
+/**
+ * The grant key is scoped to the workspace (short hash of the cwd), so a
+ * grant in workspace B never overwrites or revokes A's record. The stored
+ * grant still carries the full workspace path, checked again as defense
+ * in depth.
+ */
+export function grantKey(slug: string, workspace: string): string {
+  return `grant:${slug}:${workspaceHash(workspace)}`;
+}
+
+export function readGrant(ctx: PluginContext, slug: string, workspace: string): UltramodeGrant | undefined {
+  const grant = ctx.state.get<UltramodeGrant>(grantKey(slug, workspace));
   if (!grant || typeof grant.workspace !== "string" || typeof grant.grantedBy !== "string") {
     return undefined;
   }
@@ -78,6 +89,12 @@ export interface UltramodeShipRequest {
   /** the exact outward argv, e.g. ["gh", "pr", "create", ...] */
   argv: string[];
   tool?: string;
+  /**
+   * A probe (ship --check) exercises the ToolBefore waterfall but ships
+   * nothing, so it must not emit an approval record for an action that
+   * never happened.
+   */
+  probe?: boolean;
 }
 
 export function reviewFilePath(cwd: string, slug: string): string {
@@ -126,6 +143,15 @@ export function checkReviewText(text: string, writer?: string): ReviewCheck {
   return { ok: true, reviewer };
 }
 
+/** The `.mstack/` paths a review cites (trailing punctuation and any `:line` suffix stripped). */
+export function citedMstackPaths(text: string): string[] {
+  const found = new Set<string>();
+  for (const m of text.matchAll(/\.mstack\/[^\s"'\)\],;]+/g)) {
+    found.add(m[0].replace(/[),.]+$/, "").replace(/:\d+$/, ""));
+  }
+  return [...found];
+}
+
 /** The review gate: inspects the evidence file, never a prompt's claim. */
 export function reviewGate(ctx: PluginContext) {
   return (value: unknown): unknown => {
@@ -139,6 +165,20 @@ export function reviewGate(ctx: PluginContext) {
     }
     const checked = checkReviewText(text, req.writer);
     if (!checked.ok) throw new PolicyDenial(checked.reason);
+    // A bare `.mstack/` mention is not evidence: when it is the only
+    // evidence form, every cited path must exist on disk. The canonical
+    // run evidence is `.mstack/runs/<runId>/decision.json` (design §5).
+    const lines = text.split("\n");
+    const hasOtherEvidence = lines.some((l) => REVIEW_EVIDENCE_RES.slice(1).some((re) => re.test(l)));
+    if (!hasOtherEvidence) {
+      for (const cited of citedMstackPaths(text)) {
+        try {
+          ctx.fs.readFile(path.join(req.cwd, cited));
+        } catch {
+          throw new PolicyDenial(`review: cited evidence path "${cited}" does not exist on disk`);
+        }
+      }
+    }
     return value;
   };
 }
@@ -147,7 +187,7 @@ export function reviewGate(ctx: PluginContext) {
 export function shipGate(ctx: PluginContext) {
   return async (value: unknown): Promise<unknown> => {
     const req = (value ?? {}) as UltramodeShipRequest;
-    const grant = readGrant(ctx, req.slug);
+    const grant = readGrant(ctx, req.slug, req.cwd);
     if (!grant) {
       throw new PolicyDenial(
         `ship: no ultramode grant for "${req.slug}" — run \`mola ultramode grant ${req.slug}\` first; without a grant the mode stops at a prepared PR`,
@@ -160,20 +200,29 @@ export function shipGate(ctx: PluginContext) {
     }
     // yes comes from THIS grant only. io.yes (the global --yes flag) is
     // never read here, so --yes without a grant still denies.
+    // callId is distinct per argv (short hash of it): push and pr create
+    // are separate outward actions and must not share one audit id.
+    const callId = `ultramode-ship:${req.slug}:${createHash("sha256").update(JSON.stringify(req.argv), "utf8").digest("hex").slice(0, 12)}`;
     await ctx.events.runWaterfall(MolaEvents.ToolBefore, {
       tool: req.tool ?? req.argv[0] ?? "",
       argv: req.argv,
-      callId: `ultramode-ship:${req.slug}`,
+      callId,
       cwd: req.cwd,
       yes: true,
     });
-    ctx.events.emit(MolaEvents.ApprovalGranted, {
-      action: "ship",
-      rule: "ultramode-grant",
-      approver: `ultramode-grant:${grant.grantedBy}`,
-      slug: req.slug,
-      argv: req.argv,
-    });
+    // A probe (ship --check) ships nothing: the waterfall above is the
+    // probe, and no approval record is emitted for an action that never
+    // happened.
+    if (!req.probe) {
+      ctx.events.emit(MolaEvents.ApprovalGranted, {
+        action: "ship",
+        rule: "ultramode-grant",
+        approver: `ultramode-grant:${grant.grantedBy}`,
+        slug: req.slug,
+        argv: req.argv,
+        callId,
+      });
+    }
     return value;
   };
 }

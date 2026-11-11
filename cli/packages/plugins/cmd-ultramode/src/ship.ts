@@ -17,12 +17,15 @@
  *   review file, routing (agent and route), gates passed. No AI branding.
  *
  * Pure helpers live here so tests can assert on behaviour, not internals:
- * `gh pr checks` is parsed from its plain-text table (a failing token
- * blocks, a pending token keeps polling, anything else that parses to a
- * check with no failing/pending token is green).
+ * `gh pr checks` is read as structured JSON (`--json
+ * name,state,bucket,workflow`); verdicts come from the `bucket` field
+ * (pass/fail/pending/skipping/cancel), never from substring matching on
+ * check names. A gh failure that yields no parseable JSON is an exec
+ * failure at the ci-poll stage, never blocked/running.
  */
 
 import type { ExecResult } from "@mola/plugin-sdk";
+import { ExitCode, MolaError } from "@mola/plugin-sdk";
 import { REVIEW_EVIDENCE_RES } from "./gates.js";
 
 export type ShipVerdict = "shipped" | "blocked" | "running" | "prepared" | "duplicate" | "denied";
@@ -145,31 +148,51 @@ export interface ChecksParse {
   running: string[];
 }
 
-const FAILING_RE = /\b(fail|failed|failing|failure|error|errored|cancelled|canceled|timed_out|timed out|action_required)\b/i;
-const RUNNING_RE = /\b(pending|queued|in_progress|in progress|running|waiting|requested|expected|stale)\b/i;
-const PASSING_RE = /\b(pass|passed|passing|success|successful|skipped|neutral)\b/i;
+/** One `gh pr checks --json name,state,bucket,workflow` entry. */
+export interface GhCheckEntry {
+  name?: unknown;
+  state?: unknown;
+  bucket?: unknown;
+  workflow?: unknown;
+}
 
-/** Parse one `gh pr checks` text table. A failing check blocks; a pending one keeps polling. */
-export function parseChecks(text: string): ChecksParse {
-  if (/no checks/i.test(text)) return { complete: true, failing: [], running: [] };
-  if (/all checks (were )?successful/i.test(text)) return { complete: true, failing: [], running: [] };
+function bucketVerdict(entry: GhCheckEntry): "pass" | "fail" | "pending" {
+  const bucket = typeof entry.bucket === "string" ? entry.bucket.toLowerCase() : "";
+  if (bucket === "fail" || bucket === "cancel") return "fail";
+  if (bucket === "pending") return "pending";
+  if (bucket === "pass" || bucket === "skipping") return "pass";
+  // No bucket (older gh): fall back to the state field.
+  const state = typeof entry.state === "string" ? entry.state.toLowerCase() : "";
+  if (["failure", "error", "cancelled", "canceled", "timed_out", "action_required"].includes(state)) return "fail";
+  if (["pending", "queued", "in_progress", "waiting", "requested", "expected", "stale"].includes(state)) return "pending";
+  if (["success", "skipped", "neutral"].includes(state)) return "pass";
+  return "pending"; // unknown: keep polling to the cap rather than misreading it
+}
+
+/**
+ * Parse one `gh pr checks --json ...` payload. A failing check blocks; a
+ * pending one keeps polling; an empty list means no checks, which is
+ * complete. Throws on unparsable output — the caller treats that as an
+ * exec failure, never as blocked/running.
+ */
+export function parseChecksJson(text: string): ChecksParse {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error(`gh pr checks returned unparsable JSON: ${text.trim().slice(0, 200)}`);
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error(`gh pr checks returned JSON that is not an array: ${text.trim().slice(0, 200)}`);
+  }
   const failing: string[] = [];
   const running: string[] = [];
-  let parsed = 0;
-  for (const raw of text.split("\n")) {
-    const line = raw.trim().replace(/^[✓✔✗✘●○]\s*/, "");
-    if (!line) continue;
-    if (/^name\b/i.test(line) || /some checks are still/i.test(line)) {
-      if (/still/i.test(line)) running.push("(checks still running)");
-      continue;
-    }
-    parsed++;
-    const name = line.split(/\s+/)[0] ?? line;
-    if (FAILING_RE.test(line)) failing.push(name);
-    else if (RUNNING_RE.test(line)) running.push(name);
-    else if (!PASSING_RE.test(line)) running.push(name);
+  for (const entry of parsed as GhCheckEntry[]) {
+    const name = typeof entry.name === "string" && entry.name ? entry.name : "(unnamed check)";
+    const verdict = bucketVerdict(entry);
+    if (verdict === "fail") failing.push(name);
+    else if (verdict === "pending") running.push(name);
   }
-  if (parsed === 0) return { complete: text.trim() === "", failing: [], running: text.trim() === "" ? [] : ["(unparsed output)"] };
   return { complete: failing.length === 0 && running.length === 0, failing, running };
 }
 
@@ -186,10 +209,11 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Poll `gh pr checks <number>` until every check completes. A failed check
- * ends the poll as blocked; the cap ends it as running. `gh pr checks`
- * exits non-zero when a check fails, so its exit code is never treated as
- * an exec failure here — only its parsed output decides.
+ * Poll `gh pr checks <number> --json name,state,bucket,workflow` until
+ * every check completes. A failed check ends the poll as blocked; the cap
+ * ends it as running. The gh exit code is ignored when the JSON parses
+ * (gh exits 8 while checks are pending and non-zero when a check fails);
+ * output that does not parse is an exec failure at the ci-poll stage.
  */
 export async function pollChecks(
   exec: (argv: string[]) => Promise<ExecResult>,
@@ -203,8 +227,17 @@ export async function pollChecks(
   for (;;) {
     if (!first && Date.now() >= deadline) return { verdict: "running" };
     first = false;
-    const res = await exec(["gh", "pr", "checks", String(prNumber)]);
-    const parsed = parseChecks(`${res.stdout}\n${res.stderr}`);
+    const res = await exec(["gh", "pr", "checks", String(prNumber), "--json", "name,state,bucket,workflow"]);
+    let parsed: ChecksParse;
+    try {
+      parsed = parseChecksJson(res.stdout);
+    } catch (err) {
+      throw new MolaError(
+        "UPSTREAM_UNAVAILABLE",
+        `gh pr checks failed (exit ${res.code}): ${err instanceof Error ? err.message : String(err)}${res.stderr.trim() ? ` — ${res.stderr.trim().slice(0, 200)}` : ""}`,
+        ExitCode.Error,
+      );
+    }
     if (parsed.failing.length > 0) return { verdict: "blocked", failing: parsed.failing };
     if (parsed.complete) return { verdict: "shipped" };
     if (Date.now() >= deadline) return { verdict: "running" };
