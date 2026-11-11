@@ -5,14 +5,24 @@
  * No real process is ever spawned.
  */
 
+import assert from "node:assert/strict";
 import type {
+  AgentCapabilities,
   Command,
   EventBus,
+  HeadlessAgentAdapter,
   Io,
   Logger,
   PluginContext,
+  RunRequest,
+  RunResult,
   StateNamespace,
 } from "@mola/plugin-sdk";
+
+// legacy behaviour unless a test points MOLA_ROUTING_FILE at a real table
+process.env.MOLA_ROUTING_FILE ??= "/nonexistent/model-routing.json";
+// the policy files the fake fs can hold (user layer only in these tests)
+process.env.MOLA_HOME ??= "/fake/home";
 
 export const nullLog: Logger = {
   level: "error",
@@ -24,19 +34,84 @@ export const nullLog: Logger = {
   error: () => {},
 };
 
+export const TEST_CAPS: AgentCapabilities = {
+  headless: true,
+  headlessJsonStream: true,
+  resume: true,
+  continueLatest: false,
+  forkSession: false,
+  listSessions: false,
+  acp: false,
+  nativeHooks: false,
+  backgroundSessions: false,
+  worktree: false,
+  budgetCap: false,
+  costReadout: "magpie",
+};
+
+export interface FakeAgent {
+  id: string;
+  /** the scripted results, one per call; the last one repeats */
+  results: RunResult[];
+  calls: RunRequest[];
+  /** health reported by detect() */
+  available?: boolean;
+  broken?: boolean;
+  capabilities?: Partial<AgentCapabilities>;
+}
+
 export interface FakeCtx {
   ctx: PluginContext;
   commands: Array<Command & { owner: string }>;
+  agents: FakeAgent[];
+  adapters: HeadlessAgentAdapter[];
   hooks: Map<string, Array<(value: any) => any>>;
+  files: Map<string, string>;
   kv: Record<string, unknown>;
   emitted: Array<{ event: string; data: unknown; source?: unknown }>;
+  execCalls: Array<{ argv: string[]; opts: Record<string, unknown> }>;
 }
 
-export function makeFakeCtx(opts: { config?: Record<string, unknown> } = {}): FakeCtx {
+export function makeFakeAdapter(agent: FakeAgent): HeadlessAgentAdapter {
+  let index = 0;
+  return {
+    id: agent.id,
+    capabilities: { ...TEST_CAPS, ...(agent.capabilities ?? {}) },
+    async detect() {
+      return {
+        available: agent.available !== false,
+        health: agent.broken ? "broken" : agent.available === false ? "unknown" : "ok",
+      };
+    },
+    async run(req: RunRequest): Promise<RunResult> {
+      agent.calls.push(req);
+      const result = agent.results[Math.min(index, agent.results.length - 1)] ?? {
+        exitCode: 0,
+        finalText: "ok",
+      };
+      index++;
+      return { ...result, events: [] };
+    },
+    async resume(_id: string, req: RunRequest): Promise<RunResult> {
+      agent.calls.push(req);
+      return agent.results[0] ?? { exitCode: 0, finalText: "ok" };
+    },
+  } as HeadlessAgentAdapter;
+}
+
+export function makeFakeCtx(opts: {
+  agents?: FakeAgent[];
+  config?: Record<string, unknown>;
+  exec?: (argv: string[], execOpts: Record<string, unknown>) => Promise<{ code: number; stdout: string; stderr: string }>;
+} = {}): FakeCtx {
   const commands: FakeCtx["commands"] = [];
+  const agents = opts.agents ?? [];
+  const adapters = agents.map(makeFakeAdapter);
   const hooks = new Map<string, Array<(value: any) => any>>();
+  const files = new Map<string, string>();
   const kv: Record<string, unknown> = {};
   const emitted: FakeCtx["emitted"] = [];
+  const execCalls: FakeCtx["execCalls"] = [];
 
   const state: StateNamespace = {
     get: <T>(k: string): T | undefined => kv[k] as T | undefined,
@@ -93,13 +168,21 @@ export function makeFakeCtx(opts: { config?: Record<string, unknown> } = {}): Fa
     state,
     permissions: {},
     process: {
-      exec: async () => ({ code: 0, stdout: "", stderr: "" }),
+      exec: async (argv: string[], execOpts: Record<string, unknown> = {}) => {
+        execCalls.push({ argv, opts: execOpts });
+        if (!opts.exec) return { code: 0, stdout: "", stderr: "" };
+        return opts.exec(argv, execOpts);
+      },
     },
     fs: {
-      readFile: (_p: string): string => {
-        throw new Error("ENOENT");
+      readFile: (p: string) => {
+        const v = files.get(p);
+        if (v === undefined) throw new Error(`ENOENT: ${p}`);
+        return v;
       },
-      writeFile: (_p: string, _data: string) => {},
+      writeFile: (p: string, data: string) => {
+        files.set(p, data);
+      },
     },
     sidecars: {},
     plugins: {
@@ -111,9 +194,12 @@ export function makeFakeCtx(opts: { config?: Record<string, unknown> } = {}): Fa
       list: () => [],
     },
     agents: {
-      register: () => () => {},
-      list: () => [],
-      get: () => undefined,
+      register: (a: HeadlessAgentAdapter) => {
+        adapters.push(a);
+        return () => {};
+      },
+      list: () => adapters,
+      get: (id: string) => adapters.find((a) => a.id === id),
     },
     tools: {
       register: () => () => {},
@@ -123,7 +209,7 @@ export function makeFakeCtx(opts: { config?: Record<string, unknown> } = {}): Fa
     dispose: () => {},
   } as unknown as PluginContext;
 
-  return { ctx, commands, hooks, kv, emitted };
+  return { ctx, commands, agents, adapters, hooks, files, kv, emitted, execCalls };
 }
 
 export function makeIo(overrides: Partial<Io> = {}): Io & {

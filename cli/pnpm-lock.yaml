@@ -163,6 +163,9 @@ importers:
 
   packages/plugins/cmd-ultramode:
     dependencies:
+      '@mola/plugin-cmd-run':
+        specifier: workspace:*
+        version: link:../cmd-run
       '@mola/plugin-sdk':
         specifier: workspace:*
         version: link:../../plugin-sdk

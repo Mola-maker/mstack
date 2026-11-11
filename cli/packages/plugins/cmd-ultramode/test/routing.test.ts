@@ -1,0 +1,167 @@
+/**
+ * Routing and state tests for ultramode (unit 2): one goal in, one routed
+ * pass through prepareRun + executeRun, with the m-goal file, the state
+ * file, and the closeout written on every exit path. The agents are
+ * scripted fakes; the routing table is absent (MOLA_ROUTING_FILE points
+ * nowhere), so routing is policy-only and deterministic.
+ */
+
+import test from "node:test";
+import assert from "node:assert/strict";
+import plugin, { slugifyGoal } from "../src/index.js";
+import { errOf, makeFakeCtx, makeIo, type FakeAgent } from "./fake.js";
+
+function activate(agents: FakeAgent[] = []) {
+  const f = makeFakeCtx({ agents });
+  plugin.activate(f.ctx);
+  const cmd = f.commands.find((c) => c.path.join(" ") === "ultramode")!;
+  assert.ok(cmd, "ultramode command is registered");
+  return { ...f, cmd };
+}
+
+function doneAgent(id: string): FakeAgent {
+  return { id, results: [{ exitCode: 0, finalText: "done" }], calls: [] };
+}
+
+function goalFiles(f: ReturnType<typeof activate>, slug: string) {
+  const goalPath = `/fake/ws/.mstack/goals/${slug}.md`;
+  const statePath = `/fake/ws/.mstack/goals/${slug}.state.json`;
+  return {
+    goalPath,
+    statePath,
+    goal: f.files.get(goalPath),
+    state: f.files.get(statePath),
+  };
+}
+
+test("ultramode: fake agent returns done — exit 0, goal file + state file written, closeout present, decision recorded", async () => {
+  const f = activate([doneAgent("dsh"), doneAgent("claude")]);
+  const io = makeIo();
+  const code = await f.cmd.handler({ positionals: ["ship the fix"], flags: {} }, io);
+  assert.equal(code, 0);
+
+  const slug = slugifyGoal("ship the fix");
+  assert.equal(slug, "ship-the-fix");
+  const { goal, state } = goalFiles(f, slug);
+  assert.ok(goal, "goal file is written");
+  assert.match(goal!, /# Goal: ship the fix/);
+  assert.match(goal!, /## Closeout/);
+  assert.match(goal!, /- status: done/);
+  assert.ok(state, "state file is written");
+  const parsed = JSON.parse(state!);
+  assert.equal(parsed.slug, slug);
+  assert.equal(parsed.status, "done");
+  assert.equal(parsed.rounds, 1);
+
+  const data = io.dataValue as Record<string, unknown>;
+  const ultra = data.ultramode as Record<string, unknown>;
+  assert.equal(ultra.slug, slug);
+  assert.equal(ultra.outcome, "done");
+  const routingDefault = ultra.routingDefault as Record<string, unknown>;
+  assert.equal(routingDefault.agent, "dsh");
+  assert.equal(routingDefault.applied, true);
+  assert.deepEqual(routingDefault.overriddenBy, []);
+  assert.match(String(routingDefault.basis), /DSH Creator/);
+  assert.equal(data.agent, "dsh");
+  assert.equal(data.modelRoute, "group/smart-split");
+
+  const dsh = f.agents.find((a) => a.id === "dsh")!;
+  assert.equal(dsh.calls.length, 1);
+  assert.equal(f.agents.find((a) => a.id === "claude")!.calls.length, 0);
+  assert.equal(f.kv.activeGoal, slug);
+  const run = f.kv[`run:${io.traceId}`] as Record<string, unknown>;
+  assert.ok(run, "run record is kept");
+  assert.equal((run.ultramode as Record<string, unknown>).outcome, "done");
+});
+
+test("ultramode: agent failure propagates the exit and still writes the closeout", async () => {
+  const f = activate([{ id: "dsh", results: [{ exitCode: 3, finalText: "boom" }], calls: [] }]);
+  const io = makeIo();
+  const code = await f.cmd.handler({ positionals: ["ship the fix"], flags: {} }, io);
+  assert.equal(code, 3);
+  const { goal, state } = goalFiles(f, "ship-the-fix");
+  assert.match(goal!, /- status: failed/);
+  assert.match(goal!, /agent exited 3/);
+  assert.equal(JSON.parse(state!).status, "failed");
+  assert.equal(JSON.parse(state!).failures["agent-exit-3"], 1);
+  const lastOutcome = f.kv.lastOutcome as Record<string, unknown>;
+  assert.equal(lastOutcome.outcome, "failed");
+  assert.equal(lastOutcome.exitCode, 3);
+});
+
+test("ultramode: no runnable agent raises AGENT_NOT_FOUND and still writes the closeout", async () => {
+  const f = activate([]);
+  const io = makeIo();
+  await assert.rejects(
+    f.cmd.handler({ positionals: ["ship the fix"], flags: {} }, io),
+    (e: unknown) => {
+      const err = errOf(e);
+      assert.equal(err.code, "AGENT_NOT_FOUND");
+      assert.equal(err.exitCode, 66);
+      return true;
+    },
+  );
+  const { goal, state } = goalFiles(f, "ship-the-fix");
+  assert.match(goal!, /- status: failed/);
+  assert.match(goal!, /routing agent-not-found/);
+  assert.equal(JSON.parse(state!).status, "failed");
+  assert.equal((f.kv.lastOutcome as Record<string, unknown>).outcome, "agent-not-found");
+});
+
+test("ultramode: routing denial writes the closeout and throws ROUTE_BANNED", async () => {
+  const f = activate([doneAgent("dsh")]);
+  f.files.set(
+    "/fake/home/policy.jsonc",
+    JSON.stringify({ modelRoutes: { allowedHeadless: ["group/*"], bannedHeadless: ["group/*"] } }),
+  );
+  const io = makeIo();
+  await assert.rejects(
+    f.cmd.handler({ positionals: ["ship the fix"], flags: {} }, io),
+    (e: unknown) => {
+      const err = errOf(e);
+      assert.equal(err.code, "ROUTE_BANNED");
+      assert.equal(err.exitCode, 77);
+      return true;
+    },
+  );
+  const { goal, state } = goalFiles(f, "ship-the-fix");
+  assert.match(goal!, /- status: failed/);
+  assert.match(goal!, /routing denied/);
+  assert.equal(JSON.parse(state!).status, "failed");
+  assert.equal((f.kv.lastOutcome as Record<string, unknown>).outcome, "denied");
+  assert.equal(f.agents[0].calls.length, 0);
+});
+
+test("ultramode: --agent overrides the dsh default and is recorded", async () => {
+  const f = activate([doneAgent("dsh"), doneAgent("claude")]);
+  const io = makeIo();
+  const code = await f.cmd.handler({ positionals: ["ship the fix"], flags: { agent: "claude" } }, io);
+  assert.equal(code, 0);
+  const data = io.dataValue as Record<string, unknown>;
+  assert.equal(data.agent, "claude");
+  const routingDefault = (data.ultramode as Record<string, unknown>).routingDefault as Record<string, unknown>;
+  assert.equal(routingDefault.applied, false);
+  assert.deepEqual(routingDefault.overriddenBy, ["--agent"]);
+});
+
+test("ultramode: status shows the active goal and its last outcome after a run", async () => {
+  const f = activate([doneAgent("dsh")]);
+  const runIo = makeIo();
+  await f.cmd.handler({ positionals: ["ship the fix"], flags: {} }, runIo);
+  const io = makeIo();
+  const code = await f.cmd.handler({ positionals: [], flags: {} }, io);
+  assert.equal(code, 0);
+  const data = io.dataValue as Record<string, unknown>;
+  assert.equal(data.activeGoal, "ship-the-fix");
+  const lastOutcome = data.lastOutcome as Record<string, unknown>;
+  assert.equal(lastOutcome.outcome, "done");
+  assert.equal(lastOutcome.exitCode, 0);
+  assert.match(io.outLines.join("\n"), /goal active: ship-the-fix/);
+  assert.match(io.outLines.join("\n"), /last outcome: ship-the-fix — done \(exit 0\)/);
+});
+
+test("ultramode: slug is kebab-case and truncated", () => {
+  assert.equal(slugifyGoal("Fix the flaky test in CI!!"), "fix-the-flaky-test-in-ci");
+  assert.equal(slugifyGoal("a".repeat(100)), "a".repeat(48));
+  assert.equal(slugifyGoal("!!!"), "goal");
+});
