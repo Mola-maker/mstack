@@ -39,6 +39,7 @@
     "@mola/plugin-rec-runs": "workspace:*",
     "@mola/plugin-cmd-run": "workspace:*",
     "@mola/plugin-tool-superagent": "workspace:*",
-    "@mola/plugin-cmd-dash": "workspace:*"
+    "@mola/plugin-cmd-dash": "workspace:*",
+    "@mola/plugin-cmd-ultramode": "workspace:*"
   }
 }

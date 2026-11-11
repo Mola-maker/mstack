@@ -59,6 +59,9 @@ importers:
       '@mola/plugin-cmd-run':
         specifier: workspace:*
         version: link:../plugins/cmd-run
+      '@mola/plugin-cmd-ultramode':
+        specifier: workspace:*
+        version: link:../plugins/cmd-ultramode
       '@mola/plugin-policy-approval':
         specifier: workspace:*
         version: link:../plugins/policy-approval
@@ -153,6 +156,12 @@ importers:
         version: link:../../plugin-sdk
 
   packages/plugins/cmd-run:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
+  packages/plugins/cmd-ultramode:
     dependencies:
       '@mola/plugin-sdk':
         specifier: workspace:*
