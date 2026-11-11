@@ -19,6 +19,10 @@ export const MolaEvents = {
   // policy gates (waterfall)
   ToolBefore: "mola.tool.before",
   TaskPreDispatch: "mola.task.pre-dispatch",
+  // ultramode gates (waterfall; design §5-6, unit 3): the mode registers both
+  // in activate(); no other plugin listens to them yet
+  UltramodeReview: "mola.ultramode.review",
+  UltramodeShip: "mola.ultramode.ship",
   // facts (broadcast)
   ToolAfter: "mola.tool.after",
   SessionStarted: "mola.session.started",

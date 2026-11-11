@@ -16,8 +16,17 @@
  */
 
 import * as path from "node:path";
-import type { PluginContext } from "@mola/plugin-sdk";
-import { definePlugin, ExitCode } from "@mola/plugin-sdk";
+import type { Io, PluginContext } from "@mola/plugin-sdk";
+import { definePlugin, ExitCode, MolaError, MolaEvents } from "@mola/plugin-sdk";
+import {
+  GRANT_SCOPE,
+  SAMPLE_SHIP_ARGV,
+  grantKey,
+  readGrant,
+  reviewGate,
+  shipGate,
+  type UltramodeGrant,
+} from "./gates.js";
 import {
   executeRun,
   inferKind,
@@ -211,6 +220,124 @@ function recordLastOutcome(ctx: PluginContext, outcome: UltramodeLastOutcome): v
   ctx.state.set("lastOutcome", outcome);
 }
 
+/**
+ * One denial records the outcome and writes the closeout line, then stops.
+ * Never retried: the caller returns 77 immediately (unit 3 death-loop brake).
+ */
+function recordGateDenial(
+  ctx: PluginContext,
+  cwd: string,
+  slug: string,
+  gate: "review" | "ship",
+  reason: string,
+): void {
+  const at = new Date().toISOString();
+  const { goalPath } = goalPaths(cwd, slug);
+  let current: string | undefined;
+  try {
+    current = ctx.fs.readFile(goalPath);
+  } catch {
+    current = undefined; // no goal file to close — the state record below is the outcome
+  }
+  const goalText = current?.split("\n")[0]?.replace(/^# Goal: /, "").trim() || slug;
+  recordLastOutcome(ctx, {
+    slug,
+    goal: goalText,
+    outcome: "denied",
+    status: "failed",
+    exitCode: ExitCode.NoPerm,
+    at,
+  });
+  if (current === undefined) return;
+  const withRow = current.replace(
+    "\n\n## Amendments",
+    `\n| ${at} | gate denied: ${gate} | ${reason} | ship --check | failed |\n\n## Amendments`,
+  );
+  const closed = withRow.includes("(not yet closed — the loop is still running)")
+    ? withRow.replace(
+        "(not yet closed — the loop is still running)",
+        [
+          "- status: failed",
+          `- objective: ${slug}`,
+          `- result: gate denied at ${gate}: ${reason}`,
+          `- unfinished: the goal itself: shipping stopped at the ${gate} gate`,
+          `- known-issues: ${reason}`,
+          "- lessons: none recorded in unit 3",
+          "- gate:",
+          `  - m-review: ${gate === "review" ? "denied" : "not run"}`,
+          `  - ultramode ship: ${gate === "ship" ? "denied" : "not run"}`,
+          "- Attention: 无",
+          `- resume-hint: read ${goalPath}, last checkpoint row; blocker: ${reason}`,
+        ].join("\n"),
+      )
+    : withRow;
+  ctx.fs.writeFile(goalPath, closed);
+}
+
+const GRANT_USAGE = "usage: mola ultramode grant <slug>";
+const REVOKE_USAGE = "usage: mola ultramode revoke <slug>";
+const SHIP_CHECK_USAGE = "usage: mola ultramode ship --check <slug>";
+
+/** `ship --check`: review gate, then ship gate, with a sample outward argv. No outward action. */
+async function runShipCheck(ctx: PluginContext, io: Io, slug: string): Promise<ExitCode> {
+  const lastOutcome = ctx.state.get<UltramodeLastOutcome>("lastOutcome");
+  const writer = lastOutcome?.slug === slug ? lastOutcome.agent : undefined;
+  try {
+    await ctx.events.runWaterfall(MolaEvents.UltramodeReview, { slug, cwd: io.cwd, writer });
+    await ctx.events.runWaterfall(MolaEvents.UltramodeShip, {
+      slug,
+      cwd: io.cwd,
+      argv: SAMPLE_SHIP_ARGV,
+    });
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    const gate = reason.startsWith("review:") ? "review" : "ship";
+    recordGateDenial(ctx, io.cwd, slug, gate, reason);
+    io.data({ shipCheck: { slug, ok: false, gate, reason } });
+    if (!io.json) io.out(`ultramode ship --check ${slug}: DENIED at the ${gate} gate — ${reason}`);
+    return ExitCode.NoPerm;
+  }
+  io.data({
+    shipCheck: { slug, ok: true, review: "passed", ship: "passed", argv: [...SAMPLE_SHIP_ARGV] },
+  });
+  if (!io.json) io.out(`ultramode ship --check ${slug}: pass (review + ship gates)`);
+  return ExitCode.Ok;
+}
+
+async function handleSubcommand(
+  ctx: PluginContext,
+  io: Io,
+  sub: string,
+  subArg: string | undefined,
+  flags: Record<string, string | boolean>,
+): Promise<ExitCode> {
+  if (sub === "grant") {
+    if (!subArg) throw new MolaError("USAGE_ERROR", GRANT_USAGE, ExitCode.Usage);
+    const grant: UltramodeGrant = {
+      slug: subArg,
+      workspace: io.cwd,
+      grantedBy: io.traceId,
+      at: new Date().toISOString(),
+      scope: GRANT_SCOPE,
+    };
+    ctx.state.set(grantKey(subArg), grant);
+    io.data({ granted: true, grant });
+    if (!io.json) io.out(`ultramode grant recorded: ${subArg} (workspace ${io.cwd}, by ${io.traceId})`);
+    return ExitCode.Ok;
+  }
+  if (sub === "revoke") {
+    if (!subArg) throw new MolaError("USAGE_ERROR", REVOKE_USAGE, ExitCode.Usage);
+    const hadGrant = readGrant(ctx, subArg) !== undefined;
+    ctx.state.delete(grantKey(subArg));
+    io.data({ revoked: true, slug: subArg, hadGrant });
+    if (!io.json) io.out(`ultramode grant revoked: ${subArg}${hadGrant ? "" : " (none existed)"}`);
+    return ExitCode.Ok;
+  }
+  const slug = typeof flags.check === "string" ? flags.check : subArg;
+  if (!slug) throw new MolaError("USAGE_ERROR", SHIP_CHECK_USAGE, ExitCode.Usage);
+  return runShipCheck(ctx, io, slug);
+}
+
 /** The flags as argv entries (for the run record). */
 function flagArgs(flags: { agent?: string; on?: string; route?: string; kind?: string }): string[] {
   const out: string[] = [];
@@ -248,6 +375,10 @@ export function statusData(ctx: PluginContext): Record<string, unknown> {
 
 export default definePlugin({
   activate(ctx: PluginContext) {
+    // unit 3 gates: both waterfall, rejection is the denial path (exit 77)
+    ctx.events.hook(MolaEvents.UltramodeReview, reviewGate(ctx));
+    ctx.events.hook(MolaEvents.UltramodeShip, shipGate(ctx));
+
     ctx.commands.register({
       path: ["ultramode"],
       description: "the long-run mode: route, review, interrogate, ship (gates + grant)",
@@ -268,6 +399,11 @@ export default definePlugin({
             io.out(STATUS_USAGE);
           }
           return ExitCode.Ok;
+        }
+
+        const [sub, subArg] = args.positionals;
+        if (sub === "grant" || sub === "revoke" || sub === "ship") {
+          return handleSubcommand(ctx, io, sub, subArg, args.flags);
         }
 
         const flags = readRunFlags(args.flags);

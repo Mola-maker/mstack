@@ -90,6 +90,18 @@ The mode adds two new waterfall gates in the plugin-sdk event vocabulary
   checks the recorded grant (§6) and invokes `mola.tool.before` itself
   with the exact argv, because `cmd-run` does not call that gate.
 
+Review-file schema (minimal, unit 3): the file is
+`.mstack/reviews/<slug>.md` and the gate parses it, never trusting a
+prompt's claim. It must carry a `Reviewer: <name>` line, the last
+non-empty line must be the verdict `APPROVE` (`REQUEST CHANGES` or a
+missing verdict denies), the reviewer must differ from the writer (the
+agent from the goal's last outcome; when no outcome exists the check is
+skipped, since sameness cannot be proven), and it must cite evidence: a
+`repro: <command> → <output>` line, a backticked test command, or a
+`.mstack/` file path. Any failure denies with a specific reason, and a
+denial is a stop, not a retry: the mode records the outcome, writes the
+closeout line, and returns 77.
+
 After a PR is created, the mode polls `gh pr checks`. A failed check blocks
 the "shipped" verdict. A blocked verdict is reported, not retried in a
 loop, and never auto-merged.
@@ -109,6 +121,16 @@ grant, scoped and recorded:
 - Without a grant, the mode stops at a prepared PR: branch pushed
   nowhere, PR body written, and it says so. Preparation without push is
   the safe default.
+
+How `yes` reaches the classifier (unit 3): the ship gate sets `yes: true`
+on the `mola.tool.before` value only when its own recorded grant exists
+for that goal and workspace. It never reads `io.yes`, so `--yes` without
+a grant still denies. On success the mode emits `mola.approval.granted`
+with approver `ultramode-grant:<traceId>` — the traceId that granted it —
+so the bus record names the grant as the real authority instead of
+"--yes". `mola ultramode ship --check <slug>` exercises both gates with
+a sample `gh pr create` argv and reports pass or the denial reason,
+without any outward action.
 - The ship gate never denies three times in a row. A denial is a stop
   condition: record it, write the closeout, stop. Repeated denials would
   trip the bus brake and quarantine the mode's own policy plugin.
