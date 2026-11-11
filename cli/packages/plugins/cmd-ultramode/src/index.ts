@@ -107,8 +107,10 @@ export function slugifyGoal(goal: string): string {
     .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "");
   if (!slug) return `goal-${goalHash(goal)}`;
-  if (slug.length > 48) {
-    // Cut to 39 so the hash suffix keeps the total within 48 chars.
+  if (slug.length >= 48) {
+    // Cut to 39 so the hash suffix keeps the total within 48 chars. The
+    // >= covers the exact-48 case: two goals differing only in trailing
+    // punctuation would otherwise share one slug.
     const cut = slug.slice(0, 39).replace(/-+$/, "");
     return `${cut}-${goalHash(goal)}`;
   }

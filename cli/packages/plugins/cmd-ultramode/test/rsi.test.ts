@@ -464,18 +464,25 @@ test("rsi: the RSI loop writes only under the manifest fs.write globs (round fil
     }
   }
   assert.ok(manifestText, "mola-plugin.json found above the test file");
-  const manifest = JSON.parse(manifestText) as { permissions: { "fs.write": string[] } };
+  const manifest = JSON.parse(manifestText) as { permissions: { "fs.write": string[]; "fs.read": string[] } };
   const writeGlobs = manifest.permissions["fs.write"];
+  const readGlobs = manifest.permissions["fs.read"];
   assert.ok(writeGlobs.includes("**/.mstack/research/**"), "the manifest must allow writing round files");
+  assert.ok(readGlobs.includes("**/.mstack/research/**"), "the manifest must allow reading round files");
   const f = activate();
   seedGoal(f);
   // Enforce the manifest globs on the fake fs with core's own matcher,
-  // the way core's makeFsService does in production: a write outside the
-  // globs throws instead of silently landing.
+  // the way core's makeFsService does in production: a write or read
+  // outside the globs throws instead of silently landing.
   const realWrite = f.ctx.fs.writeFile.bind(f.ctx.fs);
   f.ctx.fs.writeFile = (p: string, data: string) => {
     if (!matchesAnyGlob(p, writeGlobs)) throw new Error(`mola-cmd-ultramode: fs.write does not allow "${p}"`);
     realWrite(p, data);
+  };
+  const realRead = f.ctx.fs.readFile.bind(f.ctx.fs);
+  f.ctx.fs.readFile = (p: string) => {
+    if (!matchesAnyGlob(p, readGlobs)) throw new Error(`mola-cmd-ultramode: fs.read does not allow "${p}"`);
+    return realRead(p);
   };
   const io = makeIo();
   const result = await runRsiLoop(f.ctx, io, {

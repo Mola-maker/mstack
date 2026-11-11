@@ -132,7 +132,10 @@ grant, scoped and recorded:
   Threat model: the grant is an approval record for the mode's unattended
   actions, not a security boundary against local code — anything with
   state access could forge one. Workspace scoping prevents
-  cross-workspace clobber, not local forgery. A policy row in
+  cross-workspace clobber, not local forgery. Grants recorded under the
+  old unscoped key (`grant:<slug>`, before workspace scoping) are
+  orphaned and need a re-grant; the mode is unreleased, so no migration
+  is provided. A policy row in
   `.mola/policy.jsonc` may also carry it for a repo.
 - With a grant, the mode pushes, opens the PR, and watches CI.
 - Without a grant, the mode stops at a prepared PR: branch pushed

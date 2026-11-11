@@ -172,6 +172,12 @@ test("ultramode: slug is kebab-case and truncated", () => {
   assert.notEqual(slugifyGoal("!!!"), slugifyGoal("???"));
 });
 
+test("ultramode: a slug of exactly 48 chars still gets a hash", () => {
+  const exact = "a".repeat(48);
+  assert.equal(slugifyGoal(exact).length, 48);
+  assert.notEqual(slugifyGoal(`${exact}!`), slugifyGoal(`${exact}?`), "goals differing only in trailing punctuation must not collide");
+});
+
 test("ultramode: Chinese goals keep their unicode and slug distinctly", () => {
   assert.equal(slugifyGoal("修复登录失败的问题"), "修复登录失败的问题");
   assert.equal(slugifyGoal("优化首页加载速度"), "优化首页加载速度");

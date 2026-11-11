@@ -143,11 +143,11 @@ export function checkReviewText(text: string, writer?: string): ReviewCheck {
   return { ok: true, reviewer };
 }
 
-/** The `.mstack/` paths a review cites (trailing punctuation and any `:line` suffix stripped). */
+/** The `.mstack/` paths a review cites (trailing punctuation, backticks, and any `:line` or `:start-end` suffix stripped). */
 export function citedMstackPaths(text: string): string[] {
   const found = new Set<string>();
-  for (const m of text.matchAll(/\.mstack\/[^\s"'\)\],;]+/g)) {
-    found.add(m[0].replace(/[),.]+$/, "").replace(/:\d+$/, ""));
+  for (const m of text.matchAll(/\.mstack\/[^\s"'`\)\],;]+/g)) {
+    found.add(m[0].replace(/[),.`]+$/, "").replace(/:\d+(-\d+)?$/, ""));
   }
   return [...found];
 }

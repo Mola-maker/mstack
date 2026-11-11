@@ -141,6 +141,13 @@ test("review gate: passes on a .mstack/ path as evidence when the path exists", 
   await f.ctx.events.runWaterfall(MolaEvents.UltramodeReview, { slug: SLUG, cwd: "/fake/ws" });
 });
 
+test("review gate: passes on a backticked .mstack/ path and a :line-range suffix when the file exists", async () => {
+  const f = activate();
+  f.files.set("/fake/ws/.mstack/runs/run-1/decision.json", JSON.stringify({ runId: "run-1" }));
+  f.files.set(REVIEW_PATH, goodReview("m-reviewer", "evidence: `.mstack/runs/run-1/decision.json:12-20`"));
+  await f.ctx.events.runWaterfall(MolaEvents.UltramodeReview, { slug: SLUG, cwd: "/fake/ws" });
+});
+
 test("review gate: passes on a .mstack/ path with a :line suffix when the file exists", async () => {
   const f = activate();
   f.files.set("/fake/ws/.mstack/runs/run-1/decision.json", JSON.stringify({ runId: "run-1" }));
