@@ -134,6 +134,13 @@ without any outward action.
 - The ship gate never denies three times in a row. A denial is a stop
   condition: record it, write the closeout, stop. Repeated denials would
   trip the bus brake and quarantine the mode's own policy plugin.
+- Branch model (unit 4): the mode owns branch `ultramode/<slug>`, created
+  from the current HEAD (or switched to if it already exists); workspace
+  changes are committed on it with a message from the goal, and only that
+  branch is ever pushed — the mode never pushes master or main, and if the
+  branch cannot be created from master or main it stops instead of forcing
+  anything. Without a grant the commit stays local and the PR body is
+  written to `.mstack/goals/<slug>.pr.md` as a prepared PR.
 
 ## 7. Routing (FrontierHarness evidence)
 

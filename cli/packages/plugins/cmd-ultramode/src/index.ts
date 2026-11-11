@@ -23,6 +23,7 @@ import {
   SAMPLE_SHIP_ARGV,
   grantKey,
   readGrant,
+  reviewFilePath,
   reviewGate,
   shipGate,
   type UltramodeGrant,
@@ -36,6 +37,18 @@ import {
   prepareRun,
   readRunFlags,
 } from "@mola/plugin-cmd-run";
+import {
+  branchName,
+  parsePrCreateOutput,
+  parsePrListJson,
+  parseReview,
+  pollChecks,
+  renderCommitMessage,
+  renderPrBody,
+  type PollOptions,
+  type ShipRecord,
+  type ShipVerdict,
+} from "./ship.js";
 
 const MODE_VERSION = "0.1.0";
 
@@ -127,6 +140,8 @@ interface GoalStateFile {
   failures: Record<string, number>;
   lastProgressAt: string | null;
   updatedAt: string;
+  /** unit 4: the last ship attempt, if any */
+  ship?: ShipRecord;
 }
 
 function renderStateFile(state: GoalStateFile): string {
@@ -221,15 +236,23 @@ function recordLastOutcome(ctx: PluginContext, outcome: UltramodeLastOutcome): v
 }
 
 /**
- * One denial records the outcome and writes the closeout line, then stops.
- * Never retried: the caller returns 77 immediately (unit 3 death-loop brake).
+ * One stopped ship records the outcome and writes the closeout line, then
+ * stops. Never retried: the caller returns 77 (gate denial) or 1 (exec
+ * failure) immediately (unit 3 death-loop brake, unit 4 exec failures).
  */
-function recordGateDenial(
+function recordShipStop(
   ctx: PluginContext,
   cwd: string,
   slug: string,
-  gate: "review" | "ship",
-  reason: string,
+  input: {
+    label: string;
+    result: string;
+    unfinished: string;
+    knownIssues: string;
+    exitCode: number;
+    via: string;
+    outcome?: "denied" | "failed";
+  },
 ): void {
   const at = new Date().toISOString();
   const { goalPath } = goalPaths(cwd, slug);
@@ -243,15 +266,15 @@ function recordGateDenial(
   recordLastOutcome(ctx, {
     slug,
     goal: goalText,
-    outcome: "denied",
+    outcome: input.outcome ?? "failed",
     status: "failed",
-    exitCode: ExitCode.NoPerm,
+    exitCode: input.exitCode,
     at,
   });
   if (current === undefined) return;
   const withRow = current.replace(
     "\n\n## Amendments",
-    `\n| ${at} | gate denied: ${gate} | ${reason} | ship --check | failed |\n\n## Amendments`,
+    `\n| ${at} | ${input.label} | ${input.result} | ${input.via} | failed |\n\n## Amendments`,
   );
   const closed = withRow.includes("(not yet closed — the loop is still running)")
     ? withRow.replace(
@@ -259,15 +282,133 @@ function recordGateDenial(
         [
           "- status: failed",
           `- objective: ${slug}`,
-          `- result: gate denied at ${gate}: ${reason}`,
-          `- unfinished: the goal itself: shipping stopped at the ${gate} gate`,
-          `- known-issues: ${reason}`,
+          `- result: ${input.result}`,
+          `- unfinished: ${input.unfinished}`,
+          `- known-issues: ${input.knownIssues}`,
           "- lessons: none recorded in unit 3",
           "- gate:",
-          `  - m-review: ${gate === "review" ? "denied" : "not run"}`,
-          `  - ultramode ship: ${gate === "ship" ? "denied" : "not run"}`,
+          "  - m-review: not run",
+          "  - ultramode ship: stopped",
           "- Attention: 无",
-          `- resume-hint: read ${goalPath}, last checkpoint row; blocker: ${reason}`,
+          `- resume-hint: read ${goalPath}, last checkpoint row; blocker: ${input.knownIssues}`,
+        ].join("\n"),
+      )
+    : withRow;
+  ctx.fs.writeFile(goalPath, closed);
+}
+
+function recordGateDenial(
+  ctx: PluginContext,
+  cwd: string,
+  slug: string,
+  gate: "review" | "ship",
+  reason: string,
+  via = "ship --check",
+): void {
+  recordShipStop(ctx, cwd, slug, {
+    label: `gate denied: ${gate}`,
+    result: `gate denied at ${gate}: ${reason}`,
+    unfinished: `the goal itself: shipping stopped at the ${gate} gate`,
+    knownIssues: reason,
+    exitCode: ExitCode.NoPerm,
+    via,
+    outcome: "denied",
+  });
+}
+
+/** An exec failure during ship: clear message, closeout line, stop, no retry. */
+function recordShipFailure(
+  ctx: PluginContext,
+  cwd: string,
+  slug: string,
+  stage: string,
+  reason: string,
+): void {
+  recordShipStop(ctx, cwd, slug, {
+    label: `ship failed: ${stage}`,
+    result: `ship failed at ${stage}: ${reason}`,
+    unfinished: `the goal itself: shipping stopped at ${stage}`,
+    knownIssues: reason,
+    exitCode: ExitCode.Error,
+    via: "ship",
+  });
+}
+
+/** Goal objective from the goal file (first line), or the slug when there is none. */
+function readGoalText(ctx: PluginContext, cwd: string, slug: string): string {
+  try {
+    const first = ctx.fs.readFile(goalPaths(cwd, slug).goalPath).split("\n")[0] ?? "";
+    return first.replace(/^# Goal: /, "").trim() || slug;
+  } catch {
+    return slug;
+  }
+}
+
+/**
+ * A ship outcome lands in the state file (merged, never wiping the run
+ * record), in the last outcome, and as a checkpoint row + closeout in the
+ * goal file when one exists.
+ */
+function recordShipOutcome(
+  ctx: PluginContext,
+  cwd: string,
+  slug: string,
+  record: ShipRecord,
+  result: string,
+): void {
+  const at = record.at;
+  const done = record.verdict === "shipped" || record.verdict === "prepared" || record.verdict === "duplicate";
+  const { goalPath, statePath } = goalPaths(cwd, slug);
+  let state: GoalStateFile;
+  try {
+    state = JSON.parse(ctx.fs.readFile(statePath)) as GoalStateFile;
+  } catch {
+    state = initialState(slug, at);
+  }
+  state.ship = record;
+  state.status = done ? "done" : "failed";
+  state.updatedAt = at;
+  ctx.fs.writeFile(statePath, renderStateFile(state));
+
+  const goalText = readGoalText(ctx, cwd, slug);
+  const lastOutcome = ctx.state.get<UltramodeLastOutcome>("lastOutcome");
+  recordLastOutcome(ctx, {
+    slug,
+    goal: goalText,
+    outcome: done ? "done" : "failed",
+    status: done ? "done" : "failed",
+    exitCode: done ? ExitCode.Ok : ExitCode.Error,
+    agent: lastOutcome?.slug === slug ? lastOutcome.agent : undefined,
+    modelRoute: lastOutcome?.slug === slug ? lastOutcome.modelRoute : undefined,
+    at,
+  });
+
+  let current: string | undefined;
+  try {
+    current = ctx.fs.readFile(goalPath);
+  } catch {
+    current = undefined;
+  }
+  if (current === undefined) return;
+  const withRow = current.replace(
+    "\n\n## Amendments",
+    `\n| ${at} | ship: ${record.verdict} | ${result} | ship | ${done ? "done" : "failed"} |\n\n## Amendments`,
+  );
+  const closed = withRow.includes("(not yet closed — the loop is still running)")
+    ? withRow.replace(
+        "(not yet closed — the loop is still running)",
+        [
+          `- status: ${done ? "done" : "failed"}`,
+          `- objective: ${goalText}`,
+          `- result: ${result}`,
+          `- unfinished: ${done ? "(none — ship outcome recorded)" : "the goal itself: shipping did not complete"}`,
+          `- known-issues: ${record.verdict === "blocked" ? `failing checks: ${(record.failing ?? []).join(", ")}` : record.reason ?? "(none)"}`,
+          "- lessons: none recorded in unit 4",
+          "- gate:",
+          "  - m-review: passed",
+          `  - ultramode ship: ${record.verdict}`,
+          "- Attention: 无",
+          `- resume-hint: read ${goalPath}, last checkpoint row`,
         ].join("\n"),
       )
     : withRow;
@@ -276,7 +417,211 @@ function recordGateDenial(
 
 const GRANT_USAGE = "usage: mola ultramode grant <slug>";
 const REVOKE_USAGE = "usage: mola ultramode revoke <slug>";
-const SHIP_CHECK_USAGE = "usage: mola ultramode ship --check <slug>";
+const SHIP_USAGE = "usage: mola ultramode ship <slug> | mola ultramode ship --check <slug>";
+
+/**
+ * `ship <slug>`: the real ship (unit 4). Order: review gate, branch +
+ * commit on `ultramode/<slug>`, prepared-PR fallback without a grant,
+ * duplicate-PR check, then per-action ship gates for push and PR create,
+ * then the CI poll. A gate denial stops at 77; any exec failure stops
+ * with a closeout line; nothing retries, nothing merges.
+ */
+export async function runShip(
+  ctx: PluginContext,
+  io: Io,
+  slug: string,
+  opts: PollOptions = {},
+): Promise<ExitCode> {
+  const cwd = io.cwd;
+  const branch = branchName(slug);
+  const goalText = readGoalText(ctx, cwd, slug);
+  const lastOutcome = ctx.state.get<UltramodeLastOutcome>("lastOutcome");
+  const sameGoal = lastOutcome?.slug === slug;
+  const writer = sameGoal ? lastOutcome.agent : undefined;
+  const agent = sameGoal ? lastOutcome.agent : undefined;
+  const modelRoute = sameGoal ? lastOutcome.modelRoute : undefined;
+  const exec = (argv: string[]) => ctx.process.exec(argv, { cwd });
+
+  const fail = (stage: string, reason: string): ExitCode => {
+    recordShipFailure(ctx, cwd, slug, stage, reason);
+    io.data({ ship: { slug, verdict: "failed", stage, reason } });
+    if (!io.json) io.out(`ultramode ship ${slug}: FAILED at ${stage} — ${reason}`);
+    return ExitCode.Error;
+  };
+  const deny = (gate: "review" | "ship", reason: string, extra: Record<string, unknown> = {}): ExitCode => {
+    recordGateDenial(ctx, cwd, slug, gate, reason, "ship");
+    io.data({ ship: { slug, verdict: "denied", gate, reason, ...extra } });
+    if (!io.json) io.out(`ultramode ship ${slug}: DENIED at the ${gate} gate — ${reason}`);
+    return ExitCode.NoPerm;
+  };
+
+  // 1. Review gate — no exec runs before it passes.
+  let reviewText: string;
+  try {
+    await ctx.events.runWaterfall(MolaEvents.UltramodeReview, { slug, cwd, writer });
+    reviewText = ctx.fs.readFile(reviewFilePath(cwd, slug));
+  } catch (err) {
+    return deny("review", err instanceof Error ? err.message : String(err));
+  }
+  const review = parseReview(reviewText);
+
+  // 2. Branch: create `ultramode/<slug>` from HEAD, or switch to it.
+  const current = await exec(["git", "rev-parse", "--abbrev-ref", "HEAD"]);
+  if (current.code !== 0) {
+    return fail("branch", `git rev-parse --abbrev-ref HEAD exited ${current.code}: ${(current.stderr || current.stdout).trim()}`);
+  }
+  const currentBranch = current.stdout.trim();
+  const exists = (await exec(["git", "rev-parse", "--verify", "--quiet", `refs/heads/${branch}`])).code === 0;
+  const checkoutArgv = exists ? ["git", "checkout", branch] : ["git", "checkout", "-b", branch];
+  const checkout = await exec(checkoutArgv);
+  if (checkout.code !== 0) {
+    const detail = (checkout.stderr || checkout.stdout).trim();
+    const reason =
+      currentBranch === "master" || currentBranch === "main"
+        ? `cannot create ${branch} from ${currentBranch} (${detail}); refusing to push ${currentBranch} — fix the branch and retry`
+        : `cannot switch to ${branch}: ${detail}`;
+    return fail("branch", reason);
+  }
+
+  // 3. Commit the workspace changes on the ultramode branch.
+  const add = await exec(["git", "add", "-A"]);
+  if (add.code !== 0) {
+    return fail("commit", `git add -A exited ${add.code}: ${(add.stderr || add.stdout).trim()}`);
+  }
+  const grant = readGrant(ctx, slug);
+  const granted = !!grant && grant.workspace === cwd;
+  const commitMessage = renderCommitMessage({
+    goal: goalText,
+    outcome: sameGoal ? lastOutcome.outcome : undefined,
+    review,
+    granted,
+  });
+  const commit = await exec(["git", "commit", "-m", commitMessage]);
+  const commitOut = `${commit.stdout}\n${commit.stderr}`;
+  if (commit.code !== 0 && !/nothing to commit/i.test(commitOut)) {
+    return fail("commit", `git commit exited ${commit.code}: ${commitOut.trim()}`);
+  }
+  const sha = await exec(["git", "rev-parse", "HEAD"]);
+  if (sha.code !== 0) {
+    return fail("commit", `git rev-parse HEAD exited ${sha.code}: ${(sha.stderr || sha.stdout).trim()}`);
+  }
+  const commitSha = sha.stdout.trim();
+
+  const prBody = renderPrBody({
+    goal: goalText,
+    outcome: sameGoal ? lastOutcome.outcome : undefined,
+    review,
+    agent,
+    modelRoute,
+    granted,
+  });
+
+  // 4. No grant: prepared PR only — commit stays local, nothing is pushed.
+  if (!granted) {
+    const prBodyPath = path.join(cwd, ".mstack", "goals", `${slug}.pr.md`);
+    ctx.fs.writeFile(prBodyPath, prBody);
+    const record: ShipRecord = {
+      slug,
+      verdict: "prepared",
+      branch,
+      commit: commitSha,
+      prBodyPath,
+      pushed: false,
+      at: new Date().toISOString(),
+    };
+    recordShipOutcome(ctx, cwd, slug, record, `prepared PR on ${branch} at ${commitSha} — nothing pushed, PR body written to ${prBodyPath}`);
+    io.data({ ship: record });
+    if (!io.json) {
+      io.out(`ultramode ship ${slug}: prepared only — committed ${commitSha} on ${branch}, nothing pushed; PR body in ${prBodyPath}`);
+    }
+    return ExitCode.Ok;
+  }
+
+  // 5. Duplicate PR check, before anything is created.
+  const list = await exec(["gh", "pr", "list", "--head", branch, "--json", "number,url", "--limit", "1"]);
+  if (list.code !== 0) {
+    return fail("pr-list", `gh pr list exited ${list.code}: ${(list.stderr || list.stdout).trim()}`);
+  }
+  let existing: { number: number; url: string } | undefined;
+  try {
+    existing = parsePrListJson(list.stdout);
+  } catch {
+    return fail("pr-list", `gh pr list returned unparsable output: ${list.stdout.trim()}`);
+  }
+  if (existing) {
+    const record: ShipRecord = {
+      slug,
+      verdict: "duplicate",
+      branch,
+      commit: commitSha,
+      prUrl: existing.url,
+      prNumber: existing.number,
+      pushed: false,
+      at: new Date().toISOString(),
+    };
+    recordShipOutcome(ctx, cwd, slug, record, `PR already exists: ${existing.url} — no duplicate created`);
+    io.data({ ship: record });
+    if (!io.json) io.out(`ultramode ship ${slug}: PR already exists — ${existing.url} (no duplicate created)`);
+    return ExitCode.Ok;
+  }
+
+  // 6. Push, gated with the exact argv.
+  const pushArgv = ["git", "push", "-u", "origin", branch];
+  try {
+    await ctx.events.runWaterfall(MolaEvents.UltramodeShip, { slug, cwd, argv: pushArgv });
+  } catch (err) {
+    return deny("ship", err instanceof Error ? err.message : String(err), { branch, commit: commitSha, pushed: false });
+  }
+  const push = await exec(pushArgv);
+  if (push.code !== 0) {
+    return fail("push", `git push exited ${push.code}: ${(push.stderr || push.stdout).trim()}`);
+  }
+
+  // 7. Create the PR, gated with the exact argv.
+  const prArgv = ["gh", "pr", "create", "--title", goalText, "--body", prBody];
+  try {
+    await ctx.events.runWaterfall(MolaEvents.UltramodeShip, { slug, cwd, argv: prArgv });
+  } catch (err) {
+    return deny("ship", err instanceof Error ? err.message : String(err), { branch, commit: commitSha, pushed: true });
+  }
+  const created = await exec(prArgv);
+  if (created.code !== 0) {
+    return fail("pr-create", `gh pr create exited ${created.code}: ${(created.stderr || created.stdout).trim()}`);
+  }
+  const pr = parsePrCreateOutput(created.stdout);
+  if (!pr) {
+    return fail("pr-create", `gh pr create did not print a PR URL: ${created.stdout.trim()}`);
+  }
+
+  // 8. Poll CI. Never auto-merge.
+  const poll = await pollChecks(exec, pr.number, opts);
+  const verdict: ShipVerdict = poll.verdict;
+  const record: ShipRecord = {
+    slug,
+    verdict,
+    branch,
+    commit: commitSha,
+    prUrl: pr.url,
+    prNumber: pr.number,
+    failing: poll.failing,
+    pushed: true,
+    at: new Date().toISOString(),
+  };
+  const result =
+    verdict === "shipped"
+      ? `shipped: PR ${pr.url} — all checks passed`
+      : verdict === "blocked"
+        ? `blocked: PR ${pr.url} — failing checks: ${(poll.failing ?? []).join(", ")}`
+        : `running: PR ${pr.url} — checks still running at the poll cap`;
+  recordShipOutcome(ctx, cwd, slug, record, result);
+  io.data({ ship: record });
+  if (!io.json) {
+    io.out(
+      `ultramode ship ${slug}: ${verdict} — ${pr.url}${verdict === "blocked" ? ` (failing: ${(poll.failing ?? []).join(", ")})` : ""}`,
+    );
+  }
+  return verdict === "shipped" ? ExitCode.Ok : ExitCode.Error;
+}
 
 /** `ship --check`: review gate, then ship gate, with a sample outward argv. No outward action. */
 async function runShipCheck(ctx: PluginContext, io: Io, slug: string): Promise<ExitCode> {
@@ -333,9 +678,15 @@ async function handleSubcommand(
     if (!io.json) io.out(`ultramode grant revoked: ${subArg}${hadGrant ? "" : " (none existed)"}`);
     return ExitCode.Ok;
   }
-  const slug = typeof flags.check === "string" ? flags.check : subArg;
-  if (!slug) throw new MolaError("USAGE_ERROR", SHIP_CHECK_USAGE, ExitCode.Usage);
-  return runShipCheck(ctx, io, slug);
+  // `ship --check <slug>` keeps its unit 3 meaning (gates only, no outward
+  // action); bare `ship <slug>` is the real ship. Bare `ship` is a usage error.
+  if (sub === "ship") {
+    if (typeof flags.check === "string") return runShipCheck(ctx, io, flags.check);
+    if ("check" in flags) throw new MolaError("USAGE_ERROR", SHIP_USAGE, ExitCode.Usage);
+    if (!subArg) throw new MolaError("USAGE_ERROR", SHIP_USAGE, ExitCode.Usage);
+    return runShip(ctx, io, subArg);
+  }
+  throw new MolaError("USAGE_ERROR", SHIP_USAGE, ExitCode.Usage);
 }
 
 /** The flags as argv entries (for the run record). */

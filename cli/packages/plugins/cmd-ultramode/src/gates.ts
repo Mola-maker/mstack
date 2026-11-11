@@ -88,7 +88,8 @@ export type ReviewCheck =
   | { ok: true; reviewer: string }
   | { ok: false; reason: string };
 
-const EVIDENCE_RES = [
+/** What counts as cited evidence in a review file (shared with ship.ts). */
+export const REVIEW_EVIDENCE_RES = [
   /\.mstack\/\S+/, // a file path under .mstack/
   /repro\s*:\s*\S+.*→/i, // a repro command with its result (m-review format)
   /`[^`]*\b(node|pnpm|npm|npx|bun|gh|git|cargo|make|pytest|vitest)\b[^`]*`/, // a backticked test command
@@ -116,7 +117,7 @@ export function checkReviewText(text: string, writer?: string): ReviewCheck {
       reason: `review: verdict is not APPROVE (last line: "${verdict || "(none)"}")`,
     };
   }
-  if (!lines.some((l) => EVIDENCE_RES.some((re) => re.test(l)))) {
+  if (!lines.some((l) => REVIEW_EVIDENCE_RES.some((re) => re.test(l)))) {
     return {
       ok: false,
       reason: "review: no evidence cited (need a repro command with its result, or a .mstack/ file path)",
