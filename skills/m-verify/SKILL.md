@@ -2,6 +2,7 @@
 name: m-verify
 description: "No 'done' without fresh evidence: run the real test/build, read the output, test behavior. Use before any success claim, 验证一下/跑通没."
 whenToUse: "Before any success claim, commit, PR, or \"done\" — or whenever confidence that a feature or fix works is required."
+when_to_use: "Before any success claim, commit, PR, or \"done\" — or whenever confidence that a feature or fix works is required."
 ---
 
 # m-verify

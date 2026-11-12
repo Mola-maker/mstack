@@ -2,6 +2,7 @@
 name: m-research
 description: "Multi-channel research: ≥3 independent channels, cross-checked, every claim cited. Use for 调研/深度调研/查一下/选型对比."
 whenToUse: "The next step depends on something unknown, recent, or contested — technology selection, open-source landscape, fact verification — and needs sourced evidence, not recollection."
+when_to_use: "The next step depends on something unknown, recent, or contested — technology selection, open-source landscape, fact verification — and needs sourced evidence, not recollection."
 ---
 
 # m-research
