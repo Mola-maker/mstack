@@ -4,6 +4,7 @@
 // Usage (run at every checkpoint — see m-goal SKILL.md step 4):
 //   node goal-state.mjs record <dir> <slug> [--round] [--fail <signature>] [--progress] [--tokens N] [--budget PCT] [--status active|done|failed]
 //   node goal-state.mjs init   <dir> <slug> --start-commit <sha> [--min-rounds N]
+//       (if <dir>/<slug>.md exists, init exits 2 unless its Boundaries and Output & approver lines are filled in)
 //   node goal-state.mjs status <dir> <slug>
 //
 // <dir> is the directory holding <slug>.state.json (usually .mstack/goals).
@@ -104,6 +105,26 @@ if (cmd === "init") {
   if (existing && existing.status === "active") {
     console.error(`goal-state: ${file} already exists and is active — refusing to re-init`);
     process.exit(2);
+  }
+  // Preflight: if the goal file exists, its Boundaries and Output & approver lines must be filled in.
+  let goalText = null;
+  try {
+    goalText = readFileSync(join(dir, `${slug}.md`), "utf8");
+  } catch (e) {
+    if (e.code !== "ENOENT") {
+      console.error(`goal-state: cannot read ${join(dir, `${slug}.md`)}: ${e.message}`);
+      process.exit(2);
+    }
+  }
+  if (goalText !== null) {
+    for (const name of ["Boundaries", "Output & approver"]) {
+      const m = goalText.match(new RegExp(`^\\s*-\\s*${name}:[ \\t]*(.*)$`, "m"));
+      const value = m ? m[1].trim() : "";
+      if (!value || /^<.*>$/.test(value)) {
+        console.error(`goal-state: goal file ${slug}.md has no filled-in "- ${name}:" line (missing or still the <...> placeholder) — fill it in before init`);
+        process.exit(2);
+      }
+    }
   }
   const state = fresh();
   state.startCommit = startCommit;
