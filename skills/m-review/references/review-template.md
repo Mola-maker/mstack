@@ -7,6 +7,7 @@ Read this before writing the first reviewer prompt. Give each reviewer the diff 
 - Report only code the diff adds or replaces, plus untracked files (`git ls-files --others --exclude-standard`). A bug in untouched tracked lines is out of scope, even if you noticed it. An empty `git diff` does not drop a finding in a new file.
 - Cite the new-file line of an added or replacement line (`path:line`). For a pure deletion, cite `path:0`.
 - If the author meant the break, and the diff's blast radius is explicit (one function, one flag, one migration), put it under Cleared with that scope. Still report it when the author likely missed a further caller, when the downside is badly understated, or when the change looks malicious.
+- Subject scope: correctness and security by default. Style, naming and formatting are not findings unless the request asks for them. State the subject scope in every reviewer prompt; a reviewer asked to "find problems" always finds some.
 - Do not raise severity to be heard. A minor issue labeled critical trains people to ignore you.
 
 The scope script understands unified diffs with unquoted paths. Paths that git quotes because they contain spaces are not parsed — check those by hand.
