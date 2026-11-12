@@ -10,6 +10,8 @@ Read this when m-goal step 1 creates the goal file, and when writing the closeou
 - Created: <ISO timestamp>
 - Budget: attempt cap <N> per task, min rounds <N, default 3>, round cap <N>, token budget <N or "none">
 - Stop conditions: <what ends the loop besides "objective met">
+- Boundaries: <worktree or branch, what it may write, what it must not run>
+- Output & approver: <where the result lands, who signs off on irreversible actions>
 
 ## Sub-goals (ordered by risk)
 
@@ -32,6 +34,8 @@ Read this when m-goal step 1 creates the goal file, and when writing the closeou
 ```
 
 ## Rules that the layout enforces
+
+- **`Boundaries` and `Output & approver` must be filled in** (not left as the `<...>` placeholder) before the loop starts: `goal-state.mjs init` exits 2 and writes nothing if the goal file exists and either line is missing or unchanged.
 
 - **Checkpoints are append-only**, exactly the 5 columns above. Never edit or delete a row; a mistake is corrected by a new row that supersedes it. Keep each cell to one line.
 - **Budget prefers breadth over depth.** The attempt cap limits retries of a single task; spare budget goes to another attempt plus selection, not to a larger single pass.
