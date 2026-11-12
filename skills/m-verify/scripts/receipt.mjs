@@ -10,11 +10,12 @@
 // or the hash could not be computed (git error, or the deadline given by --timeout-ms /
 // MSTACK_RECEIPT_TIMEOUT_MS ran out; the temp index is removed either way).
 import { execFileSync } from "node:child_process";
-import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SELF = fileURLToPath(import.meta.url);
+const STALE_MS = 10 * 60 * 1000; // far above the longest allowed run (default deadline 60 s)
 const SETUP_TIMEOUT_MS = 10000; // rev-parse calls: cheap, never part of the hashing deadline
 
 class Usage extends Error {}
@@ -45,12 +46,14 @@ const alive = (pid) => {
   }
 };
 
-// Temp indexes live in <gitdir>/mstack-tmp/index.<pid>; ones left by a process that no longer exists are removed.
+// Temp indexes live in <gitdir>/mstack-tmp/index.<pid>[.err|.lock]. One is removed only when its pid is dead AND
+// it is older than STALE_MS: pids are not shared between WSL and Windows, so "dead" alone could be another run's file.
 function sweep(dir) {
   try {
     for (const f of readdirSync(dir)) {
-      const m = f.match(/^index\.(\d+)(\.err)?$/);
-      if (m && Number(m[1]) !== process.pid && !alive(Number(m[1]))) rmSync(join(dir, f), { force: true });
+      const m = f.match(/^index\.(\d+)(\.err|\.lock)?$/);
+      if (!m || Number(m[1]) === process.pid || alive(Number(m[1]))) continue;
+      if (Date.now() - statSync(join(dir, f)).mtimeMs > STALE_MS) rmSync(join(dir, f), { force: true });
     }
   } catch { /* directory not there yet */ }
 }
@@ -78,6 +81,7 @@ function treeHash(root, timeoutMs) {
   const errFile = `${idx}.err`;
   const deadline = Date.now() + timeoutMs;
   let fd;
+  rmSync(`${idx}.lock`, { force: true }); // a pid reused after a killed run must not trip over its predecessor's lock
   const step = (args) => {
     const left = deadline - Date.now();
     if (left <= 0) throw new Usage(`tree hash timed out after ${timeoutMs} ms`);
@@ -97,8 +101,7 @@ function treeHash(root, timeoutMs) {
     return step(["write-tree"]);
   } finally {
     if (fd !== undefined) closeSync(fd);
-    rmSync(idx, { force: true });
-    rmSync(errFile, { force: true });
+    for (const f of [idx, errFile, `${idx}.lock`]) rmSync(f, { force: true }); // .lock: left behind when the deadline killed git
   }
 }
 

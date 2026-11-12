@@ -33,14 +33,18 @@ try {
   const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf8", timeout: 3000, stdio: ["ignore", "pipe", "ignore"] }).trim();
   if (!existsSync(join(root, ".mstack", "verify", "gate"))) process.exit(0);
 
+  if (!existsSync(receipt)) {
+    say(`verify gate could not be evaluated: receipt script missing at ${receipt}`);
+    process.exit(0);
+  }
   try {
     execFileSync(process.execPath, [receipt, "check", "--timeout-ms", DEADLINE], {
       cwd: root, encoding: "utf8", timeout: (Number(DEADLINE) || 4000) + 2000, stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (e) {
-    if (e.status === 1) say(oneLine(e.stdout));
+    if (e.status === 1 && oneLine(e.stdout)) say(oneLine(e.stdout));
     else if (e.code === "ETIMEDOUT") say(`verify gate could not be evaluated: the check did not finish within ${(Number(DEADLINE) || 4000) + 2000} ms`);
-    else say(`verify gate could not be evaluated: ${oneLine(e.stderr) || oneLine(e.message) || "the check crashed"}`);
+    else say(`verify gate could not be evaluated: ${oneLine(e.stderr) || `${receipt} failed with exit ${e.status ?? "none"}`}`);
   }
 } catch {
   // Never block the stop. (Reached only before the gate file is known: no git repo, unreadable cwd.)
