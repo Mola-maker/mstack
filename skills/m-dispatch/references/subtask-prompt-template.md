@@ -11,10 +11,17 @@ GOAL
 <one concrete outcome, stated as a falsifiable predicate — e.g. "make these 3
 tests pass" or "report every mismatch of X against Y">
 
+WHY
+<one or two lines: who needs this and what it unblocks, so the worker can
+judge the calls this brief did not foresee>
+
 SCOPE
 - Files/dirs you may read: <paths>
 - Files/dirs you may write: <paths, disjoint from every other worker>
 - Constraints: <e.g. "do not change production code", "do not bump a version">
+
+OUT OF SCOPE
+<the nearby things a reasonable worker would also fix, and must leave alone>
 
 CONTEXT
 <only what this task needs: error text, file paths, interface signatures,
@@ -37,5 +44,6 @@ the parent already wrote first pass, rank all, or best-of outside this prompt.
 
 ## Notes
 
+- Leave out what the worker would read in the repo anyway (layout, conventions, test setup). Spend the words on what the repo cannot show: a decision, why the task matters, what done means this time.
 - Put long context (a review package, a diff, a ledger) in a file and give the path, not the content.
 - Evidence is the command, the output, and the changed files, plus any SHA or method the brief required. A RETURN that omits them is a gap: the parent re-dispatches that worker once, naming the missing field. A second miss stays a gap and does not count as a pass. Do not invent the missing output.
