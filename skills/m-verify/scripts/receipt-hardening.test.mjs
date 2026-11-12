@@ -1,7 +1,7 @@
 // Hardening cases for receipt.mjs (review findings). Run: node --test "skills/m-verify/scripts/*.test.mjs"
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -66,13 +66,35 @@ test("the deadline can come from MSTACK_RECEIPT_TIMEOUT_MS", () => {
   assert.match(r.stderr, /timed out after 1 ms/);
 });
 
-test("a stale temp index from a dead process is removed; one from a live process is kept", () => {
-  const dir = repo();
+// A temp file is stale only when its pid is dead AND it is older than 10 minutes (pids are not shared between WSL and Windows).
+const plant = (dir, name, ageMinutes) => {
   mkdirSync(tmpDir(dir), { recursive: true });
-  writeFileSync(join(tmpDir(dir), "index.99999999"), "stale");
-  writeFileSync(join(tmpDir(dir), `index.${process.pid}`), "live");
+  const p = join(tmpDir(dir), name);
+  writeFileSync(p, "x");
+  const t = new Date(Date.now() - ageMinutes * 60000);
+  utimesSync(p, t, t);
+};
+
+test("an old temp index of a dead pid is removed (index, .err and .lock); a live pid's is kept", () => {
+  const dir = repo();
+  for (const n of ["index.99999999", "index.99999999.err", "index.99999999.lock"]) plant(dir, n, 11);
+  plant(dir, `index.${process.pid}`, 11);
   tree(dir);
   assert.deepEqual(leftovers(dir), [`index.${process.pid}`]);
+});
+
+test("a fresh temp file with a dead pid is kept", () => {
+  const dir = repo();
+  plant(dir, "index.99999999", 1);
+  plant(dir, "index.99999999.lock", 0);
+  tree(dir);
+  assert.deepEqual(leftovers(dir).sort(), ["index.99999999", "index.99999999.lock"]);
+});
+
+test("a run that hits the deadline leaves no .lock of its own behind", () => {
+  const dir = repo();
+  receipt(dir, "tree", "--timeout-ms", "1");
+  assert.deepEqual(leftovers(dir).filter((f) => f.endsWith(".lock")), []);
 });
 
 // Finding 4: check recomputes the level from validated checks; write recovers from a malformed receipt.

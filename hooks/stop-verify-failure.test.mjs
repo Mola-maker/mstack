@@ -1,7 +1,7 @@
 // stop-verify.mjs when the receipt check itself fails or is too slow. Run: node --test "hooks/*.test.mjs"
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, existsSync, readdirSync, copyFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -41,6 +41,22 @@ test("gate on and the check times out: a non-blocking systemMessage says it coul
   for (const k of ["decision", "reason", "continue", "stopReason", "hookSpecificOutput"]) assert.equal(k in out, false, `must not set ${k}`);
   const tmp = join(dir, ".git", "mstack-tmp");
   assert.deepEqual(existsSync(tmp) ? readdirSync(tmp) : [], []);
+});
+
+test("receipt script missing (broken install), gate on: a non-empty message naming the script; gate off: silent", () => {
+  const lone = mkdtempSync(join(tmpdir(), "stop-verify-lone-"));
+  mkdirSync(join(lone, "hooks"));
+  copyFileSync(hook, join(lone, "hooks", "stop-verify.mjs"));
+  const go = (dir) => spawnSync(process.execPath, [join(lone, "hooks", "stop-verify.mjs")], { cwd: dir, input: JSON.stringify({ cwd: dir }), encoding: "utf8" });
+  const on = go(repo({ gate: true }));
+  assert.equal(on.status, 0);
+  const msg = JSON.parse(on.stdout).systemMessage;
+  assert.ok(msg.length > 0);
+  assert.match(msg, /could not be evaluated/);
+  assert.match(msg, /receipt\.mjs/);
+  const off = go(repo({ gate: false }));
+  assert.equal(off.status, 0);
+  assert.equal(off.stdout, "");
 });
 
 test("gate absent: still fully silent even when the check would time out", () => {
