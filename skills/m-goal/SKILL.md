@@ -16,7 +16,7 @@ Use for "keep going until done", multi-phase or multi-session work, or anything 
 
 Using m-goal: <one-line objective> — say this first, before any tool call.
 
-**Iron Law: NO `done` STATUS WITHOUT A WRITTEN CLOSEOUT, A PASSING GATE, AND AT LEAST THE MINIMUM ROUNDS.**
+**Rule: no `done` status without a written closeout, a passing gate, and at least the minimum rounds.**
 No exceptions: do not write the closeout "after one more try", in a second file, or from memory of the run; do not loosen a criterion to reach it (amend it, step 6); do not stop on a first lucky pass; do not replace the counter script with your recollection.
 
 | You will be tempted to think… | Reality |

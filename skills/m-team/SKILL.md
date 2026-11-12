@@ -26,7 +26,7 @@ Do NOT use when:
 First line you say: `Using m-team: run a measured round, compare to solo, redesign or stop.`
 
 ```
-A TEAM IS KEPT ONLY WHILE IT BEATS SOLO BY MORE THAN THE NOISE BAND YOU WROTE BEFORE SCORING.
+A team is kept only while it beats solo by more than the noise band you wrote before scoring.
 ```
 
 Closed loopholes: widening the band after the result, reading a gain from one run, scoring with a judge who wrote a candidate or shares a family with one, and "the team felt better" all count as no gain. Breaking the letter of this rule is breaking its spirit.

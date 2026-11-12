@@ -19,7 +19,7 @@ Do NOT use it to review design or catch missing features — route that to `m-re
 First line you say: `Using m-verify: prove the claim with fresh output.`
 
 ```
-NO SUCCESS WORD WITHOUT THE COMMAND OUTPUT FROM THIS MESSAGE.
+No success word without the command output from this message.
 ```
 
 Closed loopholes: an earlier run, a green single file, a lint pass, a worktree at an older HEAD, an agent's "done", and a `| tail -1` all count as no evidence. Breaking the letter of this rule is breaking its spirit.

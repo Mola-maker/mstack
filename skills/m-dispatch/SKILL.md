@@ -26,7 +26,7 @@ Do NOT use when:
 First line you say: `Using m-dispatch: split into independent slices, prove each one.`
 
 ```
-NO WORKER RESULT IS MERGED, AND NO WORKTREE IS REUSED, UNTIL YOU HAVE LOOKED AT IT YOURSELF.
+No worker result is merged, and no worktree is reused, until you have looked at it yourself.
 ```
 
 Closed loopholes: a worker's "done", a `completed` notice, a tidy summary, a majority of identical patches, and a message to an idle worker asking how it is going all count as looking at nothing. Breaking the letter of this rule is breaking its spirit.

@@ -27,7 +27,7 @@ Do not use it (hand off instead):
 First line you say: `Using m-review: find defects another context can reproduce.`
 
 ```
-NO FINDING WITHOUT A REPRO COMMAND AND ITS OUTPUT.
+No finding without a repro command and its output.
 ```
 
 Closed loopholes: "looks risky", a finding about a line the diff did not add, a verdict formed after reading the author's rationale, and extra findings added because the list looks short. None of them is a finding. Breaking the letter of this rule is breaking its spirit.
