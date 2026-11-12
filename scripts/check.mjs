@@ -21,8 +21,7 @@ for (const name of expected) {
   const bytes = Buffer.byteLength(text, "utf8");
   if (bytes > 12000) err(`${name}: ${bytes} bytes (>12000)`);
   // 0.6.0: rules are written in sentence case; a run of 4+ all-caps words is the retired shouting style (code fences included)
-  text.split("
-").forEach((l, i) => { if (/[A-Z]{2,}( [A-Z]{2,}){3,}/.test(l)) err(`${name}: SKILL.md:${i + 1} has 4+ consecutive all-caps words`); });
+  text.split("\n").forEach((l, i) => { if (/\b[A-Z]{2,}( [A-Z]{2,}){3,}/.test(l)) err(`${name}: SKILL.md:${i + 1} has 4+ consecutive all-caps words`); });
   // only SKILL.md, references/ and scripts/ belong in a skill dir (no dev or test scenario files)
   for (const entry of readdirSync(join(root, "skills", name))) {
     if (!["SKILL.md", "references", "scripts"].includes(entry) && !entry.startsWith(".")) err(`${name}: unexpected entry skills/${name}/${entry}`);
