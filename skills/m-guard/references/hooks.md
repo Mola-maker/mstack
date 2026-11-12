@@ -88,5 +88,7 @@ mstack 的 `hooks/hooks.json` 已注册 `hooks/stop-verify.mjs`，但默认什�
 - 打开：在项目里建文件 `.mstack/verify/gate`（`mkdir -p .mstack/verify && touch .mstack/verify/gate`）。
 - 关闭：删掉这个文件。没有文件就没有任何输出。
 - 打开后，每次答完：当前代码（含未提交和未跟踪文件，不含 `.mstack/`）没有达到所需层级的验证回执，就显示一行，写明所需层级、已有层级和要跑的命令。所需层级读项目 `.claude/skills/verify/SKILL.md` 的 `Required level: L<n>`，没有则为 L1。回执由 `skills/m-verify/scripts/receipt.mjs write` 写入，规则见 m-verify 的 `references/ladder.md`。
-- 失败一律放行：不是 git 仓库、`receipt.mjs` 出错、stdin 不是 JSON，都静默退出 0。
+- 门关着（没有 gate 文件）：完全静默。不是 git 仓库、stdin 不是 JSON：也静默。
+- 门开着而检查本身失败或超时：不再静默（静默等于悄悄把提醒关掉）。钩子照样退出 0、不下 `decision`，但用 `systemMessage` 打一行 "verify gate could not be evaluated: <原因>"，例如 `tree hash timed out after 4000 ms` 或 git 的报错。
+- 耗时：哈希要把变更和未跟踪文件都 `git add` 进临时索引，代价随这些文件的数量增长；`receipt.mjs` 自带截止时间（钩子传 `--timeout-ms`，默认 4000，可用环境变量 `MSTACK_STOP_VERIFY_TIMEOUT_MS` 改），到点自己退出并清理 `.git/mstack-tmp/` 里的临时索引。钩子总超时是 10 秒。仓库太大时用户会每轮都看到超时那一行；办法是关门，或缩小未跟踪文件（补 `.gitignore`）。
 - 已知限制：只改文档也要新回执；嫌烦就关掉门，不要降所需层级。

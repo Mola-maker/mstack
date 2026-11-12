@@ -38,6 +38,8 @@ Receipts are keyed by the working-tree hash, so any edit leaves the old receipt 
 
 It covers uncommitted and untracked non-ignored files, and ignores `.mstack/` so writing a receipt does not invalidate it. Line-ending conversion is whatever `git add` does under the repo's own settings, so two calls on an untouched checkout agree.
 
+Cost: hashing adds every changed and untracked file to the temporary index, so it grows with their number; each run also writes loose objects for them into the real object store (expected from `git add`; `git gc` collects them). `receipt.mjs` has its own deadline (`--timeout-ms`, or `MSTACK_RECEIPT_TIMEOUT_MS`, default 60 s) and exits 2 with `tree hash timed out after N ms`, removing its temporary index (kept under `<gitdir>/mstack-tmp/`, stale ones swept on the next run). The Stop reminder passes a 4 s deadline; when the check is too slow it shows one line, `verify gate could not be evaluated: <reason>`, instead of going quiet. Fix a slow repo by ignoring build output or turning the gate off.
+
 ## Known limitation
 
 Docs-only changes are not exempted this round: with a gate that requires L3, a README edit also needs a new receipt, which can mean booting an emulator. The way out is to turn the Stop reminder off (delete `.mstack/verify/gate`), not to weaken the required level.

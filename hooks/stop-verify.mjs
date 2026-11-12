@@ -1,13 +1,19 @@
 #!/usr/bin/env node
 // Stop hook: opt-in reminder (m-verify). When `.mstack/verify/gate` exists in the project and the current
-// code has no verify receipt at the required level, show the user one `systemMessage` line.
-// Never blocks: no `decision`, no `continue: false`, always exit 0, and any error prints nothing.
+// code has no verify receipt at the required level, show the user one `systemMessage` line. If the check
+// itself fails or runs out of time, say so in one line instead of going quiet.
+// Never blocks: no `decision`, no `continue: false`, always exit 0. Gate absent: no output at all.
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const receipt = join(dirname(fileURLToPath(import.meta.url)), "..", "skills", "m-verify", "scripts", "receipt.mjs");
+// hooks.json gives the hook 10 s: 3 s for the git lookup, then the script's own deadline, then a margin to exit and clean up
+const DEADLINE = process.env.MSTACK_STOP_VERIFY_TIMEOUT_MS ?? "4000";
+
+const say = (message) => process.stdout.write(`${JSON.stringify({ systemMessage: message })}\n`);
+const oneLine = (s) => String(s ?? "").trim().split("\n")[0].replace(/^receipt:\s*/, "");
 
 try {
   let cwd = process.cwd();
@@ -27,16 +33,16 @@ try {
   const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf8", timeout: 3000, stdio: ["ignore", "pipe", "ignore"] }).trim();
   if (!existsSync(join(root, ".mstack", "verify", "gate"))) process.exit(0);
 
-  const reason = (() => {
-    try {
-      execFileSync(process.execPath, [receipt, "check"], { cwd: root, encoding: "utf8", timeout: 6000, stdio: ["ignore", "pipe", "ignore"] });
-      return null;
-    } catch (e) {
-      return e.status === 1 ? String(e.stdout ?? "").trim() : null; // exit 2 or a crash: stay silent
-    }
-  })();
-  if (reason) process.stdout.write(`${JSON.stringify({ systemMessage: reason })}\n`);
+  try {
+    execFileSync(process.execPath, [receipt, "check", "--timeout-ms", DEADLINE], {
+      cwd: root, encoding: "utf8", timeout: (Number(DEADLINE) || 4000) + 2000, stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (e) {
+    if (e.status === 1) say(oneLine(e.stdout));
+    else if (e.code === "ETIMEDOUT") say(`verify gate could not be evaluated: the check did not finish within ${(Number(DEADLINE) || 4000) + 2000} ms`);
+    else say(`verify gate could not be evaluated: ${oneLine(e.stderr) || oneLine(e.message) || "the check crashed"}`);
+  }
 } catch {
-  // Never block the stop.
+  // Never block the stop. (Reached only before the gate file is known: no git repo, unreadable cwd.)
 }
 process.exit(0);
