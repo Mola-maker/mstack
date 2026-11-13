@@ -60,7 +60,7 @@ OMC 从 5.7 到 5.8.6 增加到 84 个 skill，其中不少和 mstack 的职责�
 
 **mstack 没有、可以继续用 OMC 的：** models（给 OMC 自己的 agent 按角色配 provider、档位和推理强度；mstack 的角色路由只管 mstack 自己派出去的活，见 `config/model-routing.json`）、how / why / teach（讲解代码）、diagram、statechart、create-formal-verification-skill（TLA+ / Lean / Kani）、architecture-survey、typescript-best-practices、technical-writing、harbor、bro、hud、configure-notifications。
 
-**全局 CLAUDE.md 里的"已被取代"清单需要补上面表里右列的名字**，否则模型只知道旧的那 17 个被取代。这份文件由 magpie 管理，按本节末尾的命令同步。
+**全局 CLAUDE.md 里的"已被取代"清单需要补上面表里右列的名字（“只是部分重叠的”那一段点名的除外）**，否则模型只知道旧的那 17 个被取代。这份文件由 magpie 管理，按本节末尾的命令同步。
 
 **从 OMC 新版吸收的做法（已落到 mstack）：**
 
