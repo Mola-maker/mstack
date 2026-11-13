@@ -280,7 +280,7 @@ Claude Code 会把**与插件同名的 skill**（`mstack:mstack`）的 descripti
 Owner feedback: the prompts are rough, the agents are weak, nothing is assigned by model strength, and the team capability barely shows in DSH. Research: `research/round3/` (superpowers-craft, omc-agents, pstack-craft, arena-routing, dsh-team, starred-gaps).
 
 ### 12.1 Prompt craft (applies to every SKILL.md you touch; from superpowers-craft.md)
-- **Iron Law + loophole list.** Each discipline skill opens its Procedure with one absolute rule in a line by itself, followed by the specific ways agents try to get around it, each one closed off explicitly.
+- **One rule + loophole list.** (0.6.0: the rule is written in normal sentence case; the all-caps "Iron Law" wording is retired and `scripts/check.mjs` rejects it. A rule that must hold mechanically belongs in a hook or a script.) Each discipline skill opens its Procedure with one absolute rule in a line by itself, followed by the specific ways agents try to get around it, each one closed off explicitly.
 - **Rationalization table.** `| You will be tempted to think… | Reality |`, 4–8 rows, drawn from real failures in this repo's history (reviews/, logs, lessons) and research — never invented filler.
 - **Red flags.** A short list of observable signs that you are breaking the skill right now ("you wrote 'should work'", "you are about to edit a test to make it pass").
 - **Countable stop conditions + Ruling record.** Stops are numbers ("3 consecutive", "2 fixes on the same premise", "5 review rounds"); every judgement call not covered becomes one line `Ruling: decision | reason | cost if wrong` in the skill's state file.

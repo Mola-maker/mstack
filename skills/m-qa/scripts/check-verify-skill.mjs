@@ -31,6 +31,17 @@ function lineIndex(text, label, prefix) {
   return -1;
 }
 
+// Non-fatal notes. A skill without a `Required level:` line still passes; receipt.mjs treats it as L1.
+export function verifySkillWarnings(dir) {
+  try {
+    const text = readFileSync(join(dir, "SKILL.md"), "utf8");
+    if (!/^Required level:/m.test(text)) {
+      return ["SKILL.md has no `Required level: L<0-5>` line under the title; it counts as L1. Add the line to declare the level this project requires"];
+    }
+  } catch { /* SKILL.md problems are reported as errors */ }
+  return [];
+}
+
 export function checkVerifySkill(dir) {
   const problems = [];
   const skillPath = join(dir, "SKILL.md");
@@ -49,6 +60,9 @@ export function checkVerifySkill(dir) {
     }
   }
   if (text.includes("{{")) problems.push("SKILL.md still has {{placeholders}}");
+  if (/^Required level:/m.test(text) && !/^Required level:\s*L[0-5]\s*$/m.test(text)) {
+    problems.push("`Required level:` must read L0 to L5 (e.g. `Required level: L3`)");
+  }
   let last = -1;
   for (const heading of SECTIONS) {
     const at = lineIndex(text, heading, false);
@@ -98,6 +112,7 @@ if (invokedDirectly()) {
     process.exit(2);
   }
   const problems = checkVerifySkill(dir);
+  for (const w of verifySkillWarnings(dir)) console.error(`warning: ${w}`);
   if (problems.length) {
     console.log(problems.join("\n"));
     process.exit(1);
