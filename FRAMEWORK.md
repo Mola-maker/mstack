@@ -56,6 +56,7 @@ SKILL.md 的 frontmatter（三个字段都要有）：
 name: m-review
 description: <英文一句话说做什么 + "Use when …" + 中文触发词，如 "review一下/审一下/看看这个PR">
 whenToUse: <英文一句话，DSH 用这个字段决定何时加载>
+when_to_use: <与 whenToUse 完全相同；Claude Code 只读这个键，未知键会被静默忽略。check.mjs 要求两者一致>
 ---
 ```
 

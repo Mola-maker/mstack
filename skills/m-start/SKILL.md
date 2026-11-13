@@ -2,6 +2,7 @@
 name: m-start
 description: "Router: reads .mstack/ state, picks the right m-skill, resumes in-flight work. Use first, and on terse prompts like 继续/开工/接着干."
 whenToUse: "At the start of every conversation and whenever a terse prompt (\"继续\", \"开工\", pasted logs) needs routing to a skill or a resume from .mstack/ state."
+when_to_use: "At the start of every conversation and whenever a terse prompt (\"继续\", \"开工\", pasted logs) needs routing to a skill or a resume from .mstack/ state."
 ---
 
 # m-start — 总入口

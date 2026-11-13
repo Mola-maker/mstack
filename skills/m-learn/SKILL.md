@@ -2,6 +2,7 @@
 name: m-learn
 description: "复盘并沉淀 lesson、skill 或 memory。Use when 复盘/reflect/学到什么/把这个记下来/写个 skill, or the same mistake shows up twice."
 whenToUse: "Turn a session's repeatable workflow or a recurring mistake into a durable lesson, a candidate SKILL.md, or a memory entry, instead of re-discovering it next time."
+when_to_use: "Turn a session's repeatable workflow or a recurring mistake into a durable lesson, a candidate SKILL.md, or a memory entry, instead of re-discovering it next time."
 ---
 
 # m-learn — 复盘与沉淀

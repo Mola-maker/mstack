@@ -2,6 +2,7 @@
 name: m-dispatch
 description: "Fan independent subtasks out to Claude subagents, DSH headless, Codex or Orca; isolate, merge, verify. Use for 分派/并行/开N个agents."
 whenToUse: "The task decomposes into 2+ parts with no shared files or sequential dependency, or the user asks to fan work out to parallel agents."
+when_to_use: "The task decomposes into 2+ parts with no shared files or sequential dependency, or the user asks to fan work out to parallel agents."
 ---
 
 # m-dispatch

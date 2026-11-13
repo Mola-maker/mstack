@@ -24,7 +24,7 @@ jobs:
               m = re.match(r"---\n(.*?)\n---", open(f, encoding="utf8").read(), re.S)
               try:
                   d = yaml.safe_load(m.group(1))
-                  assert ({"description"} if f.startswith("commands") else {"name", "description", "whenToUse"}) <= set(d), f"missing keys in {f}"
+                  assert ({"description"} if f.startswith("commands") else {"name", "description", "whenToUse", "when_to_use"}) <= set(d), f"missing keys in {f}"
               except Exception as e:
                   bad += 1; print(f"FAIL {f}: {e}")
           sys.exit(bad)

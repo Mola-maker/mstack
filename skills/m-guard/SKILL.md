@@ -2,6 +2,7 @@
 name: m-guard
 description: "Guardrails: destructive-command checks, folder freeze, plugin vetting, loop brake, known traps. Use for 小心点/冻结目录/这插件安全吗/死循环了."
 whenToUse: "Add safety guardrails before risky work: warn on destructive commands, freeze edits to a directory, vet third-party plugins before install, brake on repeated-failure loops, and avoid Mola's own known traps."
+when_to_use: "Add safety guardrails before risky work: warn on destructive commands, freeze edits to a directory, vet third-party plugins before install, brake on repeated-failure loops, and avoid Mola's own known traps."
 ---
 
 # m-guard — 安全护栏与陷阱

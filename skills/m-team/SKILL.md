@@ -2,6 +2,7 @@
 name: m-team
 description: "Evolving agent team for open-ended, large-budget goals; a supervisor redesigns roles each round. Use for 组队/一直优化/卡在局部最优."
 whenToUse: "Open-ended optimization or exploration with a large budget, where a solo agent or a fixed setup plateaus; takes such goals over from m-goal and hands the closeout back to it."
+when_to_use: "Open-ended optimization or exploration with a large budget, where a solo agent or a fixed setup plateaus; takes such goals over from m-goal and hands the closeout back to it."
 ---
 
 # m-team — Evolving agent team
