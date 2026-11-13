@@ -6,6 +6,7 @@
  *   Superagents  ctx.tools "superagent" (instances + api + interpretState)
  *   Recent runs  the rec-runs index in the state store (run:<id>)
  *   Health       the doctor checks magpie / rtk / git / gh
+ *   Go runs      `mola go` / /go progress files under <cwd>/.mstack/runs
  *
  * --json is one snapshot envelope. --watch redraws on a TTY (default 5s)
  * until Ctrl-C; off a TTY it prints once, so pipes and tests don't loop.
@@ -19,11 +20,14 @@ import {
   detectColor,
   ExitCode,
   formatDuration,
+  formatProgressLine,
+  listProgress,
   MolaError,
   palette,
   statusGlyph,
   table,
   type Palette,
+  type RunProgress,
   type Status,
 } from "@mola/plugin-sdk";
 import { openStateStore, type StateStore } from "@mola/core";
@@ -77,11 +81,52 @@ export interface DashHealth {
   missing?: boolean;
 }
 
+export interface DashGoWorker {
+  id: string;
+  status: string;
+  stage: string;
+  model: string;
+  elapsed: string;
+  costUsd: number;
+}
+
+export interface DashGoRun {
+  id: string;
+  status: string;
+  /** formatProgressLine output */
+  line: string;
+  workers: DashGoWorker[];
+}
+
 export interface DashSnapshot {
   agents: DashAgent[];
   superagents: DashSuper[];
   runs: DashRun[];
   health: DashHealth[];
+  goRuns: DashGoRun[];
+}
+
+/** Running or blocked go runs under cwd, one line plus one row per worker. */
+export function readGoRuns(cwd: string, now = Date.now()): DashGoRun[] {
+  return listProgress(cwd)
+    .filter((p: RunProgress) => p.status === "running" || p.status === "blocked")
+    .map((p) => ({
+      id: p.id,
+      status: p.status,
+      line: formatProgressLine(p, now),
+      workers: p.workers.map((w) => {
+        const start = Date.parse(w.startedAt ?? "");
+        const end = w.status === "working" || w.status === "blocked" ? now : Date.parse(w.updatedAt ?? "") || now;
+        return {
+          id: w.id,
+          status: w.status,
+          stage: w.stage,
+          model: w.model ?? "-",
+          elapsed: Number.isFinite(start) ? formatDuration(Math.max(0, end - start)) : "-",
+          costUsd: w.costUsd ?? 0,
+        };
+      }),
+    }));
 }
 
 /** `--watch` → 5, `--watch N` → N, absent → not watching. */
@@ -229,13 +274,14 @@ export async function collectDash(
     const store = openRuns();
     return store ? readRuns(store) : [];
   },
+  goRuns: () => DashGoRun[] = () => readGoRuns(process.cwd()),
 ): Promise<DashSnapshot> {
   const [agents, superagents, health] = await Promise.all([
     readAgents(ctx),
     readSuperagents(ctx),
     readHealth(ctx.doctor.list()),
   ]);
-  return { agents, superagents, runs: runs(), health };
+  return { agents, superagents, runs: runs(), health, goRuns: goRuns() };
 }
 
 function glyphFor(status: Status, p: Palette): string {
@@ -294,6 +340,15 @@ export function renderDash(snap: DashSnapshot, color = false): string[] {
     );
   }
 
+  lines.push("", p.bold("Go runs"));
+  if (snap.goRuns.length === 0) lines.push("  (no running or blocked go runs)");
+  for (const r of snap.goRuns) {
+    lines.push(`  ${r.line}`);
+    for (const w of r.workers) {
+      lines.push(`    ${w.status.padEnd(8)} ${w.stage.padEnd(9)} ${w.model}  ${w.elapsed}  $${w.costUsd.toFixed(2)}`);
+    }
+  }
+
   lines.push("", p.bold("Health"));
   const health = [...snap.health.filter((h) => !h.ok), ...snap.health.filter((h) => h.ok)];
   lines.push(
@@ -330,7 +385,7 @@ export default definePlugin({
   activate(ctx: PluginContext) {
     ctx.commands.register({
       path: ["dash"],
-      description: "one screen: agents, superagents, recent runs, health",
+      description: "one screen: agents, superagents, recent runs, go runs, health",
       async handler(args, io) {
         if (args.positionals.length > 0) throw new MolaError("USAGE_ERROR", USAGE, ExitCode.Usage);
         const seconds = watchInterval(args.flags.watch);

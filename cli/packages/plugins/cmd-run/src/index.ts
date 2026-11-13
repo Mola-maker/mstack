@@ -955,7 +955,7 @@ export {
   ndjsonSink,
   recordingSink,
 };
-export { adaptPrompt, classifyKind, inferKind, loadRouting, loadRoutingFile, planRoutes, routingFilePath } from "./routing.js";
+export { adaptPrompt, classifyKind, familyOf, inferKind, loadRouting, loadRoutingFile, planRoutes, policyKindOf, routingFilePath, routingKindOf } from "./routing.js";
 export type { RoutingTable, RoutePlan, PromptAdapter } from "./routing.js";
 export type { Policy, TaskKind, RouteDecision, RouteRequest, SkillSpec, LadderAttempt };
 export type { EventSink } from "./stream.js";

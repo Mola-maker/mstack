@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "mola-cmd-scout",
+  "version": "0.1.0",
+  "kind": "command",
+  "displayName": "cmd-scout",
+  "mola": ">=0.1.0 <1.0.0",
+  "engine": {
+    "node": ">=22"
+  },
+  "entry": {
+    "ts": "./dist/index.js"
+  },
+  "provides": [
+    "cmd:scout"
+  ],
+  "requires": [],
+  "capabilities": [
+    "command.scout"
+  ],
+  "permissions": {
+    "fs.read": [
+      "**/.mstack/**"
+    ],
+    "fs.write": [
+      "**/.mstack/**"
+    ],
+    "mola": [
+      "commands",
+      "config.read"
+    ]
+  },
+  "hooks": {
+    "emit": [],
+    "listen": []
+  }
+}

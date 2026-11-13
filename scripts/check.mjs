@@ -63,6 +63,18 @@ if (existsSync(join(root, "agents"))) {
   }
 }
 
+// commands/*.md: plugin slash commands (/go); quoted description ≤130 chars, progress calls use the plugin root
+if (existsSync(join(root, "commands"))) {
+  for (const f of readdirSync(join(root, "commands")).filter((x) => x.endsWith(".md"))) {
+    const text = readFileSync(join(root, "commands", f), "utf8");
+    const desc = text.match(/^---\r?\n[\s\S]*?^description:\s*(.*)$/m)?.[1] ?? "";
+    if (!/^".*"$/.test(desc)) err(`commands/${f}: description missing or unquoted`);
+    else if (desc.length - 2 > 130) err(`commands/${f}: description ${desc.length - 2} chars (>130)`);
+    if (text.includes("scripts/go-progress.mjs") && !text.includes("${CLAUDE_PLUGIN_ROOT}/scripts/go-progress.mjs"))
+      err(`commands/${f}: go-progress.mjs must be called via \${CLAUDE_PLUGIN_ROOT}`);
+  }
+}
+
 // config/model-routing.json: valid JSON, only magpie routes (group/*, auto/*), never deepseek/* direct
 if (existsSync(join(root, "config", "model-routing.json"))) {
   try {

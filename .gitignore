@@ -16,3 +16,4 @@ cli/packages/*/src/**/*.js
 cli/packages/*/src/**/*.d.ts
 cli/packages/plugins/*/src/**/*.js
 cli/packages/plugins/*/src/**/*.d.ts
+.mstack/scout/

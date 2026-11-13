@@ -1,0 +1,14 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "include": [
+    "src/**/*"
+  ],
+  "references": [
+    {
+      "path": "../../plugin-sdk"
+    },
+    {
+      "path": "../cmd-run"
+    }
+  ]
+}

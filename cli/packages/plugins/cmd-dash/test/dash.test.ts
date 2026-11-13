@@ -10,6 +10,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { Command, DoctorCheck, Io, PluginContext } from "@mola/plugin-sdk";
 import { openStateStore } from "@mola/core";
+import { writeProgress, type RunProgress } from "@mola/plugin-sdk";
 import plugin, { collectDash, renderDash, watchInterval, type DashSnapshot } from "@mola/plugin-cmd-dash";
 
 function io(json = false): Io & { outLines: string[]; dataValue: unknown } {
@@ -200,5 +201,61 @@ test("dash reads the last runs from the rec-runs state namespace", async () => {
   } finally {
     if (prev === undefined) delete process.env.MOLA_HOME;
     else process.env.MOLA_HOME = prev;
+  }
+});
+
+function goRun(cwd: string, id: string, status: RunProgress["status"]): void {
+  const now = new Date().toISOString();
+  writeProgress({
+    schemaVersion: 1,
+    id,
+    intent: "ship it",
+    cwd,
+    status,
+    startedAt: now,
+    updatedAt: now,
+    stage: "verify",
+    stages: [
+      { name: "plan", status: "done", costUsd: 0.1 },
+      { name: "verify", status: "running", costUsd: 0.32 },
+    ],
+    workers: [
+      { id: "w1", stage: "verify", status: "working", model: "sonnet", startedAt: now, costUsd: 0.32 },
+      { id: "w2", stage: "plan", status: "done", model: "opus", startedAt: now, updatedAt: now, costUsd: 0.1 },
+    ],
+    costUsd: 0,
+    ...(status === "blocked" ? { blocked: { reason: "needs push approval" } } : {}),
+  });
+}
+
+test("dash shows a Go runs section and --json carries goRuns", async () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "mola-dash-go-"));
+  goRun(cwd, "run-a", "running");
+  goRun(cwd, "run-b", "blocked");
+  goRun(cwd, "run-c", "done");
+  const prev = process.cwd();
+  process.chdir(cwd);
+  try {
+    const { ctx, command } = ctxOf({ checks: healthyChecks });
+    plugin.activate(ctx);
+    const human = io(false);
+    await command().handler({ positionals: [], flags: {} }, human);
+    const text = human.outLines.join("\n");
+    assert.match(text, /Go runs/);
+    assert.match(text, /go ▸ verify \(2\/2\) · 1 agent · \$0\.42/);
+    assert.match(text, /go ⏸ verify: needs push approval/);
+    assert.match(text, /working\s+verify\s+sonnet/);
+    assert.match(text, /done\s+plan\s+opus/);
+    assert.equal(text.match(/go [▸⏸]/g)?.length, 2, "done run is not listed");
+
+    const js = io(true);
+    await command().handler({ positionals: [], flags: {} }, js);
+    const data = js.dataValue as DashSnapshot;
+    assert.equal(data.goRuns.length, 2);
+    assert.deepEqual(data.goRuns.map((r) => r.id).sort(), ["run-a", "run-b"]);
+    assert.equal(data.goRuns[0].workers.length, 2);
+    assert.equal(data.goRuns[0].workers[0].model.length > 0, true);
+  } finally {
+    process.chdir(prev);
   }
 });

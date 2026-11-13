@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "mola-policy-guard",
+  "version": "0.1.0",
+  "kind": "policy",
+  "displayName": "policy-guard",
+  "mola": ">=0.1.0 <1.0.0",
+  "engine": {
+    "node": ">=22"
+  },
+  "entry": {
+    "ts": "./dist/index.js"
+  },
+  "provides": [
+    "cmd:guard",
+    "cmd:land"
+  ],
+  "requires": [],
+  "capabilities": [
+    "command.guard",
+    "command.land",
+    "guard.git"
+  ],
+  "permissions": {
+    "fs.read": [
+      "**/.mstack/**"
+    ],
+    "fs.write": [
+      "**/.mstack/**"
+    ],
+    "mola": [
+      "commands",
+      "config.read"
+    ]
+  },
+  "hooks": {
+    "emit": [],
+    "listen": []
+  }
+}
