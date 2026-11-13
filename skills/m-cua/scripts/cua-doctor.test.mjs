@@ -16,7 +16,7 @@ function fake(dir, name, lines, code = 0) {
   if (WIN) writeFileSync(join(dir, name + ".cmd"), ["@echo off", ...lines.map((l) => "echo " + l), `exit /b ${code}`].join("\r\n") + "\r\n");
   else {
     const p = join(dir, name);
-    writeFileSync(p, ["#!/bin/sh", "cat <<'CUA_EOF'", ...lines, "CUA_EOF", `exit ${code}`].join("\n") + "\n");
+    writeFileSync(p, ["#!/bin/sh", ...lines.map((l) => `printf '%s\\n' '${l.replaceAll("'", "'\\''")}'`), `exit ${code}`].join("\n") + "\n");
     chmodSync(p, 0o755);
   }
 }
