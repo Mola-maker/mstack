@@ -21,6 +21,7 @@
  * project.
  */
 
+import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -49,6 +50,8 @@ export interface SkillPlanEntry {
   /** "symlink" (dsh) or "copy" (codex) */
   mode: "symlink" | "copy" | "print";
   action: "create" | "replace" | "keep" | "skip";
+  /** content hash of the source skill directory (copy mode only) */
+  hash?: string;
   detail?: string;
 }
 
@@ -119,6 +122,8 @@ export function planSkills(opts: {
   home: string;
   /** when true, the plan is only computed (dry run) */
   dryRun?: boolean;
+  /** copy into ~/.dsh/skills instead of linking: the install then survives the checkout moving or changing branch */
+  copy?: boolean;
 }): SkillPlan {
   const skills = listSkills(opts.root);
   const entries: SkillPlanEntry[] = [];
@@ -137,16 +142,18 @@ export function planSkills(opts: {
       continue;
     }
     const dir = targetDir(target, opts.home);
-    const mode = target === "dsh" ? "symlink" : "copy";
+    const mode = target === "dsh" && !opts.copy ? "symlink" : "copy";
     for (const skill of skills) {
       const destination = path.join(dir, skill.name);
+      const hash = mode === "copy" ? hashDir(skill.source) : undefined;
       entries.push({
         target,
         name: skill.name,
         source: skill.source,
         destination,
         mode,
-        action: classifyAction(destination, skill.source, mode),
+        action: classifyAction(destination, skill.source, mode, hash),
+        hash,
       });
     }
   }
@@ -165,6 +172,7 @@ function classifyAction(
   destination: string,
   source: string,
   mode: "symlink" | "copy",
+  hash?: string,
 ): SkillPlanEntry["action"] {
   let stat: fs.Stats | null = null;
   try {
@@ -173,6 +181,7 @@ function classifyAction(
     return "create";
   }
   if (stat.isSymbolicLink()) {
+    if (mode === "copy") return "replace";
     try {
       if (fs.realpathSync(destination) === fs.realpathSync(source)) return "keep";
     } catch {
@@ -180,8 +189,84 @@ function classifyAction(
     }
     return "replace";
   }
-  if (stat.isDirectory()) return mode === "copy" ? "keep" : "replace";
+  // A copy is current only when its stamp carries the source's content hash. A directory with no stamp
+  // (an older install, or a hand-made one) is replaced: "keep" used to mean a copy was never updated.
+  if (stat.isDirectory()) return mode === "copy" && hash !== undefined && readStamp(destination)?.hash === hash ? "keep" : "replace";
   return "replace";
+}
+
+/** The stamp written into a copied skill: what was installed, from where. */
+export const STAMP_FILE = ".mstack-install.json";
+
+export interface SkillStamp {
+  name: string;
+  hash: string;
+  source: string;
+  installedAt: string;
+}
+
+export function readStamp(dir: string): SkillStamp | null {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(path.join(dir, STAMP_FILE), "utf8"));
+    return typeof parsed?.hash === "string" ? (parsed as SkillStamp) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * sha256 over the sorted relative paths and bytes of every file in a skill directory. Dotfiles are left
+ * out (the stamp is one), and CRLF is folded to LF so a Windows checkout and a WSL one hash alike.
+ */
+export function hashDir(dir: string): string {
+  const h = createHash("sha256");
+  const walk = (d: string, rel: string): void => {
+    for (const entry of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
+      if (entry.name.startsWith(".")) continue;
+      const r = rel ? `${rel}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) walk(path.join(d, entry.name), r);
+      else if (entry.isFile()) {
+        h.update(r + "\0");
+        h.update(fs.readFileSync(path.join(d, entry.name)).toString("latin1").replace(/\r\n/g, "\n"), "latin1");
+        h.update("\0");
+      }
+    }
+  };
+  walk(dir, "");
+  return h.digest("hex");
+}
+
+export interface SkillsStatus {
+  target: SkillTarget;
+  dir: string;
+  /** skills in the source repo */
+  total: number;
+  /** linked to this source, or a copy whose stamp matches it */
+  current: string[];
+  /** installed but different from the source (another checkout, an old copy, no stamp) */
+  stale: string[];
+  missing: string[];
+}
+
+/** Compare what a harness has installed with the source repo. Reads only. */
+export function skillsStatus(opts: { root: string; target: "dsh" | "codex"; home: string }): SkillsStatus {
+  const dir = targetDir(opts.target, opts.home);
+  const out: SkillsStatus = { target: opts.target, dir, total: 0, current: [], stale: [], missing: [] };
+  for (const skill of listSkills(opts.root)) {
+    out.total++;
+    const destination = path.join(dir, skill.name);
+    let stat: fs.Stats | null = null;
+    try { stat = fs.lstatSync(destination); } catch { /* not installed */ }
+    if (!stat) { out.missing.push(skill.name); continue; }
+    let same = false;
+    if (stat.isSymbolicLink()) {
+      try { same = fs.realpathSync(destination) === fs.realpathSync(skill.source); } catch { /* dangling link */ }
+    } else if (stat.isDirectory()) {
+      same = readStamp(destination)?.hash === hashDir(skill.source);
+    }
+    (same ? out.current : out.stale).push(skill.name);
+  }
+  return out;
 }
 
 /** Execute one plan entry (create/replace only; "keep" is a no-op). */
@@ -204,6 +289,8 @@ export function applySkillEntry(entry: SkillPlanEntry): void {
     /* nothing to remove */
   }
   copyDir(entry.source, entry.destination);
+  const stamp: SkillStamp = { name: entry.name, hash: entry.hash ?? hashDir(entry.source), source: entry.source, installedAt: new Date().toISOString() };
+  fs.writeFileSync(path.join(entry.destination, STAMP_FILE), JSON.stringify(stamp, null, 2) + "\n");
 }
 
 function copyDir(from: string, to: string): void {
@@ -211,6 +298,7 @@ function copyDir(from: string, to: string): void {
   for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
     const src = path.join(from, entry.name);
     const dst = path.join(to, entry.name);
+    if (entry.name === STAMP_FILE) continue;
     if (entry.isDirectory()) copyDir(src, dst);
     else if (entry.isFile()) fs.copyFileSync(src, dst);
   }

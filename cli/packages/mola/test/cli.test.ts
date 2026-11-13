@@ -165,3 +165,14 @@ test("MOLA_LOG_LEVEL env maps into the log layer; log file carries traceId", () 
   const log = fs.readFileSync(path.join(home, "logs", "mola.log"), "utf8");
   assert.match(log, new RegExp(`"traceId":"${traceId}"`));
 });
+
+test("doctor --json lists the skills.installed check, and skills install --copy --dry-run is a known command", () => {
+  const home = tmpHome();
+  const d = envelope(run(["doctor", "--json"], home));
+  const checks = (d.data.checks ?? d.data) as any[];
+  assert.ok(checks.some((c) => c.id === "skills.installed"), JSON.stringify(checks.map((c) => c.id)));
+  const r = run(["skills", "install", "--dsh", "--copy", "--dry-run", "--json"], home);
+  assert.equal(r.status, 0, r.stderr);
+  const entries = envelope(r).data.entries as any[];
+  assert.ok(entries.length > 0 && entries.every((e) => e.target === "dsh" && e.mode === "copy" && typeof e.hash === "string"));
+});

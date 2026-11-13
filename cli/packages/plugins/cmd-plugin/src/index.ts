@@ -58,6 +58,7 @@ import {
   SKILL_TARGETS,
   userHome,
   type SkillTarget,
+  skillsStatus,
 } from "./skills.js";
 import { molaHome, findMstackRoot, readSkillsVersion } from "./paths.js";
 import {
@@ -595,7 +596,7 @@ export default definePlugin({
 
     ctx.commands.register({
       path: ["skills", "install"],
-      description: "install the mstack skills (--claude|--dsh|--codex)",
+      description: "install the mstack skills (--claude|--dsh|--codex; --copy copies into dsh instead of linking)",
       async handler(args, io) {
         const root = findMstackRoot({
           cwd: io.cwd,
@@ -612,7 +613,8 @@ export default definePlugin({
         const targets = parseTargets(args.flags);
         const dryRun = args.flags["dry-run"] === true || args.flags.dryRun === true;
         const home = userHome();
-        const plan = planSkills({ root, targets, home, dryRun });
+        const copy = args.flags.copy === true;
+        const plan = planSkills({ root, targets, home, dryRun, copy });
         if (dryRun) {
           io.data({ dryRun: true, root, entries: plan.entries, claudeHint: plan.claudeHint });
           if (!io.json) {
@@ -630,9 +632,34 @@ export default definePlugin({
             if (e.action === "keep" || e.action === "skip") continue;
             io.out(`${e.target}/${e.name} → ${e.destination} (${e.mode})`);
           }
+          const kept = plan.entries.filter((e) => e.action === "keep").length;
+          if (kept > 0) io.out(`${kept} already current`);
           if (plan.claudeHint) note(io, `claude: ${plan.claudeHint}`);
         }
         return ExitCode.Ok;
+      },
+    });
+
+    // A harness with no mstack skills, or with a copy of an older version, is an environment gap the
+    // agent cannot see from inside a session: report it here so doctor (and anything reading it) shows it.
+    ctx.doctor.registerCheck({
+      id: "skills.installed",
+      description: "mstack skills installed in dsh and codex match the source repo",
+      async run() {
+        const root = findMstackRoot({ cwd: process.cwd(), configSource: ctx.config.get<string>("skills.source") });
+        if (!root) return { ok: true, message: "mstack repo not found — nothing to compare (set skills.source or MOLA_MSTACK_DIR)" };
+        const home = userHome();
+        const parts: string[] = [];
+        let gap = false;
+        for (const target of ["dsh", "codex"] as const) {
+          if (!fs.existsSync(path.join(home, `.${target}`))) { parts.push(`${target}: not installed on this machine`); continue; }
+          const s = skillsStatus({ root, target, home });
+          if (s.missing.length || s.stale.length) gap = true;
+          parts.push(`${target}: ${s.current.length}/${s.total} current` + (s.stale.length ? `, ${s.stale.length} stale` : "") + (s.missing.length ? `, ${s.missing.length} missing` : ""));
+        }
+        return gap
+          ? { ok: false, message: `${parts.join("; ")} — run \`mola skills install --copy\` (source ${root})`, exitCode: ExitCode.Unavailable }
+          : { ok: true, message: parts.join("; ") };
       },
     });
 
