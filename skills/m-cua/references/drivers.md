@@ -20,11 +20,12 @@ agent-desktop <command> --help
 | Act | `agent-desktop click '<ref>'`, `set-value '<ref>' <text>`, `press <key>` |
 | Wait | `agent-desktop wait --app <app> --text "<text>"`, or `--wait-for role:text` on a snapshot or action |
 | Assert | `agent-desktop find` / `get` / `is`, then compare the JSON in the script |
-| Replay | `agent-desktop batch '<json array of {command,args}>' --stop-on-error` |
+| Replay | in the script, look the element up again each run: `agent-desktop find --app <app> --role button --name "<name>" --first` returns `data.match.ref_id`; pass that ref to `click` or `get`. Do not use `batch` for replay: it takes fixed refs, and a ref dies with its snapshot |
 
 Rules that save retries:
 
-- Default delivery is headless: it does not move the pointer or take focus. On Windows `type`, `right-click`, `double-click` and pointer input need the global `--headed` flag and return `POLICY_DENIED` without it. Prefer `set-value` over `type`.
+- Default delivery is headless: it does not move the pointer or take focus. Stay headless. On Windows `type`, `right-click`, `double-click` and pointer input return `POLICY_DENIED` headless; use `set-value` instead of `type`, and a ref `click` instead of pointer input.
+- `--headed` moves the real pointer and sends real keys into the user's desktop. Use it only after the user said yes for this task, never to recover from a headless failure. The same goes for `press --force`, which bypasses the dangerous-shortcut block.
 - Retry a failed command only when `error.disposition.retry` is `safe`. On `STALE_REF`, snapshot again.
 - Dense apps: `snapshot --skeleton` first, then `snapshot --root '<ref>'` for one region.
 - Measured on Windows 11 through the npm launcher (2026-11-12, v1.3.0): `list-apps` about 0.25 s, a window snapshot about 0.5 s. Install size 31 MB.
@@ -38,8 +39,8 @@ No extra agent is installed on the device; everything goes through `adb`. With s
 | Install (L3) | `adb install -r <apk>` |
 | Launch (L3) | `adb shell am start -W -n <package>/<activity>`; the output must contain `Status: ok` |
 | Not crashed (L3) | `adb shell pidof <package>` prints a pid; `adb logcat -d -b crash` has no entry for the package after launch |
-| Observe | `adb exec-out uiautomator dump /dev/tty` prints the UI as XML: each `node` has `text`, `resource-id`, `content-desc`, `clickable`, `bounds="[x1,y1][x2,y2]"` |
-| Act | tap the centre of a node's `bounds`: `adb shell input tap <x> <y>`; text: `adb shell input text '<text>'`; back: `adb shell input keyevent 4` |
+| Observe | `adb exec-out uiautomator dump /dev/tty` prints the UI as XML, followed by one line `UI hierchary dumped to: /dev/tty` that the script must cut off before parsing: each `node` has `text`, `resource-id`, `content-desc`, `clickable`, `bounds="[x1,y1][x2,y2]"` |
+| Act | tap the centre of a node's `bounds`: `adb shell input tap <x> <y>`; text: `adb shell input text '<text>'` (write a space as `%s`); back: `adb shell input keyevent 4` |
 | Wait | loop on the dump until a node with the expected `resource-id` or `text` appears, with a deadline |
 | Assert (L4) | the dump after the flow contains the expected `text` on the expected `resource-id` |
 | Evidence | save the final dump; `adb exec-out screencap -p > shot.png` for a person |

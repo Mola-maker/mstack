@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // Probes the GUI drivers m-cua can use and says what is missing and how to connect it.
 // Usage: node cua-doctor.mjs [--need desktop|android|web] [--json]
-// Exit 0: every needed driver is ready (no --need: at least one is). Exit 1: a needed driver is not ready. Exit 2: bad arguments.
-// A driver is one of: ready | not-on-path (installed, the shell cannot see it) | no-device | missing | broken.
+// Exit 0: every needed driver is usable (no --need: at least one is). Exit 1: a needed driver is not usable. Exit 2: bad arguments.
+// A driver is one of: ready | not-on-path (installed and working, but only by the full path printed) | no-device | missing | broken.
+// ready and not-on-path are both usable.
 import { existsSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { join, delimiter } from "node:path";
+import { join, delimiter, dirname, basename } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const WIN = process.platform === "win32";
@@ -23,9 +24,11 @@ export function findIn(dirs, name, env = process.env) {
 }
 
 const run = (bin, args, env) => {
-  // .cmd/.bat launchers need a shell on Windows; arguments here are fixed strings, never user input.
   const opts = { encoding: "utf8", env, timeout: 15000, windowsHide: true };
-  const r = WIN ? spawnSync(`"${bin}" ${args.join(" ")}`, { ...opts, shell: true }) : spawnSync(bin, args, opts);
+  // Windows .cmd/.bat launchers need a shell. cmd expands %VAR% even inside quotes, so the directory never goes
+  // into the command string: the file is run by its own name from its directory. Arguments are fixed strings, never user input.
+  const viaShell = WIN && !/\.(exe|com)$/i.test(bin);
+  const r = viaShell ? spawnSync(`"${basename(bin)}" ${args.join(" ")}`, { ...opts, cwd: dirname(bin), shell: true }) : spawnSync(bin, args, opts);
   return { status: r.status, out: (r.stdout || "") + (r.stderr || ""), error: r.error?.message };
 };
 
@@ -37,15 +40,17 @@ function locate(name, extraDirs, env) {
 }
 
 export function probeDesktop(env = process.env) {
-  const extra = [env.APPDATA && join(env.APPDATA, "npm"), env.npm_config_prefix, env.HOME && join(env.HOME, ".npm-global", "bin"), "/usr/local/bin", "/opt/homebrew/bin"];
+  const extra = [env.APPDATA && join(env.APPDATA, "npm"), env.npm_config_prefix && join(env.npm_config_prefix, WIN ? "" : "bin"), env.HOME && join(env.HOME, ".npm-global", "bin")];
   const hit = locate("agent-desktop", extra, env);
   if (!hit) return { driver: "desktop", tool: "agent-desktop", state: "missing", fix: "npm install -g agent-desktop" };
   const r = run(hit.bin, ["status"], env);
   let st = null;
   for (const line of r.out.split("\n")) { try { const j = JSON.parse(line); if (j.command === "status") st = j; } catch { /* launcher notices are not JSON */ } }
-  if (!st?.ok) return { driver: "desktop", tool: "agent-desktop", state: "broken", bin: hit.bin, fix: "run `agent-desktop status` and read the error", detail: (r.error || r.out).slice(0, 200) };
-  const denied = Object.entries(st.data.permissions || {}).filter(([, v]) => !["granted", "not_required"].includes(v.state)).map(([k]) => k);
-  if (denied.length) return { driver: "desktop", tool: "agent-desktop", state: "broken", bin: hit.bin, fix: "agent-desktop permissions --guide", detail: "permission not granted: " + denied.join(", ") };
+  if (!st?.ok || !st.data) return { driver: "desktop", tool: "agent-desktop", state: "broken", bin: hit.bin, fix: "run `agent-desktop status` and read the error", detail: (r.error || r.out).slice(0, 200) };
+  // Reading the accessibility tree needs only this permission; screen recording matters for screenshots alone.
+  const acc = st.data.permissions?.accessibility?.state;
+  if (acc && !["granted", "not_required"].includes(acc))
+    return { driver: "desktop", tool: "agent-desktop", state: "broken", bin: hit.bin, fix: process.platform === "darwin" ? "agent-desktop permissions --guide" : "agent-desktop permissions --request, then read `agent-desktop skills get platform`", detail: "accessibility permission is " + acc };
   return hit.onPath
     ? { driver: "desktop", tool: "agent-desktop", state: "ready", bin: hit.bin, version: st.data.version }
     : { driver: "desktop", tool: "agent-desktop", state: "not-on-path", bin: hit.bin, fix: `call it by full path, or add its directory to PATH: ${hit.bin}` };
@@ -57,11 +62,14 @@ export function probeAndroid(env = process.env) {
   if (!hit) return { driver: "android", tool: "adb", state: "missing", fix: "install Android SDK Platform-Tools (https://developer.android.com/tools/releases/platform-tools) and put platform-tools on PATH" };
   const r = run(hit.bin, ["devices"], env);
   if (r.status !== 0) return { driver: "android", tool: "adb", state: "broken", bin: hit.bin, fix: "run `adb devices` and read the error", detail: (r.error || r.out).slice(0, 200) };
-  const rows = r.out.split("\n").map((l) => l.trim().split(/\s+/)).filter((c) => c.length === 2 && c[0] !== "List");
+  // A device row is `<serial><whitespace><state>`; the state can hold spaces ("no permissions (...)"). Daemon notices start with `*`.
+  const rows = r.out.split("\n").map((l) => l.trim().match(/^(\S+)\s+(.+)$/)).filter((m) => m && !m[1].startsWith("*") && m[1] !== "List").map((m) => [m[1], m[2]]);
   const online = rows.filter((c) => c[1] === "device").map((c) => c[0]);
   if (!online.length) {
-    const why = (rows.length ? `devices present but not usable: ${rows.map((c) => c.join(" ")).join(", ")}` : "no device or emulator attached") + (hit.onPath ? "" : "; adb is also not on PATH");
-    return { driver: "android", tool: "adb", state: "no-device", bin: hit.bin, onPath: hit.onPath, fix: "start an emulator (`emulator -avd <name>`) or plug in a device with USB debugging authorised", detail: why };
+    // `emulator` is rarely on PATH; it sits beside platform-tools in the SDK.
+    const emu = findIn([join(dirname(dirname(hit.bin)), "emulator")], "emulator", env) ?? "<Android SDK>/emulator/emulator";
+    const why =(rows.length ? `devices present but not usable: ${rows.map((c) => c.join(" ")).join(", ")}` : "no device or emulator attached") + (hit.onPath ? "" : "; adb is also not on PATH");
+    return { driver: "android", tool: "adb", state: "no-device", bin: hit.bin, onPath: hit.onPath, fix: `start an emulator ("${emu}" -list-avds, then "${emu}" -avd <name>) or plug in a device with USB debugging authorised`, detail: why };
   }
   return hit.onPath
     ? { driver: "android", tool: "adb", state: "ready", bin: hit.bin, devices: online }
@@ -83,12 +91,12 @@ export function main(argv, env = process.env, cwd = process.cwd()) {
   let json = false;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--json") json = true;
-    else if (argv[i] === "--need" && PROBES[argv[i + 1]]) need.push(argv[++i]);
+    else if (argv[i] === "--need" && Object.hasOwn(PROBES, argv[i + 1] ?? "")) need.push(argv[++i]);
     else return { code: 2, text: `usage: cua-doctor.mjs [--need desktop|android|web] [--json]  (bad argument: ${argv[i]})` };
   }
   const results = (need.length ? need : Object.keys(PROBES)).map((d) => PROBES[d](env, cwd));
-  const ready = results.filter((r) => r.state === "ready");
-  const ok = need.length ? ready.length === results.length : ready.length > 0;
+  const usable = results.filter((r) => r.state === "ready" || r.state === "not-on-path");
+  const ok = need.length ? usable.length === results.length : usable.length > 0;
   const text = json
     ? JSON.stringify({ ok, drivers: results })
     : results.map((r) => `${r.driver}: ${r.state} (${r.tool}${r.bin ? " at " + r.bin : ""})${r.detail ? " - " + r.detail : ""}${r.fix ? "\n  fix: " + r.fix : ""}`).join("\n");

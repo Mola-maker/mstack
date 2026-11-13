@@ -42,12 +42,12 @@ test("agent-desktop on PATH with permissions granted is ready", (t) => {
   assert.equal(drivers(r).desktop.version, "9.9.9");
 });
 
-test("agent-desktop installed where npm puts it but not on PATH is not-on-path and names the file", (t) => {
+test("agent-desktop installed where npm puts it but not on PATH is not-on-path, usable, and names the file", (t) => {
   const d = scratch(t);
   const off = WIN ? join(d, "appdata", "npm") : join(d, "home", ".npm-global", "bin");
   fake(off, "agent-desktop", [STATUS()]);
   const r = main(["--need", "desktop", "--json"], env([d], WIN ? { APPDATA: join(d, "appdata") } : { HOME: join(d, "home") }), d);
-  assert.equal(r.code, 1);
+  assert.equal(r.code, 0);
   const x = drivers(r).desktop;
   assert.equal(x.state, "not-on-path");
   assert.ok(x.fix.includes(off), x.fix);
@@ -56,9 +56,24 @@ test("agent-desktop installed where npm puts it but not on PATH is not-on-path a
 test("agent-desktop without the accessibility permission is broken, not ready", (t) => {
   const d = scratch(t);
   fake(d, "agent-desktop", [STATUS("denied")]);
-  const x = drivers(main(["--need", "desktop", "--json"], env([d]), d)).desktop;
-  assert.equal(x.state, "broken");
-  assert.match(x.detail, /accessibility/);
+  const r = main(["--need", "desktop", "--json"], env([d]), d);
+  assert.equal(r.code, 1);
+  assert.equal(drivers(r).desktop.state, "broken");
+  assert.match(drivers(r).desktop.detail, /accessibility permission is denied/);
+});
+
+test("a denied screen-recording permission alone does not make the desktop driver unusable", (t) => {
+  const d = scratch(t);
+  fake(d, "agent-desktop", ['{"ok":true,"command":"status","data":{"permissions":{"accessibility":{"state":"granted"},"screen_recording":{"state":"denied"}},"version":"9.9.9"}}']);
+  assert.equal(drivers(main(["--need", "desktop", "--json"], env([d]), d)).desktop.state, "ready");
+});
+
+test("a status envelope without data is broken, not a crash", (t) => {
+  const d = scratch(t);
+  fake(d, "agent-desktop", ['{"ok":true,"command":"status"}']);
+  const r = main(["--need", "desktop", "--json"], env([d]), d);
+  assert.equal(r.code, 1);
+  assert.equal(drivers(r).desktop.state, "broken");
 });
 
 test("adb with no device, and with only an unauthorized device, is no-device", (t) => {
@@ -73,6 +88,30 @@ test("adb with no device, and with only an unauthorized device, is no-device", (
   assert.match(drivers(r).android.detail, /unauthorized/);
 });
 
+test("a Linux `no permissions` row is reported, not dropped; daemon notices are not devices", (t) => {
+  const d = scratch(t);
+  fake(d, "adb", ["* daemon not running; starting now at tcp:5037", "* daemon started successfully", "List of devices attached", "0123456789ABCDEF no permissions (user in plugdev group)"]);
+  const x = drivers(main(["--need", "android", "--json"], env([d]), d)).android;
+  assert.equal(x.state, "no-device");
+  assert.match(x.detail, /0123456789ABCDEF no permissions/);
+  assert.doesNotMatch(x.detail, /daemon/);
+});
+
+test("no-device names the emulator by full path when the SDK has one", (t) => {
+  const d = scratch(t);
+  fake(join(d, "sdk", "platform-tools"), "adb", ["List of devices attached"]);
+  fake(join(d, "sdk", "emulator"), "emulator", ["x"]);
+  const x = drivers(main(["--need", "android", "--json"], env([d], { ANDROID_HOME: join(d, "sdk") }), d)).android;
+  assert.equal(x.state, "no-device");
+  assert.ok(x.fix.includes(join(d, "sdk", "emulator")), x.fix);
+});
+
+test("a tool whose directory name contains %VAR% still runs", (t) => {
+  const d = join(scratch(t), "p%PATH%q");
+  fake(d, "adb", ["List of devices attached", "emulator-5554 device"]);
+  assert.equal(drivers(main(["--need", "android", "--json"], env([d]), d)).android.state, "ready");
+});
+
 test("adb with an online device is ready and lists it", (t) => {
   const d = scratch(t);
   fake(d, "adb", ["List of devices attached", "emulator-5554 device"]);
@@ -81,11 +120,12 @@ test("adb with an online device is ready and lists it", (t) => {
   assert.deepEqual(drivers(r).android.devices, ["emulator-5554"]);
 });
 
-test("adb only under ANDROID_HOME/platform-tools is not-on-path", (t) => {
+test("adb only under ANDROID_HOME/platform-tools with a device is not-on-path and usable", (t) => {
   const d = scratch(t);
   fake(join(d, "sdk", "platform-tools"), "adb", ["List of devices attached", "emulator-5554 device"]);
   const r = main(["--need", "android", "--json"], env([d], { ANDROID_HOME: join(d, "sdk") }), d);
-  assert.equal(r.code, 1);
+  assert.equal(r.code, 0);
+  assert.ok(drivers(r).android.bin.includes("platform-tools"));
   assert.equal(drivers(r).android.state, "not-on-path");
 });
 
@@ -109,6 +149,9 @@ test("without --need, one ready driver is enough for exit 0", (t) => {
 test("an unknown argument or driver name exits 2", () => {
   assert.equal(main(["--need", "ios"]).code, 2);
   assert.equal(main(["--wat"]).code, 2);
+  assert.equal(main(["--need"]).code, 2);
+  // names that exist on Object.prototype are not drivers
+  for (const n of ["constructor", "__proto__", "toString"]) assert.equal(main(["--need", n, "--json"], { PATH: "", SECRET: "s3cr3t" }).code, 2, n);
 });
 
 test("run as a command it prints one block per driver with the fix line", (t) => {

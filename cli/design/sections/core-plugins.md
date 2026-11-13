@@ -44,7 +44,7 @@ mstack/
 │  ├─ mola-ptyd/                 # PTY/process supervisor sidecar (portable-pty; ConPTY on Win)
 │  ├─ mola-syncd/                # sync daemon sidecar (backend per envs-collab section)
 │  └─ mola-layerfs/              # thin adapter crate over the existing LayerFS library
-├─ skills/                       # unchanged — the "how to work" (16 m-* skills)
+├─ skills/                       # unchanged — the "how to work" (17 m-* skills)
 └─ .claude-plugin/               # unchanged — Claude Code plugin manifest for the skills
 ```
 

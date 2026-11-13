@@ -20,8 +20,9 @@ Do not use it for what a command already proves: unit tests and builds belong to
 First line you say: `Using m-cua: drive the real UI, keep the script.`
 
 1. **Pick the driver.** Desktop app → `desktop`. Android app → `android`. Web page → `web`. One target, one driver.
-2. **Run the doctor.** `node "<this skill dir>/scripts/cua-doctor.mjs" --need <driver>`. `<this skill dir>` is the directory this SKILL.md was loaded from. Exit 0 means ready. Otherwise it prints the state and one fix line:
-   - `not-on-path`: the tool is installed but the shell cannot see it. Use the full path it prints. Do not reinstall.
+2. **Run the doctor.** `node "<this skill dir>/scripts/cua-doctor.mjs" --need <driver>`. `<this skill dir>` is the directory this SKILL.md was loaded from. Exit 0 means usable: go on. It prints one state per driver:
+   - `ready`: call the tool by name.
+   - `not-on-path` (still exit 0): the tool works but the shell cannot see it. Call it by the full path the doctor printed, in every command and in the script. Do not reinstall and do not rerun the doctor.
    - `no-device`: start the emulator or authorise the device, then rerun.
    - `missing`: install with the printed command if the user allowed installs; otherwise report it and stop.
    - `broken`: run the command it names and read the error.
@@ -40,7 +41,8 @@ First line you say: `Using m-cua: drive the real UI, keep the script.`
 
 ## Stop conditions
 
-- The doctor still fails after one fix attempt → report the state and the fix line; do not claim L3.
+- The doctor still exits 1 after one fix attempt → report the state and the fix line; do not claim L3.
+- A command returns `POLICY_DENIED`, or the step seems to need `--headed` (real pointer and keyboard) or `--force` → stop and ask the user. Never add either flag to get past a failure: headed input lands in whatever window the user is working in.
 - The same action fails 3 times in a row → stop and report the last error and snapshot (principle 9).
 - A step needs credentials, a payment, or sending a message to a real person → stop and ask.
 - The target shows private content you were not asked to read (mail, chats, password managers) → do not snapshot it; narrow the snapshot to the app under test.
