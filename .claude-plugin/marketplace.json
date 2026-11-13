@@ -2,6 +2,6 @@
   "name": "mstack",
   "owner": { "name": "Mola-maker" },
   "plugins": [
-    { "name": "mstack", "source": "./", "description": "Mola-maker's personal agent workflow stack (16 skills)." }
+    { "name": "mstack", "source": "./", "description": "Mola-maker's personal agent workflow stack (17 skills)." }
   ]
 }
