@@ -1,0 +1,21 @@
+# DSH overlay for the "bulk" role: dsh --profile <profile> --patch <this file> "<task>"
+# It declares the role group itself, so it works even when the profile's own model list does not show it.
+# Needs MAGPIE_GATEWAY_KEY in the environment (the same variable the mola-cli profile uses).
+- id: llm-pi-ai
+  config:
+    providers:
+      magpie:
+        displayName: Magpie
+        apiKeyEnv: MAGPIE_GATEWAY_KEY
+        api: openai-completions
+        baseURL: http://127.0.0.1:3425/v1
+        models:
+          - id: group/m-bulk
+            name: bulk role group
+            contextWindow: 200000
+            maxTokens: 16000
+            input: [text]
+- id: agent-default-model
+  config:
+    provider: magpie
+    model: group/m-bulk

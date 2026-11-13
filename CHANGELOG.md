@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.0 — 2026-11-13
+Work goes to the model that is good at it: strong models think, models that are steady with tools operate, cheap models do volume.
+- **Roles** in `config/model-routing.json` (v2): `think`, `build`, `operate`, `bulk`. Every task kind names a role; a new kind `operate` covers driving a UI, device or tool (`m-cua`).
+- **Each role is one magpie routing group** (`group/m-think`, `group/m-build`, `group/m-operate`, `group/m-bulk`). The group is the kind's first route; the previous picks stay behind it as the fallback. Membership, order and quota fallback inside a group belong to magpie.
+- Before this, 9 of 11 kinds, writing tests included, went to the most expensive model first. `test`, `explore`, `research` and `zh-writing` now go to `group/m-bulk`.
+- **DSH overlays** `config/dsh-roles/m-<role>.yml`: `dsh --profile mola-cli --patch <file> "<task>"` runs a worker on that role. The overlay declares the group itself, so it works when the profile's model list does not show it.
+- `m-dispatch`: the brief carries `ROLE:`; `references/model-routing.md` has the role table and says a role group counts as its leading family when a judge must differ from the author.
+- `scripts/check.mjs` checks that every kind names a role, lists the role group first, keeps a fallback, and that the overlay exists. `mola run` classifies operate tasks.
+- The membership of `think`, `build` and `operate` is a starting guess, marked `unverified`.
+
 ## 0.7.0 — 2026-11-12
 Computer use for acceptance: a 17th skill, `m-cua`, that operates a real desktop app, Android device or browser to prove L3/L4 on the acceptance ladder.
 - **`m-cua`**: pick a driver, run the doctor, explore by observe-act-observe on element refs, write the steps into a replayable script under `.mstack/cua/`, prove the script can fail, record a receipt.

@@ -60,6 +60,11 @@ const SIGNALS: Record<string, Array<[RegExp, number]>> = {
     [/\bverify\b/i, 1],
     [/审查|评审|复核/, 3],
   ],
+  operate: [
+    [/\b(click|tap|type into|press|launch|open)\b[^.\n]{0,40}\b(app|window|button|dialog|menu|emulator|device|screen|page)\b/i, 4],
+    [/\b(computer use|drive the (ui|app|browser)|operate the|adb|uiautomator|agent-desktop)\b/i, 4],
+    [/点一下|点击|操作界面|真机|模拟器/, 4],
+  ],
   test: [
     [/\b(add|write|create|extend)\b[^.\n]{0,20}\b(tests?|specs?)\b/i, 4],
     [/\b(tests?|testing|coverage|e2e|test suite|test cases?)\b/i, 2],
@@ -143,6 +148,7 @@ export function policyKindOf(kind: string): "implement" | "review" | "research" 
     case "review":
       return "review";
     case "test":
+    case "operate":
       return "qa";
     case "research":
     case "explore":

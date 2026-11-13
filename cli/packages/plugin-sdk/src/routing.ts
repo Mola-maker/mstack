@@ -27,9 +27,21 @@ export interface RoutingFamily {
   unverified?: boolean;
 }
 
+/** A role: one magpie routing group that several task kinds share (think, build, operate, bulk). */
+export interface RoutingRole {
+  /** the magpie route, e.g. `group/m-think` */
+  group: string;
+  /** the model family that leads the group; a role group counts as this family when a judge must differ from the author */
+  leads?: string;
+  desc?: string;
+  unverified?: boolean;
+}
+
 export interface RoutingTable {
   version?: number;
   updated?: string;
+  /** v2: roles by name; absent in a v1 file */
+  roles?: Record<string, RoutingRole>;
   tasks: Record<string, RoutingTask>;
   families: Record<string, RoutingFamily>;
   /** the file it was read from */
@@ -85,6 +97,7 @@ export function normalizeRouting(raw: unknown, file: string): RoutingTable | nul
     tasks[kind] = {
       picks,
       ...(typeof r.desc === "string" ? { desc: r.desc } : {}),
+      ...(typeof r.role === "string" ? { role: r.role } : {}),
       ...(typeof r.evidence === "string" ? { evidence: r.evidence } : {}),
       ...(typeof r.note === "string" ? { note: r.note } : {}),
       ...(r.unverified === true ? { unverified: true } : {}),
@@ -104,9 +117,22 @@ export function normalizeRouting(raw: unknown, file: string): RoutingTable | nul
     };
   }
   if (Object.keys(tasks).length === 0) return null;
+  const roles: Record<string, RoutingRole> = {};
+  for (const [name, row] of Object.entries((obj.roles ?? {}) as Record<string, unknown>)) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    if (typeof r.group !== "string" || r.group.length === 0) continue;
+    roles[name] = {
+      group: r.group,
+      ...(typeof r.leads === "string" ? { leads: r.leads } : {}),
+      ...(typeof r.desc === "string" ? { desc: r.desc } : {}),
+      ...(r.unverified === true ? { unverified: true } : {}),
+    };
+  }
   return {
     ...(typeof obj.version === "number" ? { version: obj.version } : {}),
     ...(typeof obj.updated === "string" ? { updated: obj.updated } : {}),
+    ...(Object.keys(roles).length > 0 ? { roles } : {}),
     tasks,
     families,
     file,

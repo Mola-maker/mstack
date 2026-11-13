@@ -20,6 +20,7 @@ import {
   loadRoutingFile,
   normalizeRouting,
   planRoutes,
+  policyKindOf,
   routingFilePath,
 } from "../src/routing.js";
 import { makeFakeCtx, makeIo, type FakeAgent } from "./fake.js";
@@ -158,6 +159,26 @@ test("classifyKind: low confidence returns null and inferKind falls back to the 
   // a kind the table does not have is skipped
   assert.equal(inferKind("review this diff", table()), "review");
   assert.equal(inferKind("write unit tests for utils", table()), "implement");
+});
+
+test("roles (v2): each kind's first route is its role group, the older picks are the ladder, and operate is a kind", () => {
+  const dir = path.dirname(fileURLToPath(import.meta.url));
+  const t = loadRoutingFile({ env: {} as never, startDir: dir }).table!;
+  assert.deepEqual(Object.keys(t.roles ?? {}).sort(), ["build", "bulk", "operate", "think"]);
+  for (const [kind, task] of Object.entries(t.tasks)) {
+    const role = t.roles![(task as { role?: string }).role ?? ""];
+    assert.ok(role, `kind ${kind} names no known role`);
+    const plan = planRoutes(t, kind, WL)!;
+    assert.equal(plan.route, role.group, kind);
+    assert.ok(plan.ladder.length >= 1, `kind ${kind} has no fallback behind its role group`);
+  }
+  assert.equal(planRoutes(t, "test", WL)!.route, "group/m-bulk");
+  assert.equal(planRoutes(t, "plan", WL)!.route, "group/m-think");
+  assert.equal(inferKind("launch the app, click the Save button and read the dialog", t), "operate");
+  assert.equal(inferKind("打开模拟器点一下登录", t), "operate");
+  assert.equal(policyKindOf("operate"), "qa");
+  // a v1 file (no roles) still loads
+  assert.equal(table().roles, undefined);
 });
 
 test("planRoutes: banned picks are dropped, the rest keep their order as the ladder", () => {

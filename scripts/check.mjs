@@ -88,6 +88,21 @@ if (existsSync(join(root, "config", "model-routing.json"))) {
       if (!t.evidence) err(`model-routing: task ${kind} has no evidence`);
     }
     if (!r.families || !Object.keys(r.families).length) err("model-routing: no families");
+    // v2 roles: every kind names a role, the role's group is the kind's first pick, and the DSH overlay for it exists
+    if (r.version >= 2) {
+      for (const [name, role] of Object.entries(r.roles ?? {})) {
+        if (role.group !== `group/m-${name}`) err(`model-routing: role ${name} must use group/m-${name}`);
+        if (!role.leads || !r.families[role.leads]) err(`model-routing: role ${name} needs "leads" set to a family`);
+        const overlay = join(root, "config", "dsh-roles", `m-${name}.yml`);
+        if (!existsSync(overlay) || !readFileSync(overlay, "utf8").includes(`model: ${role.group}`)) err(`model-routing: config/dsh-roles/m-${name}.yml missing or not set to ${role.group}`);
+      }
+      for (const [kind, t] of Object.entries(r.tasks ?? {})) {
+        const role = (r.roles ?? {})[t.role];
+        if (!role) err(`model-routing: task ${kind} has no known role`);
+        else if (t.picks?.[0] !== role.group) err(`model-routing: task ${kind} must list ${role.group} first`);
+        if ((t.picks ?? []).length < 2) err(`model-routing: task ${kind} has no fallback behind its role group`);
+      }
+    }
   } catch (e) { err(`model-routing: invalid JSON (${e.message})`); }
 }
 
