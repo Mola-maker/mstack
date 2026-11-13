@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 const root = new URL("..", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const expected = ["m-start", "m-team", "m-think", "m-plan", "m-goal", "m-dispatch", "m-verify", "m-debug", "m-handoff",
-  "m-review", "m-ship", "m-qa", "m-research", "m-learn", "m-deslop", "m-guard"];
+  "m-review", "m-ship", "m-qa", "m-research", "m-learn", "m-deslop", "m-guard", "m-cua"];
 const sections = ["## When to use", "## Procedure", "## Output", "## Stop conditions", "## Harness notes"];
 const errors = [];
 const err = (m) => errors.push(m);
@@ -28,7 +28,10 @@ for (const name of expected) {
   }
   const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!fm) { err(`${name}: no frontmatter`); continue; }
-  for (const k of ["name", "description", "whenToUse"]) if (!new RegExp(`^${k}:\\s*\\S`, "m").test(fm[1])) err(`${name}: frontmatter missing ${k}`);
+  for (const k of ["name", "description", "whenToUse", "when_to_use"]) if (!new RegExp(`^${k}:\\s*\\S`, "m").test(fm[1])) err(`${name}: frontmatter missing ${k}`);
+  // DSH reads `whenToUse`; Claude Code reads `when_to_use` and silently ignores the other. Both must be present and identical.
+  const wtu = (k) => (fm[1].match(new RegExp(`^${k}:\\s*(.*)$`, "m")) || [])[1];
+  if (wtu("whenToUse") !== wtu("when_to_use")) err(`${name}: whenToUse and when_to_use differ`);
   // An unquoted value containing ": " or " #" is invalid YAML; Claude Code then drops the skill silently.
   for (const line of fm[1].split(/\r?\n/)) {
     const v = line.replace(/^[\w-]+:\s*/, "");

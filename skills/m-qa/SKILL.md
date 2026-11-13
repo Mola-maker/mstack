@@ -2,6 +2,7 @@
 name: m-qa
 description: "QA via the project verify skill; report clean, changed, or blocked. Use for 测一下页面/QA/验收/验证skill."
 whenToUse: "The user wants a running app tested, or a project-local verify skill created or updated under .claude/skills/verify/."
+when_to_use: "The user wants a running app tested, or a project-local verify skill created or updated under .claude/skills/verify/."
 ---
 
 # m-qa

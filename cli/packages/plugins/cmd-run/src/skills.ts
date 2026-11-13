@@ -18,6 +18,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { TaskKind } from "./policy.js";
 
 export interface SkillSpec {
@@ -125,7 +126,9 @@ export function findMstackRoot(opts: {
   for (const dir of candidates) {
     if (isMstackRoot(dir)) return dir;
   }
-  for (const start of [opts.cwd, opts.startDir ?? path.dirname(import.meta.url ?? ".")]) {
+  // An explicit location that is wrong is an error to report, not a reason to guess another repo.
+  if (candidates.length > 0) return null;
+  for (const start of [opts.cwd, opts.startDir ?? path.dirname(fileURLToPath(import.meta.url))]) {
     if (!start) continue;
     let dir = path.resolve(start);
     for (let i = 0; i < 12; i++) {

@@ -2,6 +2,7 @@
 name: m-review
 description: "Multi-angle defect review by someone other than the author; verify feedback before applying. Use for review一下/审一下/看看这个PR."
 whenToUse: "A change or branch needs a correctness/security/quality audit before merge, or the user asks for code review."
+when_to_use: "A change or branch needs a correctness/security/quality audit before merge, or the user asks for code review."
 ---
 
 # m-review

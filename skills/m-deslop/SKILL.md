@@ -2,6 +2,7 @@
 name: m-deslop
 description: "删掉 AI 味和冗余——多余注释、死代码、无谓抽象、套话堆砌，先保护行为再减。Use when the user says \"deslop / 去AI味 / 删冗余 / 这段太啰嗦 / 精简一下\", or a diff feels bloated."
 whenToUse: "Remove AI-generated slop and redundancy from code or prose while preserving behavior: dead code, needless abstraction, defensive cruft, filler phrasing, and AI vocabulary."
+when_to_use: "Remove AI-generated slop and redundancy from code or prose while preserving behavior: dead code, needless abstraction, defensive cruft, filler phrasing, and AI vocabulary."
 ---
 
 # m-deslop — 删 AI 味与冗余

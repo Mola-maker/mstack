@@ -1,6 +1,6 @@
 # AGENTS.md — working in the mstack repo
 
-mstack = 16 workflow skills (`skills/`) + the `mola` CLI (`cli/`). The spec is `FRAMEWORK.md`; read the section you are changing first.
+mstack = 17 workflow skills (`skills/`) + the `mola` CLI (`cli/`). The spec is `FRAMEWORK.md`; read the section you are changing first.
 
 ## Verify before you claim done
 - Skills: `node scripts/check.mjs` (structure, ≤150 lines, ≤12000 bytes, frontmatter, no upstream names, eval cases). Must print `OK`.

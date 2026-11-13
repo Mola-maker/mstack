@@ -2,6 +2,7 @@
 name: m-ship
 description: "Branch to clean PR: sync upstream, real tests, independent review, PR doc, push, babysit CI. Use for 提PR/提交/推到上游."
 whenToUse: "Code changes are done and need committing, pushing, or a PR; or a PR is open and needs to be driven to green."
+when_to_use: "Code changes are done and need committing, pushing, or a PR; or a PR is open and needs to be driven to green."
 ---
 
 # m-ship

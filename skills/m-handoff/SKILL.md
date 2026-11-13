@@ -2,6 +2,7 @@
 name: m-handoff
 description: "Save or restore working state in .mstack/handoff.md before compact, model switch or session end. Use for 存档/交接/接着上次/compact."
 whenToUse: "Before compaction, switching models, or ending a session; or when asked to resume / \"where was I\" / \"pick up where I left off\"."
+when_to_use: "Before compaction, switching models, or ending a session; or when asked to resume / \"where was I\" / \"pick up where I left off\"."
 ---
 
 # m-handoff

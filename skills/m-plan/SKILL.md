@@ -2,6 +2,7 @@
 name: m-plan
 description: "Turn a design into ordered, verifiable steps with an independent critic pass. Use before coding, 拆任务/做计划/先规划."
 whenToUse: "When a design spec exists (from m-think) or a detailed request is ready, and you need a step-by-step, independently-checked implementation plan."
+when_to_use: "When a design spec exists (from m-think) or a detailed request is ready, and you need a step-by-step, independently-checked implementation plan."
 ---
 
 # m-plan — 把设计拆成可验证的步骤

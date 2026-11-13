@@ -2,6 +2,7 @@
 name: m-debug
 description: "Root-cause a bug or failing test: reproduce, competing hypotheses, regression test. Use for debug一下/为什么报错/这个测试挂了."
 whenToUse: "A test fails, code errors, output is wrong, or a build is broken — before any edit that claims to fix it."
+when_to_use: "A test fails, code errors, output is wrong, or a build is broken — before any edit that claims to fix it."
 ---
 
 # m-debug

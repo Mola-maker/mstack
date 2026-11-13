@@ -134,6 +134,15 @@ importers:
         specifier: workspace:*
         version: link:../../plugin-sdk
 
+  packages/plugins/cmd-go:
+    dependencies:
+      '@mola/plugin-cmd-run':
+        specifier: workspace:*
+        version: link:../cmd-run
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
   packages/plugins/cmd-model:
     dependencies:
       '@mola/plugin-sdk':
@@ -161,6 +170,18 @@ importers:
         specifier: workspace:*
         version: link:../../plugin-sdk
 
+  packages/plugins/cmd-scout:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
+  packages/plugins/cmd-tui:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
   packages/plugins/cmd-ultramode:
     dependencies:
       '@mola/plugin-cmd-run':
@@ -174,7 +195,19 @@ importers:
         specifier: workspace:*
         version: link:../../core
 
+  packages/plugins/cmd-web:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
   packages/plugins/policy-approval:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
+  packages/plugins/policy-guard:
     dependencies:
       '@mola/plugin-sdk':
         specifier: workspace:*
