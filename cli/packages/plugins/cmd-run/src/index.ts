@@ -929,7 +929,6 @@ export {
   checkRoute,
   loadPolicy,
   routeForTaskKind,
-  policyKindOf,
   approvalFor,
   permissionProfileFor,
   collectCandidates,

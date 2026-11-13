@@ -11,6 +11,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 
 /** The mola home: $MOLA_HOME, else ~/.mola (same rule as core's boot). */
 export function molaHome(env: NodeJS.ProcessEnv = process.env): string {
@@ -49,8 +50,10 @@ export function findMstackRoot(opts: {
   for (const dir of candidates) {
     if (isMstackRoot(dir)) return dir;
   }
+  // An explicit location that is wrong is an error to report, not a reason to guess another repo.
+  if (candidates.length > 0) return null;
   // upward walks
-  for (const start of [opts.cwd, opts.startDir ?? path.dirname(import.meta.url ?? ".")]) {
+  for (const start of [opts.cwd, opts.startDir ?? path.dirname(fileURLToPath(import.meta.url))]) {
     if (!start) continue;
     let dir = path.resolve(start);
     for (let i = 0; i < 12; i++) {

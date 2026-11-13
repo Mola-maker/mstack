@@ -14,7 +14,7 @@
     "process.exec": ["pnpm", "cmd"],
     "fs.read": ["**"],
     "fs.write": ["**"],
-    "mola": ["events", "commands", "config.read", "state.kv"]
+    "mola": ["events", "commands", "config.read", "state.kv", "doctor"]
   },
   "hooks": {
     "emit": [],
