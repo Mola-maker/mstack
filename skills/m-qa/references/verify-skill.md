@@ -24,7 +24,7 @@ node "<this skill dir>/scripts/check-verify-skill.mjs" <项目>/.claude/skills/v
 
 ## SKILL.md 骨架
 
-把下面的标题原样留下，正文换成这个仓库的真实命令。`name` 写成 `<repo>-verify`，其中 `<repo>` 是仓库目录名（不要写 `verify`，那会占掉 Claude Code 自带的同名入口；目录仍是 `.claude/skills/verify/`）。description 一句，点明应用、表面、何时该用，短于 130 个字符，并给 YAML 加引号。不要加 `disable-model-invocation`。
+把下面的标题原样留下，正文换成这个仓库的真实命令。`name` 写成 `<repo>-verify`，其中 `<repo>` 是仓库目录名（不要写 `verify`，那会占掉 Claude Code 自带的同名入口；目录仍是 `.claude/skills/verify/`）。标题下一行写 `Required level: L<n>`（0 到 5，含义见 m-verify 的 `references/ladder.md`），这是本项目的"完成"至少要证明到的层级；新写的 skill 都应带这一行；旧 skill 没有也不算错，`check-verify-skill.mjs` 只给警告，并按 L1 处理。行写错（`L7`、`Lx`、`<n>` 没填）则报错。description 一句，点明应用、表面、何时该用，短于 130 个字符，并给 YAML 加引号。不要加 `disable-model-invocation`。
 
 ```markdown
 ---
@@ -34,6 +34,8 @@ description: "Drive <app> (<surface>) from a cold start. Use when checking a use
 
 # Verify <app>
 
+Required level: L<n>
+
 按 `features/README.md` 选旅程。不要走测试专用接口冒充用户路径。
 
 ## Launch
@@ -42,7 +44,7 @@ description: "Drive <app> (<surface>) from a cold start. Use when checking a use
 
 ## Doctor
 
-只读检查：进程是不是这次启动的、版本或构建号、端口属主、登录是否有效。任何一步看起来不对，先跑 Doctor，再决定要不要 Drive。
+只读检查：进程是不是这次启动的、版本或构建号、端口属主、登录是否有效。任何一步看起来不对，先跑 Doctor，再决定要不要 Drive。还要查"装了但没接上"：工具在磁盘上，却不在 PATH 或环境变量没设。例：Android SDK 在 `%LOCALAPPDATA%\Android\Sdk`，`adb` 不在 PATH 且 `ANDROID_HOME` 为空。Doctor 要分别报出"没装"和"装了没接上"，并写出修复命令（设变量或写出绝对路径），不要因为 `adb: command not found` 就判定环境缺失。
 
 ## Drive
 

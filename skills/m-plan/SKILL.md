@@ -16,7 +16,7 @@ Use when `m-think` has produced an approved spec, or the request is detailed eno
 
 Using m-plan: <one-line purpose> — say this first, before any tool call.
 
-**Iron Law: NO HANDOFF TO `m-dispatch` UNTIL A DIFFERENT AGENT HAS CRITIQUED THE PLAN, ONCE.**
+**Rule: no handoff to `m-dispatch` until a different agent has critiqued the plan, once.**
 No exceptions: your own re-read is not the critic; a second critic round is not allowed either; do not hand off "pending" findings, and do not start coding to "test" the plan.
 
 | You will be tempted to think… | Reality |

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0 — 2026-11-12
+Manager practices: an audit of the stack against the "managing agents is managing a team" practices (give the agent a check it can run, say what the repo cannot show, enforce only what cannot bend, preflight unattended runs).
+- **Acceptance ladder** (`skills/m-verify/references/ladder.md`): every verdict names its level, L0 static to L5 non-functional. A project's verify skill declares `Required level: L<n>`; a claim below it is PARTIAL. A verify skill without the line gets a warning and is treated as L1.
+- **Verify receipt** (`skills/m-verify/scripts/receipt.mjs`): one receipt per working-tree hash under `.mstack/verify/receipts/`; any file change voids it. The tree hash covers uncommitted and untracked files and excludes `.mstack/`.
+- **Stop reminder** (`hooks/stop-verify.mjs`): opt-in per project (create `.mstack/verify/gate`). When the current code has no receipt at the required level it shows a reminder. It never blocks.
+- **m-qa** verify skill Doctor section probes for tools that are installed but not on PATH.
+- **m-dispatch** brief gains WHY and OUT OF SCOPE; a shared interface lands before the fan-out.
+- **m-goal** `init` requires `Boundaries` and `Output & approver` in the goal file when it exists; batch goals run 3 items first.
+- **m-review** reports correctness and security by default; style only on request. **m-think** asks what result would make us stop.
+- **Wording**: the all-caps rule lines in 9 skills are now sentence case with the same content; `check.mjs` rejects 4+ consecutive all-caps words.
+- CI runs the skill and hook script tests.
+
 ## 0.5.0 — 2026-11-07
 Round 3, after owner feedback ("prompts rough, agents weak, no model-based assignment, teams invisible in DSH"). Research: research/round3/ (six haiku agents: superpowers craft, OMC agents, pstack craft, Arena routing, DSH team, 262 starred repos). Built by DSH workers r1–r5 on auto/claude-sonnet-5-5 (group/smart-split was switched off in magpie); independent review reviews/2026-11-07-round3.md (15 findings) fixed by g1–g3.
 - **Model layer**: `config/model-routing.json` — 11 task kinds → ranked magpie routes with Arena evidence (2026-11-06), 9 model families with prompt-adapter rules. Shared by skills (m-dispatch/references/model-routing.md) and mola: `mola run` guesses the task kind (printed and recorded; `--kind` overrides), picks the route, adapts the prompt per family without adding instructions, and walks picks + policy fallbacks on quota failure; `mola models rank [kind]`.

@@ -18,7 +18,7 @@ Not this skill: the change isn't written → `m-think`/`m-plan`; you want review
 
 Using m-ship: <one-line purpose> — say this first, before any tool call.
 
-**Iron Law: NO PR CALLED READY WITHOUT FRESH TEST OUTPUT FROM THIS BRANCH AND A VERDICT FROM A REVIEWER WHO DID NOT WRITE IT.**
+**Rule: no PR called ready without fresh test output from this branch and a verdict from a reviewer who did not write it.**
 No exceptions: a CI re-run is not a fix; your own review, a passing suite and a green CI are not an independent verdict; do not edit a test's expected value, skip hooks (`--no-verify`) or mark a check not-required to get past a red.
 
 | You will be tempted to think… | Reality |

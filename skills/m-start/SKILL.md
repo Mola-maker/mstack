@@ -16,7 +16,7 @@ Use at the top of every conversation, including when the user just says "继续"
 
 Using m-start: <one-line routing purpose> — say this first, before any tool call.
 
-**Iron Law: NO WORK BEFORE A ONE-LINE ROUTING DECISION THAT NAMES A SKILL, AND NO RESUME FROM STATE YOU HAVE NOT READ.**
+**Rule: no work before a one-line routing decision that names a skill, and no resume from state you have not read.**
 No exceptions: a terse prompt is not a reason to guess the phase; "I remember where we were" is not reading; a stale goal is reported, never resumed or cleaned up by you.
 
 | You will be tempted to think… | Reality |
