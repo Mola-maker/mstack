@@ -658,7 +658,7 @@ export default definePlugin({
         }
         const home = userHome();
         const parts: string[] = [];
-        let hint = "";
+        const refresh: string[] = [];
         for (const target of ["dsh", "codex"] as const) {
           if (!fs.existsSync(path.join(home, `.${target}`))) { parts.push(`${target}: harness not found`); continue; }
           const s = skillsStatus({ root, target, home });
@@ -667,8 +667,9 @@ export default definePlugin({
           if (s.stale.length) bits.push(`${s.stale.length} stale`);
           if (s.missing.length) bits.push(`${s.missing.length} not installed`);
           parts.push(`${target}: ${bits.join(", ")}`);
-          if (s.stale.length) hint = ` — to refresh: mola skills install --${target}${target === "dsh" ? " --copy" : ""}`;
+          if (s.stale.length) refresh.push(target === "dsh" ? "--dsh --copy" : `--${target}`);
         }
+        const hint = refresh.length ? ` — to refresh: mola skills install ${refresh.join(" ")}` : "";
         return { ok: true, message: `${parts.join("; ")}${hint} (source ${root})` };
       },
     });
