@@ -25,11 +25,11 @@ interface Run {
   stderr: string;
 }
 
-function run(args: string[], home: string, cwd?: string): Run {
+function run(args: string[], home: string, cwd?: string, extraEnv: Record<string, string | undefined> = {}): Run {
   const r = spawnSync(process.execPath, [BIN, ...args], {
     encoding: "utf8",
     cwd: cwd ?? os.tmpdir(),
-    env: { ...process.env, MOLA_HOME: home },
+    env: { ...process.env, MOLA_HOME: home, ...extraEnv },
   });
   return { status: r.status ?? 1, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
 }
@@ -164,4 +164,21 @@ test("MOLA_LOG_LEVEL env maps into the log layer; log file carries traceId", () 
   const traceId = JSON.parse((r.stdout ?? "").trim()).traceId;
   const log = fs.readFileSync(path.join(home, "logs", "mola.log"), "utf8");
   assert.match(log, new RegExp(`"traceId":"${traceId}"`));
+});
+
+test("doctor --json lists the skills.installed check, and skills install --copy --dry-run is a known command", () => {
+  const home = tmpHome();
+  // The machine's own skills source and harness homes must not decide this test.
+  const clean = { MOLA_MSTACK_DIR: undefined, HOME: home, USERPROFILE: home };
+  const d = envelope(run(["doctor", "--json"], home, undefined, clean));
+  const checks = (d.data.checks ?? d.data) as any[];
+  const mine = checks.find((c) => c.id === "skills.installed");
+  assert.ok(mine, JSON.stringify(checks.map((c) => c.id)));
+  assert.equal(mine.ok, true, "no harness installed is a report, not a failure");
+  const bad = envelope(run(["doctor", "--json"], home, undefined, { ...clean, MOLA_MSTACK_DIR: path.join(home, "not-a-repo") }));
+  assert.equal(((bad.data.checks ?? bad.data) as any[]).find((c) => c.id === "skills.installed").ok, false, "a wrong explicit source fails");
+  const r = run(["skills", "install", "--dsh", "--copy", "--dry-run", "--json"], home, undefined, clean);
+  assert.equal(r.status, 0, r.stderr);
+  const entries = envelope(r).data.entries as any[];
+  assert.ok(entries.length > 0 && entries.every((e) => e.target === "dsh" && e.mode === "copy" && typeof e.hash === "string"));
 });

@@ -151,3 +151,11 @@ test("skills: no mstack root on the machine ⇒ null (never a guess)", () => {
   });
   assert.equal(root, null);
 });
+
+test("skills: with no env, config or usable cwd, the root is found from where this package is installed", () => {
+  // The default startDir is this file's own directory; the checkout it sits in is an mstack repo.
+  const root = findMstackRoot({ cwd: path.join(os.tmpdir(), "definitely-not-mstack-xyz"), env: {} as NodeJS.ProcessEnv });
+  assert.ok(root, "root is null: the walk from the package directory found nothing");
+  assert.equal(isMstackRoot(root as string), true);
+  assert.ok(fs.existsSync(path.join(root as string, "cli", "packages")));
+});

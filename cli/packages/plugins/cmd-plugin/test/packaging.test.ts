@@ -234,3 +234,77 @@ test("version reports a null skills version when the repo is not reachable", asy
   const data = io.dataValue as any;
   assert.equal(data.skills, null);
 });
+
+// ------------------------------------------------- copy mode, stamps, status
+
+import { applySkillEntry, hashDir, planSkills, readStamp, skillsStatus, STAMP_FILE } from "../src/skills.js";
+
+test("skills install --copy: dsh gets stamped copies; a second plan keeps them; an edited source replaces", () => {
+  const root = fakeMstack();
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "mola-userhome-"));
+  const first = planSkills({ root, targets: ["dsh"], home, copy: true });
+  assert.ok(first.entries.length >= 2);
+  for (const e of first.entries) { assert.equal(e.mode, "copy"); assert.equal(e.action, "create"); applySkillEntry(e); }
+  const dest = path.join(home, ".dsh", "skills", "m-start");
+  assert.equal(fs.lstatSync(dest).isSymbolicLink(), false);
+  assert.ok(fs.existsSync(path.join(dest, "SKILL.md")));
+  assert.equal(readStamp(dest)?.hash, hashDir(path.join(root, "skills", "m-start")));
+  for (const e of planSkills({ root, targets: ["dsh"], home, copy: true }).entries) assert.equal(e.action, "keep", e.name);
+
+  fs.appendFileSync(path.join(root, "skills", "m-start", "SKILL.md"), "\nnew line\n");
+  const again = planSkills({ root, targets: ["dsh"], home, copy: true }).entries;
+  assert.equal(again.find((e) => e.name === "m-start")?.action, "replace");
+  assert.equal(again.find((e) => e.name === "m-ship")?.action, "keep");
+});
+
+test("skills: a copied directory with no stamp is replaced, not kept forever", () => {
+  const root = fakeMstack();
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "mola-userhome-"));
+  const dest = path.join(home, ".codex", "skills", "m-start");
+  fs.mkdirSync(dest, { recursive: true });
+  fs.writeFileSync(path.join(dest, "SKILL.md"), "an old copy\n");
+  const e = planSkills({ root, targets: ["codex"], home }).entries.find((x) => x.name === "m-start");
+  assert.equal(e?.action, "replace");
+  applySkillEntry(e!);
+  assert.notEqual(fs.readFileSync(path.join(dest, "SKILL.md"), "utf8"), "an old copy\n");
+});
+
+test("skills: the hash ignores line endings and the stamp file", () => {
+  const root = fakeMstack();
+  const dir = path.join(root, "skills", "m-start");
+  const before = hashDir(dir);
+  const file = path.join(dir, "SKILL.md");
+  fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace(/\n/g, "\r\n"));
+  fs.writeFileSync(path.join(dir, STAMP_FILE), "{}");
+  assert.equal(hashDir(dir), before);
+});
+
+test("skills status: links to another checkout are reported as elsewhere, not stale; a dotfile change is seen", () => {
+  const root = fakeMstack();
+  const other = fakeMstack();
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "mola-userhome-"));
+  for (const e of planSkills({ root: other, targets: ["dsh"], home }).entries) applySkillEntry(e);
+  const s = skillsStatus({ root, target: "dsh", home });
+  assert.equal(s.elsewhere.length, s.total);
+  assert.deepEqual(s.stale, []);
+  assert.deepEqual(s.elsewhereRoots.map((d) => fs.realpathSync(d)), [fs.realpathSync(path.join(other, "skills"))]);
+
+  const dir = path.join(root, "skills", "m-start");
+  fs.writeFileSync(path.join(dir, ".hidden"), "a");
+  const before = hashDir(dir);
+  fs.writeFileSync(path.join(dir, ".hidden"), "b");
+  assert.notEqual(hashDir(dir), before);
+});
+
+test("skills status: missing, then current, then stale after the source changes", () => {
+  const root = fakeMstack();
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "mola-userhome-"));
+  let s = skillsStatus({ root, target: "dsh", home });
+  assert.equal(s.missing.length, s.total);
+  for (const e of planSkills({ root, targets: ["dsh"], home, copy: true }).entries) applySkillEntry(e);
+  s = skillsStatus({ root, target: "dsh", home });
+  assert.equal(s.current.length, s.total);
+  fs.appendFileSync(path.join(root, "skills", "m-ship", "SKILL.md"), "\nchanged\n");
+  s = skillsStatus({ root, target: "dsh", home });
+  assert.deepEqual(s.stale, ["m-ship"]);
+});
