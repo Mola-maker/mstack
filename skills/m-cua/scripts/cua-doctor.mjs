@@ -26,9 +26,9 @@ export function findIn(dirs, name, env = process.env) {
 const run = (bin, args, env) => {
   const opts = { encoding: "utf8", env, timeout: 15000, windowsHide: true };
   // Windows .cmd/.bat launchers need a shell. cmd expands %VAR% even inside quotes, so the directory never goes
-  // into the command string: the file is run by its own name from its directory. Arguments are fixed strings, never user input.
+  // into the command string: the file is run as .\<name> from its directory (the .\ stops cmd from taking a same-named file on PATH). Arguments are fixed strings, never user input.
   const viaShell = WIN && !/\.(exe|com)$/i.test(bin);
-  const r = viaShell ? spawnSync(`"${basename(bin)}" ${args.join(" ")}`, { ...opts, cwd: dirname(bin), shell: true }) : spawnSync(bin, args, opts);
+  const r = viaShell ? spawnSync(`".\\${basename(bin)}" ${args.join(" ")}`, { ...opts, cwd: dirname(bin), shell: true }) : spawnSync(bin, args, opts);
   return { status: r.status, out: (r.stdout || "") + (r.stderr || ""), error: r.error?.message };
 };
 
@@ -62,14 +62,15 @@ export function probeAndroid(env = process.env) {
   if (!hit) return { driver: "android", tool: "adb", state: "missing", fix: "install Android SDK Platform-Tools (https://developer.android.com/tools/releases/platform-tools) and put platform-tools on PATH" };
   const r = run(hit.bin, ["devices"], env);
   if (r.status !== 0) return { driver: "android", tool: "adb", state: "broken", bin: hit.bin, fix: "run `adb devices` and read the error", detail: (r.error || r.out).slice(0, 200) };
-  // A device row is `<serial><whitespace><state>`; the state can hold spaces ("no permissions (...)"). Daemon notices start with `*`.
-  const rows = r.out.split("\n").map((l) => l.trim().match(/^(\S+)\s+(.+)$/)).filter((m) => m && !m[1].startsWith("*") && m[1] !== "List").map((m) => [m[1], m[2]]);
+  // A device row is `<serial><TAB><state>`; the state can hold spaces ("no permissions (...)"). Notices such as
+  // "* daemon started" or "adb server version (41) doesn't match this client" have no tab and are not devices.
+  const rows = r.out.split("\n").map((l) => l.trim().match(/^(\S+)\t+(.+)$/)).filter(Boolean).map((m) => [m[1], m[2]]);
   const online = rows.filter((c) => c[1] === "device").map((c) => c[0]);
   if (!online.length) {
     // `emulator` is rarely on PATH; it sits beside platform-tools in the SDK.
     const emu = findIn([join(dirname(dirname(hit.bin)), "emulator")], "emulator", env) ?? "<Android SDK>/emulator/emulator";
     const why =(rows.length ? `devices present but not usable: ${rows.map((c) => c.join(" ")).join(", ")}` : "no device or emulator attached") + (hit.onPath ? "" : "; adb is also not on PATH");
-    return { driver: "android", tool: "adb", state: "no-device", bin: hit.bin, onPath: hit.onPath, fix: `start an emulator ("${emu}" -list-avds, then "${emu}" -avd <name>) or plug in a device with USB debugging authorised`, detail: why };
+    return { driver: "android", tool: "adb", state: "no-device", bin: hit.bin, onPath: hit.onPath, fix: `start an emulator ("${emu}" -list-avds, then "${emu}" -avd <name>; in PowerShell put & before the quoted path) or plug in a device with USB debugging authorised`, detail: why };
   }
   return hit.onPath
     ? { driver: "android", tool: "adb", state: "ready", bin: hit.bin, devices: online }

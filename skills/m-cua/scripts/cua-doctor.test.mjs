@@ -16,7 +16,7 @@ function fake(dir, name, lines, code = 0) {
   if (WIN) writeFileSync(join(dir, name + ".cmd"), ["@echo off", ...lines.map((l) => "echo " + l), `exit /b ${code}`].join("\r\n") + "\r\n");
   else {
     const p = join(dir, name);
-    writeFileSync(p, ["#!/bin/sh", ...lines.map((l) => `echo '${l}'`), `exit ${code}`].join("\n") + "\n");
+    writeFileSync(p, ["#!/bin/sh", "cat <<'CUA_EOF'", ...lines, "CUA_EOF", `exit ${code}`].join("\n") + "\n");
     chmodSync(p, 0o755);
   }
 }
@@ -82,7 +82,7 @@ test("adb with no device, and with only an unauthorized device, is no-device", (
   let r = main(["--need", "android", "--json"], env([d]), d);
   assert.equal(r.code, 1);
   assert.equal(drivers(r).android.state, "no-device");
-  fake(d, "adb", ["List of devices attached", "R58M123 unauthorized"]);
+  fake(d, "adb", ["List of devices attached", "R58M123\tunauthorized"]);
   r = main(["--need", "android", "--json"], env([d]), d);
   assert.equal(drivers(r).android.state, "no-device");
   assert.match(drivers(r).android.detail, /unauthorized/);
@@ -90,11 +90,11 @@ test("adb with no device, and with only an unauthorized device, is no-device", (
 
 test("a Linux `no permissions` row is reported, not dropped; daemon notices are not devices", (t) => {
   const d = scratch(t);
-  fake(d, "adb", ["* daemon not running; starting now at tcp:5037", "* daemon started successfully", "List of devices attached", "0123456789ABCDEF no permissions (user in plugdev group)"]);
+  fake(d, "adb", ["* daemon not running; starting now at tcp:5037", "* daemon started successfully", "List of devices attached", "adb server version (41) doesn't match this client (39); killing...", "0123456789ABCDEF\tno permissions (user in plugdev group)"]);
   const x = drivers(main(["--need", "android", "--json"], env([d]), d)).android;
   assert.equal(x.state, "no-device");
   assert.match(x.detail, /0123456789ABCDEF no permissions/);
-  assert.doesNotMatch(x.detail, /daemon/);
+  assert.doesNotMatch(x.detail, /daemon|server version/);
 });
 
 test("no-device names the emulator by full path when the SDK has one", (t) => {
@@ -108,13 +108,13 @@ test("no-device names the emulator by full path when the SDK has one", (t) => {
 
 test("a tool whose directory name contains %VAR% still runs", (t) => {
   const d = join(scratch(t), "p%PATH%q");
-  fake(d, "adb", ["List of devices attached", "emulator-5554 device"]);
+  fake(d, "adb", ["List of devices attached", "emulator-5554\tdevice"]);
   assert.equal(drivers(main(["--need", "android", "--json"], env([d]), d)).android.state, "ready");
 });
 
 test("adb with an online device is ready and lists it", (t) => {
   const d = scratch(t);
-  fake(d, "adb", ["List of devices attached", "emulator-5554 device"]);
+  fake(d, "adb", ["List of devices attached", "emulator-5554\tdevice"]);
   const r = main(["--need", "android", "--json"], env([d]), d);
   assert.equal(r.code, 0);
   assert.deepEqual(drivers(r).android.devices, ["emulator-5554"]);
@@ -122,7 +122,7 @@ test("adb with an online device is ready and lists it", (t) => {
 
 test("adb only under ANDROID_HOME/platform-tools with a device is not-on-path and usable", (t) => {
   const d = scratch(t);
-  fake(join(d, "sdk", "platform-tools"), "adb", ["List of devices attached", "emulator-5554 device"]);
+  fake(join(d, "sdk", "platform-tools"), "adb", ["List of devices attached", "emulator-5554\tdevice"]);
   const r = main(["--need", "android", "--json"], env([d], { ANDROID_HOME: join(d, "sdk") }), d);
   assert.equal(r.code, 0);
   assert.ok(drivers(r).android.bin.includes("platform-tools"));

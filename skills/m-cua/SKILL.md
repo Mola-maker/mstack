@@ -22,7 +22,7 @@ First line you say: `Using m-cua: drive the real UI, keep the script.`
 1. **Pick the driver.** Desktop app → `desktop`. Android app → `android`. Web page → `web`. One target, one driver.
 2. **Run the doctor.** `node "<this skill dir>/scripts/cua-doctor.mjs" --need <driver>`. `<this skill dir>` is the directory this SKILL.md was loaded from. Exit 0 means usable: go on. It prints one state per driver:
    - `ready`: call the tool by name.
-   - `not-on-path` (still exit 0): the tool works but the shell cannot see it. Call it by the full path the doctor printed, in every command and in the script. Do not reinstall and do not rerun the doctor.
+   - `not-on-path` (still exit 0): the tool works but the shell cannot see it. Call it by the full path the doctor printed. Do not reinstall and do not rerun the doctor. The script must not hard-code that path: it reads it at run time from `cua-doctor.mjs --need <driver> --json` (`drivers[0].bin`).
    - `no-device`: start the emulator or authorise the device, then rerun.
    - `missing`: install with the printed command if the user allowed installs; otherwise report it and stop.
    - `broken`: run the command it names and read the error.
