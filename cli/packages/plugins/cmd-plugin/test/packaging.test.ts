@@ -279,6 +279,23 @@ test("skills: the hash ignores line endings and the stamp file", () => {
   assert.equal(hashDir(dir), before);
 });
 
+test("skills status: links to another checkout are reported as elsewhere, not stale; a dotfile change is seen", () => {
+  const root = fakeMstack();
+  const other = fakeMstack();
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "mola-userhome-"));
+  for (const e of planSkills({ root: other, targets: ["dsh"], home }).entries) applySkillEntry(e);
+  const s = skillsStatus({ root, target: "dsh", home });
+  assert.equal(s.elsewhere.length, s.total);
+  assert.deepEqual(s.stale, []);
+  assert.deepEqual(s.elsewhereRoots.map((d) => fs.realpathSync(d)), [fs.realpathSync(path.join(other, "skills"))]);
+
+  const dir = path.join(root, "skills", "m-start");
+  fs.writeFileSync(path.join(dir, ".hidden"), "a");
+  const before = hashDir(dir);
+  fs.writeFileSync(path.join(dir, ".hidden"), "b");
+  assert.notEqual(hashDir(dir), before);
+});
+
 test("skills status: missing, then current, then stale after the source changes", () => {
   const root = fakeMstack();
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "mola-userhome-"));

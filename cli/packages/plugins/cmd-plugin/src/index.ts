@@ -641,25 +641,35 @@ export default definePlugin({
     });
 
     // A harness with no mstack skills, or with a copy of an older version, is an environment gap the
-    // agent cannot see from inside a session: report it here so doctor (and anything reading it) shows it.
+    // agent cannot see from inside a session. It is reported, never failed on: a machine may have a
+    // harness it does not use mstack in, and links to another checkout are a working install.
+    // The one failure is an explicit source that is not an mstack repo, because `skills install` fails on it.
     ctx.doctor.registerCheck({
       id: "skills.installed",
-      description: "mstack skills installed in dsh and codex match the source repo",
+      description: "mstack skills installed in dsh and codex, compared with the source repo",
       async run() {
-        const root = findMstackRoot({ cwd: process.cwd(), configSource: ctx.config.get<string>("skills.source") });
-        if (!root) return { ok: true, message: "mstack repo not found — nothing to compare (set skills.source or MOLA_MSTACK_DIR)" };
+        const configSource = ctx.config.get<string>("skills.source");
+        const root = findMstackRoot({ cwd: process.cwd(), configSource });
+        if (!root) {
+          const explicit = process.env.MOLA_MSTACK_DIR || configSource;
+          return explicit
+            ? { ok: false, message: `skills source is set to ${explicit}, which is not an mstack repo (needs skills/ and .claude-plugin/plugin.json) — fix MOLA_MSTACK_DIR or skills.source`, exitCode: ExitCode.DataErr }
+            : { ok: true, message: "mstack repo not found — nothing to compare (set skills.source or MOLA_MSTACK_DIR)" };
+        }
         const home = userHome();
         const parts: string[] = [];
-        let gap = false;
+        let hint = "";
         for (const target of ["dsh", "codex"] as const) {
-          if (!fs.existsSync(path.join(home, `.${target}`))) { parts.push(`${target}: not installed on this machine`); continue; }
+          if (!fs.existsSync(path.join(home, `.${target}`))) { parts.push(`${target}: harness not found`); continue; }
           const s = skillsStatus({ root, target, home });
-          if (s.missing.length || s.stale.length) gap = true;
-          parts.push(`${target}: ${s.current.length}/${s.total} current` + (s.stale.length ? `, ${s.stale.length} stale` : "") + (s.missing.length ? `, ${s.missing.length} missing` : ""));
+          const bits = [`${s.current.length}/${s.total} current`];
+          if (s.elsewhere.length) bits.push(`${s.elsewhere.length} linked to another checkout (${s.elsewhereRoots.join(", ")})`);
+          if (s.stale.length) bits.push(`${s.stale.length} stale`);
+          if (s.missing.length) bits.push(`${s.missing.length} not installed`);
+          parts.push(`${target}: ${bits.join(", ")}`);
+          if (s.stale.length) hint = ` — to refresh: mola skills install --${target}${target === "dsh" ? " --copy" : ""}`;
         }
-        return gap
-          ? { ok: false, message: `${parts.join("; ")} — run \`mola skills install --copy\` (source ${root})`, exitCode: ExitCode.Unavailable }
-          : { ok: true, message: parts.join("; ") };
+        return { ok: true, message: `${parts.join("; ")}${hint} (source ${root})` };
       },
     });
 

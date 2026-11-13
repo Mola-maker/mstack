@@ -215,14 +215,15 @@ export function readStamp(dir: string): SkillStamp | null {
 }
 
 /**
- * sha256 over the sorted relative paths and bytes of every file in a skill directory. Dotfiles are left
- * out (the stamp is one), and CRLF is folded to LF so a Windows checkout and a WSL one hash alike.
+ * sha256 over the sorted relative paths and bytes of every file in a skill directory. Only the stamp file
+ * is left out (everything else is copied, so everything else counts), and CRLF is folded to LF so a Windows
+ * checkout and a WSL one hash alike.
  */
 export function hashDir(dir: string): string {
   const h = createHash("sha256");
   const walk = (d: string, rel: string): void => {
     for (const entry of fs.readdirSync(d, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
-      if (entry.name.startsWith(".")) continue;
+      if (entry.name === STAMP_FILE) continue;
       const r = rel ? `${rel}/${entry.name}` : entry.name;
       if (entry.isDirectory()) walk(path.join(d, entry.name), r);
       else if (entry.isFile()) {
@@ -243,15 +244,19 @@ export interface SkillsStatus {
   total: number;
   /** linked to this source, or a copy whose stamp matches it */
   current: string[];
-  /** installed but different from the source (another checkout, an old copy, no stamp) */
+  /** a copy that differs from the source (an old copy, or one with no stamp), or a dangling link */
   stale: string[];
+  /** linked to a skill directory of another checkout: a working install this source does not own */
+  elsewhere: string[];
+  /** where those links point (the directories holding the linked skills) */
+  elsewhereRoots: string[];
   missing: string[];
 }
 
 /** Compare what a harness has installed with the source repo. Reads only. */
 export function skillsStatus(opts: { root: string; target: "dsh" | "codex"; home: string }): SkillsStatus {
   const dir = targetDir(opts.target, opts.home);
-  const out: SkillsStatus = { target: opts.target, dir, total: 0, current: [], stale: [], missing: [] };
+  const out: SkillsStatus = { target: opts.target, dir, total: 0, current: [], stale: [], elsewhere: [], elsewhereRoots: [], missing: [] };
   for (const skill of listSkills(opts.root)) {
     out.total++;
     const destination = path.join(dir, skill.name);
@@ -260,7 +265,15 @@ export function skillsStatus(opts: { root: string; target: "dsh" | "codex"; home
     if (!stat) { out.missing.push(skill.name); continue; }
     let same = false;
     if (stat.isSymbolicLink()) {
-      try { same = fs.realpathSync(destination) === fs.realpathSync(skill.source); } catch { /* dangling link */ }
+      let real: string | null = null;
+      try { real = fs.realpathSync(destination); } catch { /* dangling link */ }
+      if (real !== null && real !== fs.realpathSync(skill.source) && fs.existsSync(path.join(real, "SKILL.md"))) {
+        out.elsewhere.push(skill.name);
+        const holder = path.dirname(real);
+        if (!out.elsewhereRoots.includes(holder)) out.elsewhereRoots.push(holder);
+        continue;
+      }
+      same = real !== null && real === fs.realpathSync(skill.source);
     } else if (stat.isDirectory()) {
       same = readStamp(destination)?.hash === hashDir(skill.source);
     }
