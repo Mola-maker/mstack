@@ -1,6 +1,6 @@
 # mstack — 框架规格（给构建 agent 的唯一依据）
 
-mstack = Mola-maker 的个人 agent 工作流技能栈。把 superpowers、gstack、pstack、oh-my-claudecode（OMC）四套 skill 去重合并成 **16 个** skill，按 Mola 的使用习惯改写。同一份 `skills/` 目录同时给 Claude Code（plugin）、DSH（`~/.dsh/skills`）、Codex 用。
+mstack = Mola-maker 的个人 agent 工作流技能栈。把 superpowers、gstack、pstack、oh-my-claudecode（OMC）四套 skill 去重合并成 **16 个** skill，另加 1 个自己写的 `m-cua`（共 17 个），按 Mola 的使用习惯改写。同一份 `skills/` 目录同时给 Claude Code（plugin）、DSH（`~/.dsh/skills`）、Codex 用。
 
 ## 1. 为什么要做（用户画像 → 设计约束）
 
@@ -10,13 +10,13 @@ mstack = Mola-maker 的个人 agent 工作流技能栈。把 superpowers、gstac
 | 最常用：brainstorming(20)、ultragoal/goal(32)、code-review(11)、/compact(49)、/resume(73) | 这几条链路做到最好：`m-think`、`m-goal`、`m-review`、`m-handoff` |
 | 爱并行分派（"分派给 subagents"），跨 Claude / DSH / Codex / Kimi 多模型 | `m-dispatch` 跨 harness：Claude subagent、DSH headless、Codex；每个子任务自包含 |
 | 真实测试后再 PR，保留 trace 和 commit 历史 | `m-verify` 要求证据；`m-ship` 先跑真测试再开 PR |
-| 痛点：插件冲突（omc vs superpowers）、工具调用死循环、上下文膨胀 | 16 个 skill 互不重叠；每个 SKILL.md ≤150 行，细节放 `references/`；`m-guard` 管冲突与死循环（同一错误 3 次就停） |
+| 痛点：插件冲突（omc vs superpowers）、工具调用死循环、上下文膨胀 | 17 个 skill 互不重叠；每个 SKILL.md ≤150 行，细节放 `references/`；`m-guard` 管冲突与死循环（同一错误 3 次就停） |
 | 无人值守运行结束时没写 closeout（ultragoal 3 次） | `m-goal` 结束时**必须**写 closeout（成功、失败、被打断都写） |
 | 中文为主夹英文 | skill 正文英文（省 token、各模型都稳），description 里带中文触发词；对用户的输出跟随用户语言 |
 | 方向：agent infra（LayerFS/Rust、DSH 插件/TS）、个人站（Astro 动画）、CAD2GIS、信息聚合 | 例子优先用这些场景；`m-qa` 面向网页（molamaker-site） |
 | 已知陷阱：WSL 里 `pkill -f` 会杀掉自己的 shell；dev checkout 不能 `git pull`；magpie 管模型列表；清 %TEMP% 要排除 `%TEMP%\claude` | 写进 `m-guard` |
 
-## 2. 16 个 skill 与来源映射
+## 2. 17 个 skill 与来源映射
 
 来源文件都在 `.sources/<stack>/<name>.md`（只读参考，不要复制大段原文，用自己的话重写、合并、删掉重复）。
 
@@ -38,6 +38,7 @@ mstack = Mola-maker 的个人 agent 工作流技能栈。把 superpowers、gstac
 | 14 | `m-deslop` | 删 AI 味：多余代码、注释、抽象、废话 | pstack/deslop, pstack/unslop, omc/ai-slop-cleaner, omc/minimal-code-discipline, omc/minimal-prose-discipline, pstack/principle-subtract-before-you-add |
 | 15 | `m-guard` | 安全护栏 + 插件冲突体检 + 死循环刹车 + Mola 的已知陷阱 | gstack/careful, gstack/freeze, gstack/guard, dsh/plugin-intake, superpowers/diagnosing-superpowers |
 | 16 | `m-team` | 会进化的 agent team：开放式大预算目标按轮次重组团队，supervisor 每轮诊断卡点并重设角色与知识流向 | papers/evolving-agent-teams, orca/*（详见 §9） |
+| 17 | `m-cua` | 操作真实界面做 L3/L4 验收（桌面 / Android / 浏览器）：探测驱动 → 观察-操作-再观察 → 写成可重放脚本 → 记回执 | 无上游来源，自己写的；桌面驱动用 vercel-labs/agent-desktop，Android 用 adb |
 
 明确**不收**的（太窄或与 Mola 无关）：gstack 的 iOS 系列、design-shotgun、setup-gbrain、ubicloud、supabase；pstack 的 ketchup、bro、arena、statechart、typescript-best-practices、formal-verification 系列。
 
@@ -126,7 +127,7 @@ whenToUse: <英文一句话，DSH 用这个字段决定何时加载>
 
 ```
 .claude-plugin/plugin.json      Claude Code plugin 清单（name: mstack）
-README.md                       中文：是什么、16 个 skill 一览、安装（Claude / DSH / Codex）、和原插件怎么共存
+README.md                       中文：是什么、17 个 skill 一览、安装（Claude / DSH / Codex）、和原插件怎么共存
 docs/source-map.md              每个来源 skill → 归入哪个 m-skill / 不收的理由（覆盖 .sources 里的全部文件）
 docs/migration.md               装了 mstack 后建议停用哪些重叠插件/skill（只建议，不自动改用户配置）
 NOTICE.md                       致谢四个上游项目及其许可证（superpowers MIT / gstack MIT / pstack 见其仓库 / OMC MIT）
@@ -134,7 +135,7 @@ NOTICE.md                       致谢四个上游项目及其许可证（superp
 
 ## 8. 验收标准（构建完成的定义）
 
-- 16 个 `skills/*/SKILL.md` 都在（含 §9 的 `m-team`），frontmatter 三字段齐全，`name` 与目录名一致，每个 ≤150 行。
+- 17 个 `skills/*/SKILL.md` 都在（含 §9 的 `m-team` 和 0.7.0 的 `m-cua`），frontmatter 三字段齐全，`name` 与目录名一致，每个 ≤150 行。
 - 每个 SKILL.md 含 §3 规定的 6 节。
 - 不出现 `superpowers:`、`oh-my-claudecode:`、`omc:` 形式的 skill 引用。
 - `docs/source-map.md` 覆盖 `.sources/` 下每一个文件。

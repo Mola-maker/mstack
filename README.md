@@ -2,7 +2,7 @@
 
 [![check](https://github.com/Mola-maker/mstack/actions/workflows/check.yml/badge.svg)](https://github.com/Mola-maker/mstack/actions/workflows/check.yml)
 
-mstack 是 Mola-maker 的个人 agent 工作流技能栈：把 superpowers、gstack、pstack、oh-my-claudecode（OMC）四套 skill 去重、合并、按个人使用习惯重写成 **16 个互不重叠的 skill**。同一份 `skills/` 目录同时供 Claude Code（plugin）、DSH（`~/.dsh/skills`）和 Codex 使用。
+mstack 是 Mola-maker 的个人 agent 工作流技能栈：把 superpowers、gstack、pstack、oh-my-claudecode（OMC）四套 skill 去重、合并、按个人使用习惯重写成 **17 个互不重叠的 skill**。同一份 `skills/` 目录同时供 Claude Code（plugin）、DSH（`~/.dsh/skills`）和 Codex 使用。
 
 ![mstack demo](assets/demo.gif)
 
@@ -29,7 +29,7 @@ mstack 是 Mola-maker 的个人 agent 工作流技能栈：把 superpowers、gst
 
 设计约束（详见 [FRAMEWORK.md](FRAMEWORK.md)）：短 prompt 也能接得上（`m-start` 总入口读 `.mstack/` 状态续干）、每个 SKILL.md ≤150 行、长跑任务必须写 closeout、同一个错误连错 3 次就停。
 
-## 16 个 skill 一览
+## 17 个 skill 一览
 
 | skill | 说明（来自 frontmatter） |
 |---|---|
@@ -49,6 +49,7 @@ mstack 是 Mola-maker 的个人 agent 工作流技能栈：把 superpowers、gst
 | `m-deslop` | 删 AI 味：多余代码、注释、抽象、废话，先保行为再做减法 |
 | `m-guard` | 安全护栏 + 插件冲突体检 + 死循环刹车 + Mola 的已知陷阱清单 |
 | `m-team` | 会进化的 agent team：开放式大预算任务交给按轮次重组的团队，supervisor 每轮诊断卡点、重设角色与知识流向 |
+| `m-cua` | 操作真实界面做 L3/L4 验收：桌面应用、Android 设备、浏览器；先探测驱动是否接通，留下可重放的脚本和回执 |
 
 ## 安装
 
@@ -106,9 +107,9 @@ cp -r /path/to/mstack/skills/* ~/.codex/skills/
 ## 验证
 
 ```sh
-node scripts/check.mjs                       # FRAMEWORK.md §8 验收：16 个 skill、6 节结构、≤150 行、frontmatter 合法、无上游引用
+node scripts/check.mjs                       # FRAMEWORK.md §8 验收：17 个 skill、6 节结构、≤150 行、frontmatter 合法、无上游引用
 claude plugin validate .                     # 插件清单
-claude -p "列出所有以 mstack: 开头的 skill"    # 真实加载：应列出 16 个
+claude -p "列出所有以 mstack: 开头的 skill"    # 真实加载：应列出 17 个
 ```
 
 CI（`.github/workflows/check.yml`）在每次 push 时跑前两类检查。有 `.sources/`（上游原文，不入库）时 `check.mjs` 还会检查 source-map 覆盖率和"连续 3 行雷同"。
@@ -134,7 +135,7 @@ CI（`.github/workflows/check.yml`）在每次 push 时跑前两类检查。有 
 ```
 .claude-plugin/              plugin.json（插件清单）+ marketplace.json（本仓库即 marketplace）
 agents/m-*.md                7 个子 agent
-skills/<name>/SKILL.md       16 个 skill（≤150 行，细节放 references/）
+skills/<name>/SKILL.md       17 个 skill（≤150 行，细节放 references/）
 FRAMEWORK.md                 规格：画像 → 约束、来源映射、格式、共享约定、验收标准、§9 m-team
 docs/source-map.md           每个来源文件 → 归入哪个 m-skill
 docs/migration.md            与 superpowers / OMC 共存的做法

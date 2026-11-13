@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0 — 2026-11-12
+Computer use for acceptance: a 17th skill, `m-cua`, that operates a real desktop app, Android device or browser to prove L3/L4 on the acceptance ladder.
+- **`m-cua`**: pick a driver, run the doctor, explore by observe-act-observe on element refs, write the steps into a replayable script under `.mstack/cua/`, prove the script can fail, record a receipt.
+- **`cua-doctor.mjs`**: probes `agent-desktop` (desktop), `adb` (Android) and Playwright (web) and reports `ready`, `not-on-path`, `no-device`, `missing` or `broken`, each with one fix line. It looks in the usual install locations, so a tool that is installed but not on PATH is reported as that, not as missing.
+- **Drivers** (`skills/m-cua/references/drivers.md`): desktop through vercel-labs/agent-desktop (accessibility tree, no screenshots), Android through `adb` and `uiautomator dump`, web through the project's Playwright.
+
 ## 0.6.0 — 2026-11-12
 Manager practices: an audit of the stack against the "managing agents is managing a team" practices (give the agent a check it can run, say what the repo cannot show, enforce only what cannot bend, preflight unattended runs).
 - **Acceptance ladder** (`skills/m-verify/references/ladder.md`): every verdict names its level, L0 static to L5 non-functional. A project's verify skill declares `Required level: L<n>`; a claim below it is PARTIAL. A verify skill without the line gets a warning and is treated as L1.

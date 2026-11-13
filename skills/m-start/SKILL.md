@@ -10,7 +10,7 @@ mstack is the front door: before doing any work, inspect `.mstack/` state and th
 
 ## When to use / not use
 
-Use at the top of every conversation, including when the user just says "继续" or pastes a log. Use it to route to one of: `m-think`, `m-plan`, `m-goal`, `m-team`, `m-dispatch`, `m-verify`, `m-debug`, `m-review`, `m-ship`, `m-qa`, `m-research`, `m-handoff`, `m-learn`, `m-deslop`, `m-guard`. Do not use it when a sibling skill is already running with clear in-progress state — hand back to that skill instead.
+Use at the top of every conversation, including when the user just says "继续" or pastes a log. Use it to route to one of: `m-think`, `m-plan`, `m-goal`, `m-team`, `m-dispatch`, `m-verify`, `m-debug`, `m-review`, `m-ship`, `m-qa`, `m-research`, `m-handoff`, `m-learn`, `m-deslop`, `m-guard`, `m-cua`. Do not use it when a sibling skill is already running with clear in-progress state — hand back to that skill instead.
 
 ## Procedure
 
