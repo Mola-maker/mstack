@@ -26,7 +26,7 @@ whenToUse: "Turn a session's repeatable workflow or a recurring mistake into a d
    - **教训 / 陷阱，第一次** → lesson（一行 key + 一句 insight + confidence 1-10 + 涉及文件）。不写 skill。
    - **同一 key 第 2 次及以上** → 更新 lesson 的出现次数。写成 skill 还要按 `references/skill-creation.md` 跑完 RED-GREEN。用户明确要求"写个 skill"时可以不卡次数，但不能跳过验证。
    - **只在一个项目里出现** → 即使次数够、验证过，也只写该项目 `.mstack/learnings/<slug>.md`，不进共享 skill 目录。用户明确要求共享时除外。
-   - **可被检查脚本拦住** → 不写文字，落地成检查，并证明它对一条真实历史错误会失败（原则 10）。
+   - **能用结构拦住** → 不写文字。按下面的顺序找第一个行得通的一层，并证明它对一条真实历史错误会失败（原则 10）：① lint 规则或编译错误；② 类型约束；③ 运行时检查或断言；④ 脚本、钩子或 doctor 检查；⑤ skill 文字。落到 ⑤ 时写一句为什么前四层都不行。
 4. **走生命周期**。字段、状态转移和退役阈值都在 `references/skill-creation.md`：create → verify → retrieve → refine → retire。没过 verify 的不检索。每次检索改记录里的成功次数/调用次数，不要只留在对话里。低成功率改为 retire，文件留着。
 5. **写文件**：lesson 追加到 `~/.claude/lessons/`（项目内 `CLAUDE.md` 只在用户要求时写）。项目内记录写到 `.mstack/learnings/<slug>.md`。共享 SKILL.md 只在用户批准后写入对方指定的目录。
 6. **收尾汇报**（中文，格式见 §4）：一句结论 → 记了什么(文件:行) → 为什么够格（次数、验证证据）→ 还有哪些没沉淀或存疑。
