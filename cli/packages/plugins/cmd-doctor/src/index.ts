@@ -11,7 +11,9 @@
  */
 
 import type { CheckResult, DoctorCheck, PluginContext } from "@mola/plugin-sdk";
-import { definePlugin, detectColor, ExitCode, palette, statusGlyph } from "@mola/plugin-sdk";
+import * as os from "node:os";
+import * as path from "node:path";
+import { definePlugin, detectColor, ExitCode, palette, statusGlyph, writeJsonAtomic } from "@mola/plugin-sdk";
 
 function nodeCheck(): DoctorCheck {
   return {
@@ -49,8 +51,14 @@ interface ReportedCheck {
   id: string;
   description?: string;
   ok: boolean;
+  warn?: boolean;
   message?: string;
   exitCode?: number;
+}
+
+/** Where the last doctor result is kept for the status line (`mola statusline` reads it; it never runs checks). */
+export function doctorCacheFile(env: NodeJS.ProcessEnv = process.env): string {
+  return path.join(env.MOLA_HOME || path.join(os.homedir(), ".mola"), "doctor-last.json");
 }
 
 export default definePlugin({
@@ -82,6 +90,7 @@ export default definePlugin({
             id: check.id,
             description: check.description,
             ok: result.ok,
+            ...(result.ok && result.warn ? { warn: true } : {}),
             message: result.message,
             exitCode: result.ok ? undefined : (result.exitCode ?? ExitCode.Unavailable),
           });
@@ -92,7 +101,7 @@ export default definePlugin({
           const p = palette(detectColor());
           const ordered = [...checks.filter((c) => !c.ok), ...checks.filter((c) => c.ok)];
           for (const c of ordered) {
-            const glyph = statusGlyph(c.ok ? "ok" : "fail", p);
+            const glyph = statusGlyph(!c.ok ? "fail" : c.warn ? "warn" : "ok", p);
             io.out(`${glyph}  ${c.id}${c.message ? `  ${c.message}` : ""}`);
           }
         }
@@ -100,6 +109,16 @@ export default definePlugin({
           checks,
           summary: { total: checks.length, failed: checks.filter((c) => !c.ok).length },
         });
+
+        try {
+          writeJsonAtomic(doctorCacheFile(), {
+            ts: new Date().toISOString(),
+            total: checks.length,
+            gaps: checks.filter((c) => !c.ok || c.warn).map((c) => ({ id: c.id, ok: c.ok, message: c.message ?? "" })),
+          });
+        } catch {
+          // the cache is a convenience; a read-only home must not fail doctor
+        }
 
         const failing = checks.find((c) => !c.ok);
         return (failing?.exitCode ?? ExitCode.Ok) as ExitCode;

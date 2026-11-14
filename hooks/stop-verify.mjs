@@ -4,7 +4,7 @@
 // itself fails or runs out of time, say so in one line instead of going quiet.
 // Never blocks: no `decision`, no `continue: false`, always exit 0. Gate absent: no output at all.
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,6 +14,23 @@ const DEADLINE = process.env.MSTACK_STOP_VERIFY_TIMEOUT_MS ?? "4000";
 
 const say = (message) => process.stdout.write(`${JSON.stringify({ systemMessage: message })}\n`);
 const oneLine = (s) => String(s ?? "").trim().split("\n")[0].replace(/^receipt:\s*/, "");
+// The status line shows this file instead of hashing the tree itself. ok: true = receipt at the required level,
+// false = below it, null = the check could not run. A read-only checkout must not break the stop.
+// The file is local state: it changes on every stop, so it is kept out of git by a .gitignore beside it, and the
+// recorded message stops before the "run …" hint, which holds an absolute path of this machine.
+const record = (root, ok, message) => {
+  const dir = join(root, ".mstack", "verify");
+  // The verdict first, on its own: a .gitignore that cannot be written must not leave an old "ok" standing.
+  try {
+    const local = String(message).split("; run ")[0].split(receipt).join("receipt.mjs");
+    writeFileSync(join(dir, "status.json"), `${JSON.stringify({ ts: new Date().toISOString(), ok, message: local })}\n`);
+  } catch { /* nothing to do */ }
+  try {
+    const ignore = join(dir, ".gitignore");
+    const have = existsSync(ignore) ? readFileSync(ignore, "utf8") : "";
+    if (!have.split(/\r?\n/).includes("status.json")) appendFileSync(ignore, `${have && !have.endsWith("\n") ? "\n" : ""}status.json\n`);
+  } catch { /* the file stays untracked-but-visible; the verdict is still current */ }
+};
 
 try {
   let cwd = process.cwd();
@@ -35,16 +52,23 @@ try {
 
   if (!existsSync(receipt)) {
     say(`verify gate could not be evaluated: receipt script missing at ${receipt}`);
+    record(root, null, `receipt script missing at ${receipt}`);
     process.exit(0);
   }
   try {
     execFileSync(process.execPath, [receipt, "check", "--timeout-ms", DEADLINE], {
       cwd: root, encoding: "utf8", timeout: (Number(DEADLINE) || 4000) + 2000, stdio: ["ignore", "pipe", "pipe"],
     });
+    record(root, true, "receipt at the required level");
   } catch (e) {
-    if (e.status === 1 && oneLine(e.stdout)) say(oneLine(e.stdout));
-    else if (e.code === "ETIMEDOUT") say(`verify gate could not be evaluated: the check did not finish within ${(Number(DEADLINE) || 4000) + 2000} ms`);
-    else say(`verify gate could not be evaluated: ${oneLine(e.stderr) || `${receipt} failed with exit ${e.status ?? "none"}`}`);
+    const below = e.status === 1 && oneLine(e.stdout);
+    const message = below
+      ? oneLine(e.stdout)
+      : e.code === "ETIMEDOUT"
+        ? `verify gate could not be evaluated: the check did not finish within ${(Number(DEADLINE) || 4000) + 2000} ms`
+        : `verify gate could not be evaluated: ${oneLine(e.stderr) || `${receipt} failed with exit ${e.status ?? "none"}`}`;
+    say(message);
+    record(root, below ? false : null, message);
   }
 } catch {
   // Never block the stop. (Reached only before the gate file is known: no git repo, unreadable cwd.)

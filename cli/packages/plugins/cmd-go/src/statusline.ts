@@ -32,6 +32,82 @@ export function ourLine(cwd: string, now = Date.now()): string {
   }
 }
 
+/**
+ * The git checkout `start` is in: the nearest directory at or above it that holds `.git` (a directory, or the
+ * file a worktree has). The Stop hook writes its verdict at the git toplevel, so this is where to read it:
+ * a `.mstack/` further up belongs to another project, and one further down (a package's run state) is not it.
+ */
+function projectRoot(start: string): string | null {
+  let dir = path.resolve(start);
+  for (let i = 0; i < 40; i++) {
+    if (fs.existsSync(path.join(dir, ".git"))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+  return null;
+}
+
+function age(ts: unknown, now: number): string {
+  const t = typeof ts === "string" ? Date.parse(ts) : NaN;
+  if (!Number.isFinite(t)) return "";
+  const m = Math.max(0, Math.round((now - t) / 60000));
+  return m < 1 ? "just now" : m < 60 ? `${m}m ago` : m < 48 * 60 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`;
+}
+
+function readJson(file: string): Record<string, unknown> | null {
+  try {
+    const v = JSON.parse(fs.readFileSync(file, "utf8")) as unknown;
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The environment line: what the agent could not see from inside the session.
+ *  - verify: the Stop reminder's last verdict for this project (`.mstack/verify/status.json`), with its age.
+ *    It is a record of the last stop, not a fresh check: edits since then are not in it, so the line says "last stop".
+ *    The file sits in the repository, so a clone can ship its own: nothing from it is printed except a level or one
+ *    of three fixed phrases, and a time computed from its timestamp.
+ *  - gaps: what the last `mola doctor` found failing or worth a warning (`~/.mola/doctor-last.json`), with its age.
+ * Reads two small files and runs nothing. "" when neither exists.
+ */
+export function envLine(cwd: string, now = Date.now(), env: NodeJS.ProcessEnv = process.env): string {
+  const parts: string[] = [];
+  try {
+    const root = projectRoot(cwd);
+    const st = root ? readJson(path.join(root, ".mstack", "verify", "status.json")) : null;
+    if (st) {
+      const msg = typeof st.message === "string" ? st.message.slice(0, 400) : "";
+      const levels = /required (L[0-5]), found (L[0-5]|no receipt|no passing check|no valid receipt)\b/.exec(msg);
+      const body =
+        st.ok === true
+          ? "verify ✓"
+          : st.ok === false
+            ? `verify ✗ ${levels ? `${levels[2]} of ${levels[1]}` : "below the required level"}`
+            : "verify ? check could not run";
+      const when = age(st.ts, now);
+      parts.push(`${body} (last stop${when ? ` ${when}` : ""})`);
+    }
+    const doc = readJson(path.join(env.MOLA_HOME || path.join(os.homedir(), ".mola"), "doctor-last.json"));
+    const gaps = Array.isArray(doc?.gaps) ? (doc!.gaps as Array<{ id?: unknown; ok?: unknown }>) : null;
+    if (gaps) {
+      // check ids are short dotted names; anything else in the file is not echoed to the terminal
+      const ids = gaps.map((g) => (typeof g.id === "string" && /^[\w.>=<:-]{1,60}$/.test(g.id) ? g.id : "?"));
+      const when = age(doc!.ts, now);
+      parts.push(
+        ids.length === 0
+          ? `env ✓ (mola doctor${when ? ` ${when}` : ""})`
+          : `gaps ${ids.length}: ${ids.slice(0, 3).join(", ")}${ids.length > 3 ? ", …" : ""} (mola doctor${when ? ` ${when}` : ""})`,
+      );
+    }
+  } catch {
+    return "";
+  }
+  return parts.join(" · ");
+}
+
 /** Run the wrapped statusLine command with the same stdin; its trimmed stdout, or "" on any failure. */
 export function runWrapped(command: string, stdin: string, timeoutMs = 3000): string {
   try {
@@ -56,8 +132,11 @@ export function renderStatusline(opts: { stdin: string; cwd: string; wrap?: stri
     const wrapped = runWrapped(opts.wrap, opts.stdin);
     if (wrapped) parts.push(wrapped);
   }
-  const line = ourLine(cwdFromStdin(opts.stdin, opts.cwd), opts.now);
+  const cwd = cwdFromStdin(opts.stdin, opts.cwd);
+  const line = ourLine(cwd, opts.now);
   if (line) parts.push(line);
+  const env = envLine(cwd, opts.now);
+  if (env) parts.push(env);
   return parts.join("\n");
 }
 

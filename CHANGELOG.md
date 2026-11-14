@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0 — 2026-11-13
+Status line HUD: what the agent could not see from inside the session.
+- `mola statusline` adds an environment line after the run line: `verify ✗ L1 of L3 (7m ago) · gaps 2: superagent.layerfs, superagent.cad2gis (45m ago; mola doctor)`.
+- **verify**: the Stop reminder (`hooks/stop-verify.mjs`) now writes its verdict to `.mstack/verify/status.json` (`ok` true / false / null, the line it showed, a timestamp). The status line shows that record with its age; it is the verdict of the last stop, not a fresh check.
+- **gaps**: `mola doctor` writes the checks that fail or warn to `~/.mola/doctor-last.json`. A check can now pass with `warn: true`; stale skill copies in a harness are the first such warning.
+- The status line reads two small files and runs nothing (131 ms measured through the standalone entry on Windows).
+
 ## 0.8.0 — 2026-11-13
 Work goes to the model that is good at it: strong models think, models that are steady with tools operate, cheap models do volume.
 - **Roles** in `config/model-routing.json` (v2): `think`, `build`, `operate`, `bulk`. Every task kind names a role; a new kind `operate` covers driving a UI, device or tool (`m-cua`).

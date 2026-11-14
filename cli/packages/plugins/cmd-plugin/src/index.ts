@@ -670,7 +670,7 @@ export default definePlugin({
           if (s.stale.length) refresh.push(target === "dsh" ? "--dsh --copy" : `--${target}`);
         }
         const hint = refresh.length ? ` — to refresh: mola skills install ${refresh.join(" ")}` : "";
-        return { ok: true, message: `${parts.join("; ")}${hint} (source ${root})` };
+        return { ok: true, ...(refresh.length ? { warn: true } : {}), message: `${parts.join("; ")}${hint} (source ${root})` };
       },
     });
 

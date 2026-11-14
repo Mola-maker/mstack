@@ -9,6 +9,9 @@ import { applyInstall, buildCommand, fastBase, cwdFromStdin, planInstall, readSt
 import { fakeAgent, makeCtx, makeIo, tempCwd } from "./helpers.js";
 import { Readable } from "node:stream";
 
+// The status line also reads the last `mola doctor` result from the mola home: keep the machine's own out of these tests.
+process.env.MOLA_HOME = fs.mkdtempSync(path.join((await import("node:os")).tmpdir(), "mola-home-sl-"));
+
 function activeRun(cwd: string) {
   const p = initProgress("go-20261108-1200-abcd", "fix the bug", cwd, ["plan", "implement"]);
   p.stages[1].status = "running";
