@@ -182,3 +182,13 @@ test("doctor --json lists the skills.installed check, and skills install --copy 
   const entries = envelope(r).data.entries as any[];
   assert.ok(entries.length > 0 && entries.every((e) => e.target === "dsh" && e.mode === "copy" && typeof e.hash === "string"));
 });
+
+test("doctor leaves its last result in the mola home for the status line: failing and warning checks only", () => {
+  const home = tmpHome();
+  const d = envelope(run(["doctor", "--json"], home, undefined, { MOLA_MSTACK_DIR: undefined, HOME: home, USERPROFILE: home }));
+  const cache = JSON.parse(fs.readFileSync(path.join(home, "doctor-last.json"), "utf8"));
+  const checks = (d.data.checks ?? d.data) as any[];
+  assert.equal(cache.total, checks.length);
+  assert.deepEqual(cache.gaps.map((g: any) => g.id).sort(), checks.filter((c) => !c.ok || c.warn).map((c) => c.id).sort());
+  assert.ok(Math.abs(Date.now() - Date.parse(cache.ts)) < 60_000);
+});

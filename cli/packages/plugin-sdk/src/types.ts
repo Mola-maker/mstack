@@ -164,6 +164,8 @@ export interface PluginRegistry {
 
 export interface CheckResult {
   ok: boolean;
+  /** passes, but the message names a gap someone should close (shown as a warning, never a failure) */
+  warn?: boolean;
   message?: string;
   /** sysexits code this failing check maps to (default 69) */
   exitCode?: number;

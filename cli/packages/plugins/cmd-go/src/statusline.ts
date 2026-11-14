@@ -32,6 +32,73 @@ export function ourLine(cwd: string, now = Date.now()): string {
   }
 }
 
+/** The nearest directory at or above `start` that holds `.mstack/`, or null. */
+function projectRoot(start: string): string | null {
+  let dir = path.resolve(start);
+  for (let i = 0; i < 40; i++) {
+    if (fs.existsSync(path.join(dir, ".mstack"))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+  return null;
+}
+
+function age(ts: unknown, now: number): string {
+  const t = typeof ts === "string" ? Date.parse(ts) : NaN;
+  if (!Number.isFinite(t)) return "";
+  const m = Math.max(0, Math.round((now - t) / 60000));
+  return m < 1 ? "just now" : m < 60 ? `${m}m ago` : m < 48 * 60 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`;
+}
+
+function readJson(file: string): Record<string, unknown> | null {
+  try {
+    const v = JSON.parse(fs.readFileSync(file, "utf8")) as unknown;
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The environment line: what the agent could not see from inside the session.
+ *  - verify: the Stop reminder's last verdict for this project (`.mstack/verify/status.json`), with its age.
+ *    It is a record of the last stop, not a fresh check: edits since then are not in it, which is why the age is shown.
+ *  - gaps: what the last `mola doctor` found failing or worth a warning (`~/.mola/doctor-last.json`), with its age.
+ * Reads two small files and runs nothing. "" when neither exists.
+ */
+export function envLine(cwd: string, now = Date.now(), env: NodeJS.ProcessEnv = process.env): string {
+  const parts: string[] = [];
+  try {
+    const root = projectRoot(cwd);
+    const st = root ? readJson(path.join(root, ".mstack", "verify", "status.json")) : null;
+    if (st) {
+      const msg = typeof st.message === "string" ? st.message : "";
+      const levels = /required (L\d), found ([^ ]+(?: [a-z]+)*?) for/.exec(msg);
+      const body =
+        st.ok === true
+          ? "verify ✓"
+          : st.ok === false
+            ? `verify ✗ ${levels ? `${levels[2]} of ${levels[1]}` : "below the required level"}`
+            : "verify ? check could not run";
+      parts.push(`${body} (${age(st.ts, now)})`);
+    }
+    const doc = readJson(path.join(env.MOLA_HOME || path.join(os.homedir(), ".mola"), "doctor-last.json"));
+    const gaps = Array.isArray(doc?.gaps) ? (doc!.gaps as Array<{ id?: unknown; ok?: unknown }>) : null;
+    if (gaps) {
+      const ids = gaps.map((g) => (typeof g.id === "string" ? g.id : "?"));
+      parts.push(
+        ids.length === 0
+          ? `env ✓ (${age(doc!.ts, now)})`
+          : `gaps ${ids.length}: ${ids.slice(0, 3).join(", ")}${ids.length > 3 ? ", …" : ""} (${age(doc!.ts, now)}; mola doctor)`,
+      );
+    }
+  } catch {
+    return "";
+  }
+  return parts.join(" · ");
+}
+
 /** Run the wrapped statusLine command with the same stdin; its trimmed stdout, or "" on any failure. */
 export function runWrapped(command: string, stdin: string, timeoutMs = 3000): string {
   try {
@@ -56,8 +123,11 @@ export function renderStatusline(opts: { stdin: string; cwd: string; wrap?: stri
     const wrapped = runWrapped(opts.wrap, opts.stdin);
     if (wrapped) parts.push(wrapped);
   }
-  const line = ourLine(cwdFromStdin(opts.stdin, opts.cwd), opts.now);
+  const cwd = cwdFromStdin(opts.stdin, opts.cwd);
+  const line = ourLine(cwd, opts.now);
   if (line) parts.push(line);
+  const env = envLine(cwd, opts.now);
+  if (env) parts.push(env);
   return parts.join("\n");
 }
 
