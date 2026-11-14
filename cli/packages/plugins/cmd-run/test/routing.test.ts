@@ -212,6 +212,8 @@ test("operate is for driving a running app, not for code that mentions clicks or
     "launch the dev server",
     "press release notes into the changelog",
     "the click handler on the menu button throws",
+    "打开应用的配置文件，读一下端口",
+    "launch the application server and read the logs",
   ]) assert.notEqual(inferKind(p, t), "operate", p);
   for (const p of [
     "launch the app, click the Save button and read the dialog",

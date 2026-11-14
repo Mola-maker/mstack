@@ -778,9 +778,12 @@ export async function executeRun(
   let exhausted = false;
 
   // a run that succeeded is never a quota failure, whatever its output mentions
-  if (first.exitCode !== 0 && (first.quotaFailure || looksQuotaShaped(first))) {
+  const routeMissing = first.exitCode !== 0 && !first.quotaFailure && looksRouteMissing(first, route);
+  if (first.exitCode !== 0 && (first.quotaFailure || looksQuotaShaped(first) || routeMissing)) {
     io.note(
-      `mola: quota failure on ${decision.agent}/${route} (${first.quotaFailure?.status ?? "unknown"}) — walking the ADR-0003 §4 ladder`,
+      routeMissing
+        ? `mola: route ${route} does not exist on this machine — walking the ladder to the next pick`
+        : `mola: quota failure on ${decision.agent}/${route} (${first.quotaFailure?.status ?? "unknown"}) — walking the ADR-0003 §4 ladder`,
     );
     const walk = await runLadder({
       attempt: runOnce,
@@ -918,20 +921,25 @@ function progressLine(e: HookEvent): string {
   return e.kind.replace(/^mola\./, "").replace(/\./g, " ");
 }
 
-/**
- * Should the next route on the ladder be tried? Yes for a quota-shaped failure the adapter did not normalize,
- * and for a route that does not exist on this machine (a role group that was never created, or has no member):
- * the older picks behind it still work.
- */
+/** Does the failure look quota-shaped even when the adapter did not normalize it? */
 export function looksQuotaShaped(result: RunResult): boolean {
   if (result.quotaFailure) return true;
   const text = `${result.finalText ?? ""}`;
-  return (
-    /\b402\b/.test(text) ||
-    /\b429\b/.test(text) ||
-    /rate\s*limit|insufficient.*(quota|balance|credit)/i.test(text) ||
-    /unknown[_ ]model|no configured model|model[^.\n]{0,40}(not found|does not exist|not available)|no member ready/i.test(text)
-  );
+  return /\b402\b/.test(text) || /\b429\b/.test(text) || /rate\s*limit|insufficient.*(quota|balance|credit)/i.test(text);
+}
+
+/**
+ * Did the run fail because the route itself does not exist on this machine (a role group that was never
+ * created or has no member)? Only a harness or gateway error that names this exact route counts: an agent
+ * that writes "the User model was not found" about its task is an ordinary failure and is not rerouted.
+ * The run never reached a model, so nothing was edited and the older picks behind the route are safe to try.
+ */
+export function looksRouteMissing(result: RunResult, route: string): boolean {
+  const text = `${result.finalText ?? ""}`;
+  if (!route || !text.includes(route)) return false;
+  const at = text.indexOf(route);
+  const near = text.slice(Math.max(0, at - 120), at + route.length + 120);
+  return /UNKNOWN_MODEL|unknown model|no configured model|model_not_found|no member ready/i.test(near);
 }
 
 export {
