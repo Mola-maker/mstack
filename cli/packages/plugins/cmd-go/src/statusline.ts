@@ -8,7 +8,7 @@ import * as childProcess from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { activeProgress, formatProgressLine, writeJsonAtomic } from "@mola/plugin-sdk";
+import { activeProgress, formatProgressLine, themePalette, writeJsonAtomic } from "@mola/plugin-sdk";
 
 /** The directory Claude Code says it is in: workspace.current_dir, else cwd, else `fallback`. */
 export function cwdFromStdin(stdin: string, fallback: string): string {
@@ -72,9 +72,12 @@ function readJson(file: string): Record<string, unknown> | null {
  *    of three fixed phrases, and a time computed from its timestamp.
  *  - gaps: what the last `mola doctor` found failing or worth a warning (`~/.mola/doctor-last.json`), with its age.
  * Reads two small files and runs nothing. "" when neither exists.
+ * `color` paints each part in the theme's tone (ok blue, gaps pink, the age muted); the words and glyphs carry the
+ * meaning, so the plain form says the same.
  */
-export function envLine(cwd: string, now = Date.now(), env: NodeJS.ProcessEnv = process.env): string {
+export function envLine(cwd: string, now = Date.now(), env: NodeJS.ProcessEnv = process.env, color = false): string {
   const parts: string[] = [];
+  const p = themePalette(color);
   try {
     const root = projectRoot(cwd);
     const st = root ? readJson(path.join(root, ".mstack", "verify", "status.json")) : null;
@@ -88,7 +91,8 @@ export function envLine(cwd: string, now = Date.now(), env: NodeJS.ProcessEnv = 
             ? `verify ✗ ${levels ? `${levels[2]} of ${levels[1]}` : "below the required level"}`
             : "verify ? check could not run";
       const when = age(st.ts, now);
-      parts.push(`${body} (last stop${when ? ` ${when}` : ""})`);
+      const tone = st.ok === true ? p.ok : st.ok === false ? p.fail : p.warn;
+      parts.push(`${tone(body)} ${p.muted(`(last stop${when ? ` ${when}` : ""})`)}`);
     }
     const doc = readJson(path.join(env.MOLA_HOME || path.join(os.homedir(), ".mola"), "doctor-last.json"));
     const gaps = Array.isArray(doc?.gaps) ? (doc!.gaps as Array<{ id?: unknown; ok?: unknown }>) : null;
@@ -96,16 +100,13 @@ export function envLine(cwd: string, now = Date.now(), env: NodeJS.ProcessEnv = 
       // check ids are short dotted names; anything else in the file is not echoed to the terminal
       const ids = gaps.map((g) => (typeof g.id === "string" && /^[\w.>=<:-]{1,60}$/.test(g.id) ? g.id : "?"));
       const when = age(doc!.ts, now);
-      parts.push(
-        ids.length === 0
-          ? `env ✓ (mola doctor${when ? ` ${when}` : ""})`
-          : `gaps ${ids.length}: ${ids.slice(0, 3).join(", ")}${ids.length > 3 ? ", …" : ""} (mola doctor${when ? ` ${when}` : ""})`,
-      );
+      const tail = p.muted(`(mola doctor${when ? ` ${when}` : ""})`);
+      parts.push(ids.length === 0 ? `${p.ok("env ✓")} ${tail}` : `${p.warn(`gaps ${ids.length}: ${ids.slice(0, 3).join(", ")}${ids.length > 3 ? ", …" : ""}`)} ${tail}`);
     }
   } catch {
     return "";
   }
-  return parts.join(" · ");
+  return parts.join(p.muted(" · "));
 }
 
 /** Run the wrapped statusLine command with the same stdin; its trimmed stdout, or "" on any failure. */
@@ -126,7 +127,7 @@ export function runWrapped(command: string, stdin: string, timeoutMs = 3000): st
 }
 
 /** The whole statusline output (without trailing newline). Never throws. */
-export function renderStatusline(opts: { stdin: string; cwd: string; wrap?: string; now?: number }): string {
+export function renderStatusline(opts: { stdin: string; cwd: string; wrap?: string; now?: number; color?: boolean }): string {
   const parts: string[] = [];
   if (opts.wrap) {
     const wrapped = runWrapped(opts.wrap, opts.stdin);
@@ -135,7 +136,7 @@ export function renderStatusline(opts: { stdin: string; cwd: string; wrap?: stri
   const cwd = cwdFromStdin(opts.stdin, opts.cwd);
   const line = ourLine(cwd, opts.now);
   if (line) parts.push(line);
-  const env = envLine(cwd, opts.now);
+  const env = envLine(cwd, opts.now, process.env, opts.color === true);
   if (env) parts.push(env);
   return parts.join("\n");
 }

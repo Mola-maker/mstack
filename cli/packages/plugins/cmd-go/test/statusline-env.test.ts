@@ -93,3 +93,14 @@ test("statusline output carries the env line after the run line", () => {
     if (prev === undefined) delete process.env.MOLA_HOME; else process.env.MOLA_HOME = prev;
   }
 });
+
+test("env line in colour: the same words, each part in its tone, nothing else added", () => {
+  const cwd = project({ ts: ago(7), ok: false, message: "verify gate: required L3, found L1 for the current code (tree abc)" });
+  const env = home({ ts: ago(45), gaps: [{ id: "tool.git", ok: false }] });
+  const plain = envLine(cwd, NOW, env);
+  const coloured = envLine(cwd, NOW, env, true);
+  assert.notEqual(coloured, plain);
+  // eslint-disable-next-line no-control-regex
+  assert.equal(coloured.replace(/\x1b\[[0-9;]*m/g, ""), plain);
+  assert.ok(coloured.startsWith("\x1b[38;2;221;102;141mverify ✗ L1 of L3\x1b[39m"), JSON.stringify(coloured));
+});

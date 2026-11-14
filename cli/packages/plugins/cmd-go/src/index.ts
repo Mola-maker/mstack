@@ -141,7 +141,7 @@ export default definePlugin({
         try {
           const stdin = await readStdin();
           const wrap = str(args.flags.wrap);
-          const out = renderStatusline({ stdin, cwd: io.cwd, ...(wrap ? { wrap } : {}) });
+          const out = renderStatusline({ stdin, cwd: io.cwd, color: !process.env.NO_COLOR && !process.env.MOLA_NO_COLOR, ...(wrap ? { wrap } : {}) });
           if (out) process.stdout.write(out + "\n");
         } catch {
           // a statusline never fails the host
