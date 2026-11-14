@@ -40,15 +40,15 @@ test("env line: verify ok, and a check that could not run is not shown as a pass
 
 test("env line: doctor gaps are listed by id, at most three, with where to look", () => {
   const env = home({ ts: ago(45), total: 19, gaps: [{ id: "superagent.layerfs", ok: false }, { id: "superagent.cad2gis", ok: false }, { id: "skills.installed", ok: true }, { id: "tool.rtk", ok: false }] });
-  assert.equal(envLine(project(), NOW, env), "gaps 4: superagent.layerfs, superagent.cad2gis, skills.installed, … (45m ago; mola doctor)");
-  assert.equal(envLine(project(), NOW, home({ ts: ago(3), total: 19, gaps: [] })), "env ✓ (3m ago)");
+  assert.equal(envLine(project(), NOW, env), "gaps 4: superagent.layerfs, superagent.cad2gis, skills.installed, … (mola doctor 45m ago)");
+  assert.equal(envLine(project(), NOW, home({ ts: ago(3), total: 19, gaps: [] })), "env ✓ (mola doctor 3m ago)");
 });
 
 test("env line: both parts, found from a subdirectory of the project; broken files are ignored", () => {
   const cwd = project({ ts: ago(2), ok: true, message: "x" });
   const sub = path.join(cwd, "src", "deep");
   fs.mkdirSync(sub, { recursive: true });
-  assert.equal(envLine(sub, NOW, home({ ts: ago(2), total: 3, gaps: [{ id: "tool.git", ok: false }] })), "verify ✓ (last stop 2m ago) · gaps 1: tool.git (2m ago; mola doctor)");
+  assert.equal(envLine(sub, NOW, home({ ts: ago(2), total: 3, gaps: [{ id: "tool.git", ok: false }] })), "verify ✓ (last stop 2m ago) · gaps 1: tool.git (mola doctor 2m ago)");
   assert.equal(envLine(project("{not json"), NOW, home()), "");
   assert.equal(envLine(project([1, 2]), NOW, home()), "");
 });
@@ -60,7 +60,12 @@ test("env line: a verdict file shipped in a repo cannot put control characters o
   // eslint-disable-next-line no-control-regex
   assert.equal(/[\u0000-\u001f\u007f-\u009f]/.test(line), false);
   const ids = envLine(project(), NOW, home({ ts: ago(1), gaps: [{ id: "x\u001b[2J", ok: false }, { id: "a".repeat(200), ok: false }, { id: "tool.git", ok: false }] }));
-  assert.equal(ids, "gaps 3: ?, ?, tool.git (1m ago; mola doctor)");
+  assert.equal(ids, "gaps 3: ?, ?, tool.git (mola doctor 1m ago)");
+});
+
+test("env line: a doctor result with an unreadable time still reads as a sentence", () => {
+  assert.equal(envLine(project(), NOW, home({ ts: "x", gaps: [{ id: "tool.git", ok: false }] })), "gaps 1: tool.git (mola doctor)");
+  assert.equal(envLine(project(), NOW, home({ ts: "x", gaps: [] })), "env ✓ (mola doctor)");
 });
 
 test("env line: the malformed-receipt message keeps its required level", () => {

@@ -1,7 +1,7 @@
 // Tests for the verdict file stop-verify.mjs leaves for the status line. Run: node --test "hooks/*.test.mjs"
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -65,6 +65,28 @@ test("writing the verdict does not void the receipt it reports on", () => {
   stop(dir);
   stop(dir);
   assert.equal(status(dir).ok, true);
+});
+
+test("a .gitignore that cannot be written does not leave an old pass standing", () => {
+  const dir = repo();
+  spawnSync(process.execPath, [receipt, "write", "--level", "3", "--cmd", "t", "--exit", "0"], { cwd: dir, encoding: "utf8" });
+  stop(dir);
+  assert.equal(status(dir).ok, true);
+  // a directory where the file should be makes every write to it fail, on every platform
+  const ignore = join(dir, ".mstack", "verify", ".gitignore");
+  rmSync(ignore);
+  mkdirSync(ignore);
+  writeFileSync(join(dir, "a.txt"), "two\n");
+  const r = stop(dir);
+  assert.equal(r.status, 0);
+  assert.match(JSON.parse(r.stdout).systemMessage, /found no receipt/);
+  assert.equal(status(dir).ok, false);
+});
+
+test("the stored message holds no absolute path of this machine", () => {
+  const dir = repo();
+  stop(dir);
+  assert.equal(status(dir).message.includes(receipt), false);
 });
 
 test("the check cannot run: ok null, never true", () => {

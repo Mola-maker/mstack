@@ -95,10 +95,11 @@ export function envLine(cwd: string, now = Date.now(), env: NodeJS.ProcessEnv = 
     if (gaps) {
       // check ids are short dotted names; anything else in the file is not echoed to the terminal
       const ids = gaps.map((g) => (typeof g.id === "string" && /^[\w.>=<:-]{1,60}$/.test(g.id) ? g.id : "?"));
+      const when = age(doc!.ts, now);
       parts.push(
         ids.length === 0
-          ? `env ✓ (${age(doc!.ts, now)})`
-          : `gaps ${ids.length}: ${ids.slice(0, 3).join(", ")}${ids.length > 3 ? ", …" : ""} (${age(doc!.ts, now)}; mola doctor)`,
+          ? `env ✓ (mola doctor${when ? ` ${when}` : ""})`
+          : `gaps ${ids.length}: ${ids.slice(0, 3).join(", ")}${ids.length > 3 ? ", …" : ""} (mola doctor${when ? ` ${when}` : ""})`,
       );
     }
   } catch {

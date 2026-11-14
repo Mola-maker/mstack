@@ -19,13 +19,17 @@ const oneLine = (s) => String(s ?? "").trim().split("\n")[0].replace(/^receipt:\
 // The file is local state: it changes on every stop, so it is kept out of git by a .gitignore beside it, and the
 // recorded message stops before the "run …" hint, which holds an absolute path of this machine.
 const record = (root, ok, message) => {
+  const dir = join(root, ".mstack", "verify");
+  // The verdict first, on its own: a .gitignore that cannot be written must not leave an old "ok" standing.
   try {
-    const dir = join(root, ".mstack", "verify");
+    const local = String(message).split("; run ")[0].split(receipt).join("receipt.mjs");
+    writeFileSync(join(dir, "status.json"), `${JSON.stringify({ ts: new Date().toISOString(), ok, message: local })}\n`);
+  } catch { /* nothing to do */ }
+  try {
     const ignore = join(dir, ".gitignore");
     const have = existsSync(ignore) ? readFileSync(ignore, "utf8") : "";
     if (!have.split(/\r?\n/).includes("status.json")) appendFileSync(ignore, `${have && !have.endsWith("\n") ? "\n" : ""}status.json\n`);
-    writeFileSync(join(dir, "status.json"), `${JSON.stringify({ ts: new Date().toISOString(), ok, message: String(message).split("; run ")[0] })}\n`);
-  } catch { /* nothing to do */ }
+  } catch { /* the file stays untracked-but-visible; the verdict is still current */ }
 };
 
 try {
