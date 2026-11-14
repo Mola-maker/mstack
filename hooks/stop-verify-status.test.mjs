@@ -41,8 +41,10 @@ test("below the required level: ok false, the same line the user was shown, and 
   const shown = JSON.parse(stop(dir).stdout).systemMessage;
   const s = status(dir);
   assert.equal(s.ok, false);
-  assert.equal(s.message, shown);
+  assert.ok(shown.startsWith(s.message), `${s.message} / ${shown}`);
   assert.match(s.message, /required L3, found no receipt/);
+  // the hint with this machine's absolute path stays out of the file
+  assert.doesNotMatch(s.message, /receipt\.mjs|; run /);
   assert.ok(Math.abs(Date.now() - Date.parse(s.ts)) < 60_000);
 });
 
@@ -70,6 +72,20 @@ test("the check cannot run: ok null, never true", () => {
   const r = spawnSync(process.execPath, [hook], { cwd: dir, input: JSON.stringify({ cwd: dir }), encoding: "utf8", env: { ...process.env, MSTACK_STOP_VERIFY_TIMEOUT_MS: "1" } });
   assert.equal(r.status, 0);
   const s = status(dir);
-  assert.notEqual(s.ok, true);
-  if (s.ok === null) assert.match(s.message, /could not be evaluated/);
+  assert.equal(s.ok, null);
+  assert.match(s.message, /could not be evaluated/);
+});
+
+test("the verdict file is kept out of git: a .gitignore beside it, written once, and an existing one is kept", () => {
+  const dir = repo();
+  stop(dir);
+  stop(dir);
+  assert.equal(readFileSync(join(dir, ".mstack", "verify", ".gitignore"), "utf8"), "status.json\n");
+  const st = spawnSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: dir, encoding: "utf8" }).stdout;
+  assert.doesNotMatch(st, /status\.json/);
+
+  const other = repo();
+  writeFileSync(join(other, ".mstack", "verify", ".gitignore"), "receipts/");
+  stop(other);
+  assert.equal(readFileSync(join(other, ".mstack", "verify", ".gitignore"), "utf8"), "receipts/\nstatus.json\n");
 });

@@ -4,7 +4,7 @@
 // itself fails or runs out of time, say so in one line instead of going quiet.
 // Never blocks: no `decision`, no `continue: false`, always exit 0. Gate absent: no output at all.
 import { execFileSync } from "node:child_process";
-import { existsSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -16,9 +16,15 @@ const say = (message) => process.stdout.write(`${JSON.stringify({ systemMessage:
 const oneLine = (s) => String(s ?? "").trim().split("\n")[0].replace(/^receipt:\s*/, "");
 // The status line shows this file instead of hashing the tree itself. ok: true = receipt at the required level,
 // false = below it, null = the check could not run. A read-only checkout must not break the stop.
+// The file is local state: it changes on every stop, so it is kept out of git by a .gitignore beside it, and the
+// recorded message stops before the "run …" hint, which holds an absolute path of this machine.
 const record = (root, ok, message) => {
   try {
-    writeFileSync(join(root, ".mstack", "verify", "status.json"), `${JSON.stringify({ ts: new Date().toISOString(), ok, message })}\n`);
+    const dir = join(root, ".mstack", "verify");
+    const ignore = join(dir, ".gitignore");
+    const have = existsSync(ignore) ? readFileSync(ignore, "utf8") : "";
+    if (!have.split(/\r?\n/).includes("status.json")) appendFileSync(ignore, `${have && !have.endsWith("\n") ? "\n" : ""}status.json\n`);
+    writeFileSync(join(dir, "status.json"), `${JSON.stringify({ ts: new Date().toISOString(), ok, message: String(message).split("; run ")[0] })}\n`);
   } catch { /* nothing to do */ }
 };
 
