@@ -32,16 +32,15 @@ Work goes to the model that is good at it: strong models think, models that are 
 3. Never route to `deepseek/*` directly. Only `group/*` and `auto/*` are allowed.
 4. Same brief on several models (a race): take one route per family from `picks`, so the candidates differ in training, not only in size.
 
-| Kind | First pick | Next family worth trying |
-|---|---|---|
-| plan, review, long-context | claude-opus | gemini |
-| implement, debug | claude-opus or sonnet | deepseek |
-| test | deepseek flash | glm flash |
-| operate | gpt | kimi |
-| frontend, vision | claude-opus | claude-sonnet / gemini |
-| explore | gemini flash | deepseek flash |
-| research | group/smart-split | claude-opus |
-| zh-writing | kimi | deepseek |
+| Kind | First pick (role group) | Behind it, when the group is missing or spent | Next family worth trying |
+|---|---|---|---|
+| plan, review, debug | `group/m-think` | claude-opus | gemini |
+| implement, frontend, long-context, vision | `group/m-build` | claude-opus or sonnet | deepseek / gemini |
+| operate | `group/m-operate` | gpt | kimi |
+| test | `group/m-bulk` | claude-sonnet | deepseek flash |
+| explore | `group/m-bulk` | gemini flash | deepseek flash |
+| research | `group/m-bulk` | group/smart-split | claude-opus |
+| zh-writing | `group/m-bulk` | kimi | deepseek |
 
 The table is a map to the file, not a copy of it. Read the file for the exact route ids.
 

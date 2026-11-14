@@ -100,7 +100,7 @@ if (existsSync(join(root, "config", "model-routing.json"))) {
         const role = (r.roles ?? {})[t.role];
         if (!role) err(`model-routing: task ${kind} has no known role`);
         else if (t.picks?.[0] !== role.group) err(`model-routing: task ${kind} must list ${role.group} first`);
-        if ((t.picks ?? []).length < 2) err(`model-routing: task ${kind} has no fallback behind its role group`);
+        if (new Set(t.picks ?? []).size < 2) err(`model-routing: task ${kind} has no fallback behind its role group`);
       }
     }
   } catch (e) { err(`model-routing: invalid JSON (${e.message})`); }
