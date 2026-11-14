@@ -11,9 +11,7 @@
  */
 
 import type { CheckResult, DoctorCheck, PluginContext } from "@mola/plugin-sdk";
-import * as os from "node:os";
-import * as path from "node:path";
-import { definePlugin, detectColor, ExitCode, palette, statusGlyph, writeJsonAtomic } from "@mola/plugin-sdk";
+import { definePlugin, detectColor, doctorCachePath, ExitCode, palette, statusGlyph, writeJsonAtomic } from "@mola/plugin-sdk";
 
 function nodeCheck(): DoctorCheck {
   return {
@@ -58,7 +56,7 @@ interface ReportedCheck {
 
 /** Where the last doctor result is kept for the status line (`mola statusline` reads it; it never runs checks). */
 export function doctorCacheFile(env: NodeJS.ProcessEnv = process.env): string {
-  return path.join(env.MOLA_HOME || path.join(os.homedir(), ".mola"), "doctor-last.json");
+  return doctorCachePath(env);
 }
 
 export default definePlugin({

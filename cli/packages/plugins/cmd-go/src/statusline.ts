@@ -8,7 +8,7 @@ import * as childProcess from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { activeProgress, formatProgressLine, themePalette, writeJsonAtomic } from "@mola/plugin-sdk";
+import { activeProgress, ago, doctorStatus, formatProgressLine, themePalette, verifyStatus, writeJsonAtomic } from "@mola/plugin-sdk";
 
 /** The directory Claude Code says it is in: workspace.current_dir, else cwd, else `fallback`. */
 export function cwdFromStdin(stdin: string, fallback: string): string {
@@ -33,45 +33,12 @@ export function ourLine(cwd: string, now = Date.now()): string {
 }
 
 /**
- * The git checkout `start` is in: the nearest directory at or above it that holds `.git` (a directory, or the
- * file a worktree has). The Stop hook writes its verdict at the git toplevel, so this is where to read it:
- * a `.mstack/` further up belongs to another project, and one further down (a package's run state) is not it.
- */
-function projectRoot(start: string): string | null {
-  let dir = path.resolve(start);
-  for (let i = 0; i < 40; i++) {
-    if (fs.existsSync(path.join(dir, ".git"))) return dir;
-    const parent = path.dirname(dir);
-    if (parent === dir) return null;
-    dir = parent;
-  }
-  return null;
-}
-
-function age(ts: unknown, now: number): string {
-  const t = typeof ts === "string" ? Date.parse(ts) : NaN;
-  if (!Number.isFinite(t)) return "";
-  const m = Math.max(0, Math.round((now - t) / 60000));
-  return m < 1 ? "just now" : m < 60 ? `${m}m ago` : m < 48 * 60 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`;
-}
-
-function readJson(file: string): Record<string, unknown> | null {
-  try {
-    const v = JSON.parse(fs.readFileSync(file, "utf8")) as unknown;
-    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * The environment line: what the agent could not see from inside the session.
- *  - verify: the Stop reminder's last verdict for this project (`.mstack/verify/status.json`), with its age.
- *    It is a record of the last stop, not a fresh check: edits since then are not in it, so the line says "last stop".
- *    The file sits in the repository, so a clone can ship its own: nothing from it is printed except a level or one
- *    of three fixed phrases, and a time computed from its timestamp.
- *  - gaps: what the last `mola doctor` found failing or worth a warning (`~/.mola/doctor-last.json`), with its age.
- * Reads two small files and runs nothing. "" when neither exists.
+ *  - verify: the Stop reminder's last verdict for this checkout, with its age. It is a record of the last stop,
+ *    not a fresh check: edits since then are not in it, so the line says "last stop".
+ *  - gaps: what the last `mola doctor` found failing or worth a warning, with its age.
+ * Both come from `@mola/plugin-sdk` (`verifyStatus`, `doctorStatus`), which read two small files, run nothing and
+ * pass on nothing from the repository's file but fixed values. "" when neither exists.
  * `color` paints each part in the theme's tone (ok blue, gaps pink, the age muted); the words and glyphs carry the
  * meaning, so the plain form says the same.
  */
@@ -79,27 +46,22 @@ export function envLine(cwd: string, now = Date.now(), env: NodeJS.ProcessEnv = 
   const parts: string[] = [];
   const p = themePalette(color);
   try {
-    const root = projectRoot(cwd);
-    const st = root ? readJson(path.join(root, ".mstack", "verify", "status.json")) : null;
+    const st = verifyStatus(cwd);
     if (st) {
-      const msg = typeof st.message === "string" ? st.message.slice(0, 400) : "";
-      const levels = /required (L[0-5]), found (L[0-5]|no receipt|no passing check|no valid receipt)\b/.exec(msg);
       const body =
         st.ok === true
           ? "verify ✓"
           : st.ok === false
-            ? `verify ✗ ${levels ? `${levels[2]} of ${levels[1]}` : "below the required level"}`
+            ? `verify ✗ ${st.found && st.required ? `${st.found} of ${st.required}` : "below the required level"}`
             : "verify ? check could not run";
-      const when = age(st.ts, now);
+      const when = ago(st.at, now);
       const tone = st.ok === true ? p.ok : st.ok === false ? p.fail : p.warn;
       parts.push(`${tone(body)} ${p.muted(`(last stop${when ? ` ${when}` : ""})`)}`);
     }
-    const doc = readJson(path.join(env.MOLA_HOME || path.join(os.homedir(), ".mola"), "doctor-last.json"));
-    const gaps = Array.isArray(doc?.gaps) ? (doc!.gaps as Array<{ id?: unknown; ok?: unknown }>) : null;
-    if (gaps) {
-      // check ids are short dotted names; anything else in the file is not echoed to the terminal
-      const ids = gaps.map((g) => (typeof g.id === "string" && /^[\w.>=<:-]{1,60}$/.test(g.id) ? g.id : "?"));
-      const when = age(doc!.ts, now);
+    const doc = doctorStatus(env);
+    if (doc) {
+      const ids = doc.gaps.map((g) => g.id);
+      const when = ago(doc.at, now);
       const tail = p.muted(`(mola doctor${when ? ` ${when}` : ""})`);
       parts.push(ids.length === 0 ? `${p.ok("env ✓")} ${tail}` : `${p.warn(`gaps ${ids.length}: ${ids.slice(0, 3).join(", ")}${ids.length > 3 ? ", …" : ""}`)} ${tail}`);
     }

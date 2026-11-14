@@ -6,5 +6,6 @@ export * from "./argv.js";
 export * from "./agents.js";
 export * from "./ui.js";
 export * from "./theme.js";
+export * from "./env.js";
 export * from "./routing.js";
 export * from "./progress.js";
