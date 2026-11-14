@@ -22,8 +22,8 @@ Work goes to the model that is good at it: strong models think, models that are 
 - Each role is one magpie routing group. Which models are in it, in what order, and what happens on a 402 are magpie's: `magpie group m-think` shows it, `magpie group set m-think models=…` changes it. Do not rebuild that fallback by hand.
 - `roles.<name>.unverified: true` means the membership is a starting guess. Replace it with a measurement, not with an opinion.
 - DSH: `dsh --profile mola-cli --patch "<mstack root>/config/dsh-roles/m-<role>.yml" "<task>"`. The overlay declares the group itself, so it works when the profile's model list does not show it.
-- A group missing on this machine (the request fails with an unknown model) → use the kind's next pick and say so in the report. `magpie group add m-<role> models=<roles.<role>.members, comma separated> routing=order` creates it.
-- For the judge rule below, a role group counts as the family in `roles.<name>.leads`, not as a family of its own.
+- A group missing on this machine (the request fails with an unknown model) → use the kind's next pick and say so in the report; `mola run` does this by itself. `magpie group add m-<role> models=<roles.<role>.members, comma separated> routing=order` creates it.
+- For the judge rule below, a role group counts as the family in `roles.<name>.leads`, not as a family of its own (`mola go` applies the same rule). With claude leading both think and build, the reviewer of build work is the first `review` pick that is not claude-led.
 
 ## Choosing a route
 

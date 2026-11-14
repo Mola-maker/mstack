@@ -918,11 +918,20 @@ function progressLine(e: HookEvent): string {
   return e.kind.replace(/^mola\./, "").replace(/\./g, " ");
 }
 
-/** Does the failure look quota-shaped even when the adapter did not normalize it? */
+/**
+ * Should the next route on the ladder be tried? Yes for a quota-shaped failure the adapter did not normalize,
+ * and for a route that does not exist on this machine (a role group that was never created, or has no member):
+ * the older picks behind it still work.
+ */
 export function looksQuotaShaped(result: RunResult): boolean {
   if (result.quotaFailure) return true;
   const text = `${result.finalText ?? ""}`;
-  return /\b402\b/.test(text) || /\b429\b/.test(text) || /rate\s*limit|insufficient.*(quota|balance|credit)/i.test(text);
+  return (
+    /\b402\b/.test(text) ||
+    /\b429\b/.test(text) ||
+    /rate\s*limit|insufficient.*(quota|balance|credit)/i.test(text) ||
+    /unknown[_ ]model|no configured model|model[^.\n]{0,40}(not found|does not exist|not available)|no member ready/i.test(text)
+  );
 }
 
 export {
@@ -954,7 +963,7 @@ export {
   ndjsonSink,
   recordingSink,
 };
-export { adaptPrompt, classifyKind, familyOf, inferKind, loadRouting, loadRoutingFile, planRoutes, policyKindOf, routingFilePath, routingKindOf } from "./routing.js";
+export { adaptPrompt, classifyKind, familyOf, judgeFamilyOf, inferKind, loadRouting, loadRoutingFile, planRoutes, policyKindOf, routingFilePath, routingKindOf } from "./routing.js";
 export type { RoutingTable, RoutePlan, PromptAdapter } from "./routing.js";
 export type { Policy, TaskKind, RouteDecision, RouteRequest, SkillSpec, LadderAttempt };
 export type { EventSink } from "./stream.js";

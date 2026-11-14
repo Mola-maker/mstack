@@ -19,6 +19,7 @@ import {
   loadRouting,
   loadRoutingFile,
   normalizeRouting,
+  judgeFamilyOf,
   planRoutes,
   policyKindOf,
   routingFilePath,
@@ -179,6 +180,45 @@ test("roles (v2): each kind's first route is its role group, the older picks are
   assert.equal(policyKindOf("operate"), "qa");
   // a v1 file (no roles) still loads
   assert.equal(table().roles, undefined);
+});
+
+test("judgeFamilyOf: a role group is the family that leads it; the reviewer of claude-led work is not claude-led", () => {
+  const dir = path.dirname(fileURLToPath(import.meta.url));
+  const t = loadRoutingFile({ env: {} as never, startDir: dir }).table!;
+  assert.equal(familyOf(t, "group/m-build"), "group"); // prompt style: unchanged
+  assert.equal(judgeFamilyOf(t, "group/m-build"), "claude");
+  assert.equal(judgeFamilyOf(t, "group/m-think"), "claude");
+  assert.equal(judgeFamilyOf(t, "group/m-bulk"), "deepseek");
+  assert.equal(judgeFamilyOf(t, "auto/gemini-3.8-flash"), "gemini");
+  assert.equal(judgeFamilyOf(t, "group/smart-split"), "group");
+  // what `mola go` does for the review stage: first route on the review plan outside the implementer's family
+  const review = planRoutes(t, "review", WL)!;
+  for (const impl of ["group/m-build", "auto/claude-sonnet-5-5"]) {
+    const fam = judgeFamilyOf(t, impl);
+    const judge = [review.route, ...review.ladder].find((r) => judgeFamilyOf(t, r) !== fam);
+    assert.ok(judge, "no reviewer outside the implementer's family");
+    assert.notEqual(judgeFamilyOf(t, judge!), "claude", `${impl} would be judged by ${judge}`);
+  }
+});
+
+test("operate is for driving a running app, not for code that mentions clicks or pages", () => {
+  const dir = path.dirname(fileURLToPath(import.meta.url));
+  const t = loadRoutingFile({ env: {} as never, startDir: dir }).table!;
+  for (const p of [
+    "open the page component and fix the CSS",
+    "click the button in the settings page component to fix its styles",
+    "点击事件的处理函数有 bug，修一下",
+    "open the file and add a test",
+    "launch the dev server",
+    "press release notes into the changelog",
+    "the click handler on the menu button throws",
+  ]) assert.notEqual(inferKind(p, t), "operate", p);
+  for (const p of [
+    "launch the app, click the Save button and read the dialog",
+    "打开模拟器点一下登录",
+    "use adb to install the apk and tap through the login flow",
+    "tap Log in and then check the welcome text",
+  ]) assert.equal(inferKind(p, t), "operate", p);
 });
 
 test("planRoutes: banned picks are dropped, the rest keep their order as the ladder", () => {

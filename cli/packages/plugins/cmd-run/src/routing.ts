@@ -60,10 +60,12 @@ const SIGNALS: Record<string, Array<[RegExp, number]>> = {
     [/\bverify\b/i, 1],
     [/审查|评审|复核/, 3],
   ],
+  // Driving a running app, not editing its code: a UI verb alone ("click handler", "open the component") is not enough.
   operate: [
-    [/\b(click|tap|type into|press|launch|open)\b[^.\n]{0,40}\b(app|window|button|dialog|menu|emulator|device|screen|page)\b/i, 4],
-    [/\b(computer use|drive the (ui|app|browser)|operate the|adb|uiautomator|agent-desktop)\b/i, 4],
-    [/点一下|点击|操作界面|真机|模拟器/, 4],
+    [/\b(computer use|drive the (ui|app|browser)|operate the (app|ui|device)|adb|uiautomator|agent-desktop|mola-cua|emulator)\b/i, 4],
+    [/\b(launch|open|start)\b[^.\n]{0,20}\b(app|application|emulator)\b[^.\n]{0,60}\b(click|tap|type|press|read)\b/i, 4],
+    [/\b(click|tap)\b[^.\n]{0,40}\b(and|then)\b[^.\n]{0,40}\b(read|check|verify|confirm|screenshot)\b/i, 3],
+    [/(打开|启动).{0,8}(模拟器|应用|app).{0,20}(点|输入|读)|操作界面|真机(验收|操作)|在模拟器上/i, 4],
   ],
   test: [
     [/\b(add|write|create|extend)\b[^.\n]{0,20}\b(tests?|specs?)\b/i, 4],
@@ -214,6 +216,18 @@ export interface PromptAdapter {
 }
 
 /** Which family a route belongs to: `group/*` first, then the first family whose match word occurs in the route. */
+/**
+ * The family a route counts as when a judge must differ from an author. A role group (`group/m-think`)
+ * counts as the family that leads it (`roles.<name>.leads`): two role groups led by claude are the same
+ * family, whatever `familyOf` says about their `group/` prefix. Other routes are their own family.
+ */
+export function judgeFamilyOf(table: RoutingTable, route: string): string | null {
+  const role = Object.values(table.roles ?? {}).find((r) => r.group.toLowerCase() === route.toLowerCase());
+  if (role?.leads) return role.leads;
+  return familyOf(table, route);
+}
+
+/** The family whose prompt style a route gets. Every `group/` route is "group": the model behind it varies. */
 export function familyOf(table: RoutingTable, route: string): string | null {
   const lower = route.toLowerCase();
   const group = table.families.group;

@@ -27,7 +27,7 @@ import {
 import {
   adaptPrompt,
   buildRunRequest,
-  familyOf,
+  judgeFamilyOf,
   gatePermissionProfile,
   loadPolicy,
   loadRoutingFile,
@@ -175,10 +175,11 @@ export async function prepareStage(
     });
   const base = await run();
   if (stage !== "review" || !rc.table || !implementModel) return base;
-  const implFamily = familyOf(rc.table, implementModel);
-  if (!implFamily || familyOf(rc.table, base.route) !== implFamily) return base;
+  // A role group counts as the family that leads it, so two claude-led groups are not "different".
+  const implFamily = judgeFamilyOf(rc.table, implementModel);
+  if (!implFamily || judgeFamilyOf(rc.table, base.route) !== implFamily) return base;
   const candidates = [base.route, ...(base.routing?.ladder ?? [])];
-  const other = candidates.find((r) => familyOf(rc.table!, r) !== implFamily);
+  const other = candidates.find((r) => judgeFamilyOf(rc.table!, r) !== implFamily);
   if (!other) {
     env.io.note(`mola: warning: no review route outside the "${implFamily}" family — the reviewer shares the implementer's family`);
     return base;
