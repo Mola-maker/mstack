@@ -280,3 +280,30 @@ test("quota: a failing magpie wait carries its stderr into the ladder record", a
   assert.equal(res.ok, false);
   assert.equal(res.detail, "quota still exhausted");
 });
+
+// ------------------------------------------------ a route that does not exist
+
+import { looksQuotaShaped, looksRouteMissing } from "../src/index.js";
+
+const failed = (finalText: string): RunResult => ({ exitCode: 1, finalText }) as RunResult;
+
+test("looksRouteMissing: only a harness or gateway error that names the route in use", () => {
+  const route = "group/m-think";
+  assert.equal(looksRouteMissing(failed('dsh: UNKNOWN_MODEL: pi-ai provider "magpie" has no configured model "group/m-think"'), route), true);
+  assert.equal(looksRouteMissing(failed('{"error":{"code":"model_not_found","message":"group/m-think"}}'), route), true);
+  assert.equal(looksRouteMissing(failed("group/m-think: no member ready"), route), true);
+  // the same error about another route is not about this run's route
+  assert.equal(looksRouteMissing(failed('UNKNOWN_MODEL: no configured model "group/m-bulk"'), route), false);
+  // an agent describing its own task is an ordinary failure
+  for (const text of [
+    "Tests failed: the User model was not found in the Prisma schema.",
+    "I could not finish: model file not found at ./weights/model.bin",
+    "django.core.exceptions: Model not available in app registry",
+    "I used group/m-think to plan this, but the build failed with 3 type errors.",
+    "Build failed: 3 type errors",
+  ]) {
+    assert.equal(looksRouteMissing(failed(text), route), false, text);
+    assert.equal(looksQuotaShaped(failed(text)), false, text);
+  }
+  assert.equal(looksRouteMissing(failed("UNKNOWN_MODEL"), ""), false);
+});

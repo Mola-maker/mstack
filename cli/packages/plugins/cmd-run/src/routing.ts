@@ -60,6 +60,13 @@ const SIGNALS: Record<string, Array<[RegExp, number]>> = {
     [/\bverify\b/i, 1],
     [/审查|评审|复核/, 3],
   ],
+  // Driving a running app, not editing its code: a UI verb alone ("click handler", "open the component") is not enough.
+  operate: [
+    [/\b(computer use|drive the (ui|app|browser)|operate the (app|ui|device)|adb|uiautomator|agent-desktop|mola-cua|emulator)\b/i, 4],
+    [/\b(launch|open|start)\b[^.\n]{0,20}\b(app|application|emulator)\b(?!\s+(server|config|logs?|code|repo))[^.\n]{0,60}\b(click|tap|type into|press)\b/i, 4],
+    [/\b(click|tap)\b[^.\n]{0,40}\b(and|then)\b[^.\n]{0,40}\b(read|check|verify|confirm|screenshot)\b/i, 3],
+    [/(打开|启动).{0,8}(模拟器|应用|app)(?!的?(配置|文件|日志|服务|代码)).{0,20}(点一下|点击|输入)|操作界面|真机(验收|操作)|在模拟器上/i, 4],
+  ],
   test: [
     [/\b(add|write|create|extend)\b[^.\n]{0,20}\b(tests?|specs?)\b/i, 4],
     [/\b(tests?|testing|coverage|e2e|test suite|test cases?)\b/i, 2],
@@ -143,6 +150,7 @@ export function policyKindOf(kind: string): "implement" | "review" | "research" 
     case "review":
       return "review";
     case "test":
+    case "operate":
       return "qa";
     case "research":
     case "explore":
@@ -207,7 +215,21 @@ export interface PromptAdapter {
   unverified?: boolean;
 }
 
-/** Which family a route belongs to: `group/*` first, then the first family whose match word occurs in the route. */
+/**
+ * The family a route counts as when a judge must differ from an author. A role group (`group/m-think`)
+ * counts as the family that leads it (`roles.<name>.leads`): two role groups led by claude are the same
+ * family, whatever `familyOf` says about their `group/` prefix. Other routes are their own family.
+ */
+export function judgeFamilyOf(table: RoutingTable, route: string): string | null {
+  const role = Object.values(table.roles ?? {}).find((r) => r.group.toLowerCase() === route.toLowerCase());
+  if (role?.leads) return role.leads;
+  return familyOf(table, route);
+}
+
+/**
+ * The family whose prompt style a route gets: `group/*` first (the model behind it varies), then the first
+ * family whose match word occurs in the route.
+ */
 export function familyOf(table: RoutingTable, route: string): string | null {
   const lower = route.toLowerCase();
   const group = table.families.group;

@@ -19,7 +19,9 @@ import {
   loadRouting,
   loadRoutingFile,
   normalizeRouting,
+  judgeFamilyOf,
   planRoutes,
+  policyKindOf,
   routingFilePath,
 } from "../src/routing.js";
 import { makeFakeCtx, makeIo, type FakeAgent } from "./fake.js";
@@ -158,6 +160,67 @@ test("classifyKind: low confidence returns null and inferKind falls back to the 
   // a kind the table does not have is skipped
   assert.equal(inferKind("review this diff", table()), "review");
   assert.equal(inferKind("write unit tests for utils", table()), "implement");
+});
+
+test("roles (v2): each kind's first route is its role group, the older picks are the ladder, and operate is a kind", () => {
+  const dir = path.dirname(fileURLToPath(import.meta.url));
+  const t = loadRoutingFile({ env: {} as never, startDir: dir }).table!;
+  assert.deepEqual(Object.keys(t.roles ?? {}).sort(), ["build", "bulk", "operate", "think"]);
+  for (const [kind, task] of Object.entries(t.tasks)) {
+    const role = t.roles![(task as { role?: string }).role ?? ""];
+    assert.ok(role, `kind ${kind} names no known role`);
+    const plan = planRoutes(t, kind, WL)!;
+    assert.equal(plan.route, role.group, kind);
+    assert.ok(plan.ladder.length >= 1, `kind ${kind} has no fallback behind its role group`);
+  }
+  assert.equal(planRoutes(t, "test", WL)!.route, "group/m-bulk");
+  assert.equal(planRoutes(t, "plan", WL)!.route, "group/m-think");
+  assert.equal(inferKind("launch the app, click the Save button and read the dialog", t), "operate");
+  assert.equal(inferKind("打开模拟器点一下登录", t), "operate");
+  assert.equal(policyKindOf("operate"), "qa");
+  // a v1 file (no roles) still loads
+  assert.equal(table().roles, undefined);
+});
+
+test("judgeFamilyOf: a role group is the family that leads it; the reviewer of claude-led work is not claude-led", () => {
+  const dir = path.dirname(fileURLToPath(import.meta.url));
+  const t = loadRoutingFile({ env: {} as never, startDir: dir }).table!;
+  assert.equal(familyOf(t, "group/m-build"), "group"); // prompt style: unchanged
+  assert.equal(judgeFamilyOf(t, "group/m-build"), "claude");
+  assert.equal(judgeFamilyOf(t, "group/m-think"), "claude");
+  assert.equal(judgeFamilyOf(t, "group/m-bulk"), "deepseek");
+  assert.equal(judgeFamilyOf(t, "auto/gemini-3.8-flash"), "gemini");
+  assert.equal(judgeFamilyOf(t, "group/smart-split"), "group");
+  // what `mola go` does for the review stage: first route on the review plan outside the implementer's family
+  const review = planRoutes(t, "review", WL)!;
+  for (const impl of ["group/m-build", "auto/claude-sonnet-5-5"]) {
+    const fam = judgeFamilyOf(t, impl);
+    const judge = [review.route, ...review.ladder].find((r) => judgeFamilyOf(t, r) !== fam);
+    assert.ok(judge, "no reviewer outside the implementer's family");
+    assert.notEqual(judgeFamilyOf(t, judge!), "claude", `${impl} would be judged by ${judge}`);
+  }
+});
+
+test("operate is for driving a running app, not for code that mentions clicks or pages", () => {
+  const dir = path.dirname(fileURLToPath(import.meta.url));
+  const t = loadRoutingFile({ env: {} as never, startDir: dir }).table!;
+  for (const p of [
+    "open the page component and fix the CSS",
+    "click the button in the settings page component to fix its styles",
+    "点击事件的处理函数有 bug，修一下",
+    "open the file and add a test",
+    "launch the dev server",
+    "press release notes into the changelog",
+    "the click handler on the menu button throws",
+    "打开应用的配置文件，读一下端口",
+    "launch the application server and read the logs",
+  ]) assert.notEqual(inferKind(p, t), "operate", p);
+  for (const p of [
+    "launch the app, click the Save button and read the dialog",
+    "打开模拟器点一下登录",
+    "use adb to install the apk and tap through the login flow",
+    "tap Log in and then check the welcome text",
+  ]) assert.equal(inferKind(p, t), "operate", p);
 });
 
 test("planRoutes: banned picks are dropped, the rest keep their order as the ladder", () => {

@@ -8,21 +8,39 @@ Read this at step 3 of m-dispatch, when m-team picks a judge, or when m-review p
 - `families.<name>` — `match` substrings that classify a route id, a `style` (xml, markdown, xml-or-markdown) and `rules` for writing a brief to that family. Classify a route by the first family whose `match` appears in its id (`auto/claude-opus-5-5` → claude, `group/smart-split` → group).
 - The ranks come from a leaderboard snapshot dated in the file. They go stale; when your own eval disagrees with the file, your eval wins and the disagreement is a Ruling line.
 
+## Roles (v2)
+
+Work goes to the model that is good at it: strong models think, models that are steady with tools operate, cheap models do volume.
+
+| Role | Kinds | Route | What it needs |
+|---|---|---|---|
+| think | plan, review, debug | `group/m-think` | the strongest reasoning; cost is accepted |
+| build | implement, frontend, long-context, vision | `group/m-build` | strong at code |
+| operate | operate (drive a UI, device or tool: `m-cua`, QA flows, release mechanics) | `group/m-operate` | reliable tool calls, fast, follows steps |
+| bulk | test, explore, research reading, zh-writing | `group/m-bulk` | cheap and good enough |
+
+- Each role is one magpie routing group. Which models are in it, in what order, and what happens on a 402 are magpie's: `magpie group m-think` shows it, `magpie group set m-think models=…` changes it. Do not rebuild that fallback by hand.
+- `roles.<name>.unverified: true` means the membership is a starting guess. Replace it with a measurement, not with an opinion.
+- DSH: `dsh --profile mola-cli --patch "<mstack root>/config/dsh-roles/m-<role>.yml" "<task>"`. The overlay declares the group itself, so it works when the profile's model list does not show it.
+- A group missing on this machine (the request fails with an unknown model) → use the kind's next pick and say so in the report; `mola run` does this by itself. `magpie group add m-<role> models=<roles.<role>.members, comma separated> routing=order` creates it.
+- For the judge rule below, a role group counts as the family in `roles.<name>.leads`, not as a family of its own (`mola go` applies the same rule). With claude leading both think and build, the reviewer of build work is the first `review` pick that is not claude-led.
+
 ## Choosing a route
 
-1. Name the kind per subtask: plan, implement, debug, review, test, frontend, long-context, research, explore, zh-writing, vision. A subtask that fits none gets `implement` if it edits and `explore` if it only reads.
-2. Take `picks[0]`. On a 402/429 or a missing route, take the next entry; do not retry the same one. When the list is spent, stop and report (m-dispatch stop conditions).
+1. Name the kind per subtask: plan, implement, operate, debug, review, test, frontend, long-context, research, explore, zh-writing, vision. A subtask that fits none gets `implement` if it edits and `explore` if it only reads.
+2. Take `picks[0]` (in v2 this is the role group). On a 402/429 or a missing route, take the next entry; do not retry the same one. When the list is spent, stop and report (m-dispatch stop conditions).
 3. Never route to `deepseek/*` directly. Only `group/*` and `auto/*` are allowed.
 4. Same brief on several models (a race): take one route per family from `picks`, so the candidates differ in training, not only in size.
 
-| Kind | First pick | Next family worth trying |
-|---|---|---|
-| plan, review, long-context | claude-opus | gemini |
-| implement, debug, test | claude-opus or sonnet | deepseek |
-| frontend, vision | claude-opus | claude-sonnet / gemini |
-| explore | gemini flash | deepseek flash |
-| research | group/smart-split | claude-opus |
-| zh-writing | kimi | deepseek |
+| Kind | First pick (role group) | Behind it, when the group is missing or spent | Next family worth trying |
+|---|---|---|---|
+| plan, review, debug | `group/m-think` | claude-opus | gemini |
+| implement, frontend, long-context, vision | `group/m-build` | claude-opus or sonnet | deepseek / gemini |
+| operate | `group/m-operate` | gpt | kimi |
+| test | `group/m-bulk` | claude-sonnet | deepseek flash |
+| explore | `group/m-bulk` | gemini flash | deepseek flash |
+| research | `group/m-bulk` | group/smart-split | claude-opus |
+| zh-writing | `group/m-bulk` | kimi | deepseek |
 
 The table is a map to the file, not a copy of it. Read the file for the exact route ids.
 
