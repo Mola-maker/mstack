@@ -32,7 +32,7 @@ test("the CSS carries every token for day and night, and turns motion off on req
   const css = themeCss();
   for (const v of ["--m-blue-500: #5d93dc", "--m-pink-300: #f2a5c4", "--m-ground: #f7fbff", "--m-lift-2:", "--m-t-hover: 420ms", "--m-radius-md: 16px"]) assert.ok(css.includes(v), v);
   assert.match(css, /:root\[data-theme="night"\] \{[^}]*--m-ground: #0f1726/);
-  assert.match(css, /prefers-color-scheme: dark/);
+  assert.match(css, /prefers-color-scheme:dark/);
   assert.match(css, /prefers-reduced-motion: reduce[^}]*--m-t-hover: 0ms/);
   // every var() the night block overrides exists in the day block
   const day = css.slice(0, css.indexOf(':root[data-theme="night"]'));

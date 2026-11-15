@@ -17,7 +17,7 @@
   "permissions": {
     "fs.read": ["**/.mstack/runs/**"],
     "fs.write": ["**/.mstack/runs/**"],
-    "mola": ["commands", "config.read"]
+    "mola": ["commands", "config.read", "doctor"]
   },
   "hooks": {
     "emit": [],

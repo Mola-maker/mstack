@@ -13,6 +13,9 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { ExitCode } from "./errors.js";
+import { writeJsonAtomic } from "./progress.js";
+import type { CheckResult, DoctorCheck } from "./types.js";
 
 export interface VerifyStatus {
   /** true: receipt at the required level; false: below it; null: the check could not run */
@@ -113,4 +116,48 @@ export function ago(at: number | undefined, now = Date.now()): string {
   if (at === undefined) return "";
   const m = Math.max(0, Math.round((now - at) / 60000));
   return m < 1 ? "just now" : m < 60 ? `${m}m ago` : m < 48 * 60 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`;
+}
+
+export interface ReportedCheck {
+  id: string;
+  description?: string;
+  ok: boolean;
+  warn?: boolean;
+  message?: string;
+  exitCode?: number;
+}
+
+/**
+ * Run every doctor check and remember what failed or warned in `doctor-last.json`. `mola doctor` and the web
+ * console's "check again" both go through here, so the status line always shows the newest of the two.
+ * A check that throws is a failing check. A home that cannot be written does not fail the run.
+ */
+export async function runDoctorChecks(checks: readonly DoctorCheck[], env: NodeJS.ProcessEnv = process.env): Promise<ReportedCheck[]> {
+  const out: ReportedCheck[] = [];
+  for (const check of checks) {
+    let result: CheckResult;
+    try {
+      result = await check.run();
+    } catch (err) {
+      result = { ok: false, message: `check crashed: ${err instanceof Error ? err.message : String(err)}`, exitCode: ExitCode.Software };
+    }
+    out.push({
+      id: check.id,
+      description: check.description,
+      ok: result.ok,
+      ...(result.ok && result.warn ? { warn: true } : {}),
+      message: result.message,
+      exitCode: result.ok ? undefined : (result.exitCode ?? ExitCode.Unavailable),
+    });
+  }
+  try {
+    writeJsonAtomic(doctorCachePath(env), {
+      ts: new Date().toISOString(),
+      total: out.length,
+      gaps: out.filter((c) => !c.ok || c.warn).map((c) => ({ id: c.id, ok: c.ok, message: c.message ?? "" })),
+    });
+  } catch {
+    // the cache is a convenience
+  }
+  return out;
 }

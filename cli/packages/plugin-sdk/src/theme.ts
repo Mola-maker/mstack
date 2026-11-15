@@ -92,7 +92,7 @@ export function themeCss(): string {
   return [
     `:root {\n${vars({ ...base, ...light })}\n}`,
     `:root[data-theme="night"] {\n${vars(night)}\n}`,
-    `@media (prefers-color-scheme: dark) {\n  :root:not([data-theme="day"]) {\n${vars(night).replace(/^/gm, "  ")}\n  }\n}`,
+    `@media (prefers-color-scheme:dark) {\n  :root:not([data-theme="day"]) {\n${vars(night).replace(/^/gm, "  ")}\n  }\n}`,
     `@media (prefers-reduced-motion: reduce) {\n  :root { --m-t-press: 0ms; --m-t-hover: 0ms; --m-t-settle: 0ms; }\n}`,
   ].join("\n\n") + "\n";
 }
