@@ -9,7 +9,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { spawn as spawnChild } from "node:child_process";
 import type { PluginContext } from "@mola/plugin-sdk";
-import { definePlugin, detectColor, ExitCode, MolaError } from "@mola/plugin-sdk";
+import { definePlugin, detectColor, envParts, ExitCode, MolaError, type EnvPart } from "@mola/plugin-sdk";
 import {
   applyEffects,
   buildLaunch,
@@ -85,6 +85,8 @@ export interface TuiOptions {
   /** minimum ms between frames (default 100 = 10 fps) */
   minFrameMs?: number;
   color?: boolean;
+  /** the environment facts for the title bar, asked for at most once a second; omitted → the bar shows none */
+  env?: () => EnvPart[];
   /** error text sink, called after the terminal is restored */
   err?: (s: string) => void;
   now?: () => number;
@@ -145,10 +147,21 @@ export function runTui(opts: TuiOptions): Promise<TuiResult> {
       }
     };
 
+    // The verdict and the doctor result change at most every few seconds; a frame can be painted ten times a second.
+    let envAt = 0;
+    let envCache: EnvPart[] = [];
+    const envNow = (): EnvPart[] => {
+      if (now() - envAt >= 1000) {
+        envCache = opts.env ? opts.env() : [];
+        envAt = now();
+      }
+      return envCache;
+    };
+
     const paint = (force = false): void => {
       if (finished) return;
       paintTimer = undefined;
-      const lines = render(state, { cols: state.cols, rows: state.rows, color });
+      const lines = render(state, { cols: state.cols, rows: state.rows, color, env: envNow() });
       const frame = lines.join("\n");
       if (!force && frame === lastFrame) return;
       lastFrame = frame;
@@ -336,6 +349,7 @@ export default definePlugin({
           cwds,
           io: systemIO(),
           color: detectColor(process.stdout),
+          env: () => envParts(cwds[0] ?? process.cwd()),
           err: (s) => void process.stderr.write(s),
         });
         return res.reason === "error" ? ExitCode.Software : ExitCode.Ok;

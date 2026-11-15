@@ -8,8 +8,9 @@ import {
   displayWidth,
   formatDuration,
   formatProgressLine,
-  palette,
   table,
+  themedPalette,
+  type EnvPart,
   type Palette,
   type StageStatus,
   type WorkerStatus,
@@ -20,6 +21,8 @@ export interface RenderOptions {
   cols: number;
   rows: number;
   color: boolean;
+  /** the environment facts for the title bar (`envParts` from the SDK); omitted → not shown */
+  env?: EnvPart[];
 }
 
 type Paint = (s: string) => string;
@@ -330,7 +333,7 @@ function heights(total: number, needs: number[], caps: number[]): number[] {
 
 export function render(s: State, o: RenderOptions): string[] {
   const { cols, rows } = o;
-  const pal = palette(o.color);
+  const pal = themedPalette(o.color);
   const out: string[] = [];
   const bodyH = Math.max(1, rows - 3);
 
@@ -338,8 +341,11 @@ export function render(s: State, o: RenderOptions): string[] {
   const running = s.runs.filter((r) => r.p.status === "running").length;
   const blocked = s.runs.filter((r) => r.p.status === "blocked").length;
   const cost = s.runs.reduce((n, r) => n + r.p.costUsd, 0);
+  // the same environment facts the status line and the web console show, when the caller passes them
+  const tone = { ok: pal.cyan, warn: pal.yellow, fail: pal.red };
+  const envSegs: Line = (o.env ?? []).flatMap((part): Line => [["  ", pal.dim], [part.text, tone[part.tone]], [` ${part.note}`, pal.dim]]);
   out.push(
-    fitLine([[" mola tui", pal.bold], [`  ${s.runs.length} runs · ${running} running · ${blocked} blocked · $${cost.toFixed(2)}`, pal.dim]], cols),
+    fitLine([[" mola tui", pal.bold], [`  ${s.runs.length} runs · ${running} running · ${blocked} blocked · $${cost.toFixed(2)}`, pal.dim], ...envSegs], cols),
   );
 
   // body

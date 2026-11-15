@@ -12,6 +12,8 @@
  *  - Web and terminal read the same object: `themeCss()` for the browser, `themePalette()` for ANSI.
  */
 
+import type { Palette } from "./ui.js";
+
 export const THEME = {
   blue: { 50: "#f7fbff", 100: "#eaf3ff", 300: "#b7d4ff", 500: "#5d93dc", 600: "#3f72bd", 700: "#2b5597" },
   pink: { 100: "#fde8f1", 300: "#f2a5c4", 500: "#dd668d" },
@@ -111,4 +113,23 @@ function luminance(hex: string): number {
 export function contrast(a: string, b: string): number {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
+}
+
+/**
+ * The classic `Palette` (bold, dim, red, green, yellow, cyan) in the theme's colours, for code written
+ * against it: cyan is work in progress (blue), yellow is "needs a person" (pink), green is done (pale blue),
+ * red is failure (deep pink), dim is the quiet tone. `color: false` is plain text, as with `palette(false)`.
+ */
+export function themedPalette(color: boolean): Palette {
+  const t = themePalette(color);
+  const done = color ? (text: string) => { const [r, g, b] = hexToRgb(THEME.blue[300]); return `\x1b[38;2;${r};${g};${b}m${text}\x1b[39m`; } : (text: string) => text;
+  return {
+    color,
+    bold: color ? (text: string) => `\x1b[1m${text}\x1b[22m` : (text: string) => text,
+    dim: t.muted,
+    red: t.fail,
+    green: done,
+    yellow: t.warn,
+    cyan: t.ok,
+  };
 }
