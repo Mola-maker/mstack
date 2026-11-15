@@ -15,16 +15,23 @@ import type { PluginContext } from "@mola/plugin-sdk";
 import {
   decideApproval,
   definePlugin,
+  doctorStatus,
   ExitCode,
   listProgress,
+  loadRoutingFile,
   MolaError,
   readApproval,
   readProgress,
   runDir,
+  runDoctorChecks,
+  verifyStatus,
   type Approval,
+  type DoctorStatus,
   type RunProgress,
+  type VerifyStatus,
 } from "@mola/plugin-sdk";
 import { PAGE_HTML } from "./page.js";
+export { pageHtml } from "./page.js";
 
 const USAGE = "usage: mola web [--port 7333] [--host 127.0.0.1] [--token <t>] [--cwd <dir> ...]";
 const ID_RE = /^[\w.-]+$/;
@@ -41,6 +48,31 @@ export interface WebOptions {
   pollMs?: number;
   /** SSE heartbeat interval, default 15000 */
   heartbeatMs?: number;
+  /** runs the doctor checks and stores the result (`POST /api/doctor`); absent → 501 */
+  runDoctor?: () => Promise<unknown>;
+  /** where the doctor result and the routing file are looked up (tests) */
+  env?: NodeJS.ProcessEnv;
+}
+
+export interface EnvSnapshot {
+  /** one entry per watched directory that is inside a git checkout */
+  projects: Array<{ cwd: string; verify: VerifyStatus | null }>;
+  doctor: DoctorStatus | null;
+  roles: Array<{ role: string; group: string; leads?: string; unverified?: boolean; desc?: string; kinds: string[] }>;
+}
+
+/** What the console shows beside the runs. Reads small files only. */
+export function envSnapshot(cwds: string[], env: NodeJS.ProcessEnv = process.env): EnvSnapshot {
+  const table = loadRoutingFile({ env }).table;
+  const roles = Object.entries(table?.roles ?? {}).map(([role, r]) => ({
+    role,
+    group: r.group,
+    ...(r.leads ? { leads: r.leads } : {}),
+    ...(r.unverified ? { unverified: true } : {}),
+    ...(r.desc ? { desc: r.desc } : {}),
+    kinds: Object.entries(table?.tasks ?? {}).filter(([, t]) => t.role === role).map(([k]) => k),
+  }));
+  return { projects: cwds.map((cwd) => ({ cwd, verify: verifyStatus(cwd) })), doctor: doctorStatus(env), roles };
 }
 
 export interface WebServer {
@@ -129,6 +161,18 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
   const pollMs = opts.pollMs ?? 1000;
   const heartbeatMs = opts.heartbeatMs ?? 15000;
   const clients = new Set<() => void>();
+  let doctorRun: Promise<unknown> | undefined;
+  // The environment is read once per poll interval, however many pages are connected.
+  let snapshotAt = 0;
+  let snapshotJson = "";
+  const snapshot = (): string => {
+    if (Date.now() - snapshotAt >= pollMs) {
+      snapshotJson = JSON.stringify(envSnapshot(cwds, opts.env));
+      snapshotAt = Date.now();
+    }
+    return snapshotJson;
+  };
+  const isJson = (req: http.IncomingMessage): boolean => (req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase() === "application/json";
 
   const authorized = (req: http.IncomingMessage, url: URL): boolean => {
     if (!token) return true;
@@ -164,6 +208,19 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
     if (!authorized(req, url)) return send(res, 401, { error: "unauthorized" });
 
     if (method === "GET" && segs.length === 2 && segs[1] === "runs") return send(res, 200, allRuns(cwds));
+    if (method === "GET" && segs.length === 2 && segs[1] === "env") return send(res, 200, JSON.parse(snapshot()));
+    if (method === "POST" && segs.length === 2 && segs[1] === "doctor") {
+      // Same guard as the other POSTs: a form or no-cors request from another site cannot send this content type.
+      if (!isJson(req)) return send(res, 415, { error: "content-type must be application/json" });
+      if (!opts.runDoctor) return send(res, 501, { error: "this server cannot run the checks" });
+      // one run at a time: a second press while checks run joins the first
+      doctorRun ??= opts.runDoctor().finally(() => {
+        doctorRun = undefined;
+      });
+      await doctorRun;
+      snapshotAt = 0;
+      return send(res, 200, JSON.parse(snapshot()));
+    }
 
     if (method === "GET" && segs.length === 2 && segs[1] === "stream") {
       res.writeHead(200, {
@@ -174,7 +231,13 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
       });
       res.write("retry: 2000\n\n");
       const seen = new Map<string, string>();
+      let envSig = "";
       const tick = (): void => {
+        const now = snapshot();
+        if (now !== envSig) {
+          envSig = now;
+          res.write(`event: env\ndata: ${now}\n\n`);
+        }
         for (const r of allRuns(cwds)) {
           const key = `${r.cwd}|${r.id}`;
           const sig = `${r.updatedAt}|${r.approval?.status ?? ""}`;
@@ -221,8 +284,7 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
     }
 
     if (method === "POST") {
-      const ctype = (req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
-      if (ctype !== "application/json") return send(res, 415, { error: "content-type must be application/json" });
+      if (!isJson(req)) return send(res, 415, { error: "content-type must be application/json" });
       let body: unknown;
       try {
         const raw = await readBody(req);
@@ -303,7 +365,7 @@ export default definePlugin({
   activate(ctx: PluginContext) {
     ctx.commands.register({
       path: ["web"],
-      description: "live runs in a browser (phone-friendly): workers, cost, approve/deny",
+      description: "the control room in a browser: runs, approvals, verify state, environment gaps, roles",
       async handler(args, io) {
         if (args.positionals.length > 0) throw new MolaError("USAGE_ERROR", USAGE, ExitCode.Usage);
         const port = args.flags.port === undefined ? 7333 : Number(args.flags.port);
@@ -318,7 +380,7 @@ export default definePlugin({
         const configured = ctx.config.get<unknown>("web.cwds", []);
         const cfgCwds = Array.isArray(configured) ? configured.filter((c): c is string => typeof c === "string") : [];
         const cwds = [...cwdFlags(args.flags.cwd, process.argv), ...cfgCwds].map((c) => path.resolve(io.cwd, c));
-        const web = await startWeb({ host, port, ...(token ? { token } : {}), cwds: [io.cwd, ...cwds] });
+        const web = await startWeb({ host, port, ...(token ? { token } : {}), cwds: [io.cwd, ...cwds], runDoctor: () => runDoctorChecks(ctx.doctor.list()) });
         io.out(`mola web listening on ${web.url}`);
         if (!isLoopback(host)) {
           const ts = tailscaleHint();

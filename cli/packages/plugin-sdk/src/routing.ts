@@ -14,6 +14,8 @@ import { fileURLToPath } from "node:url";
 
 export interface RoutingTask {
   desc?: string;
+  /** v2: the role this kind of work belongs to (a key of `roles`) */
+  role?: string;
   picks: string[];
   evidence?: string;
   note?: string;
