@@ -19,7 +19,7 @@ Do not use it for what a command already proves: unit tests and builds belong to
 
 First line you say: `Using m-cua: drive the real UI, keep the script.`
 
-1. **Pick the driver.** Desktop app → `desktop`. Android app → `android`. Web page → `web`. One target, one driver.
+1. **Pick the driver.** Desktop app → `desktop`. Android app → `android`. Web page → `web`. One target, one driver. For Android the doctor names the tool it found: `mola-cua` (refs, verified input) or plain `adb`; `references/drivers.md` has a table for each.
 2. **Run the doctor.** `node "<this skill dir>/scripts/cua-doctor.mjs" --need <driver>`. `<this skill dir>` is the directory this SKILL.md was loaded from. Exit 0 means usable: go on. It prints one state per driver:
    - `ready`: call the tool by name.
    - `not-on-path` (still exit 0): the tool works but the shell cannot see it. Call it by the full path the doctor printed. Do not reinstall and do not rerun the doctor. The script must not hard-code that path: it reads it at run time from `cua-doctor.mjs --need <driver> --json` (`drivers[0].bin`).

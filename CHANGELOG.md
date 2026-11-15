@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- **m-cua, Android**: `mola-cua` (github.com/Mola-maker/agent-desktop, `mola-cua/`) is the Android driver when installed: refs that are re-found before every action, errors that say whether input reached the device, `set-value` that reads the field back. `cua-doctor.mjs` probes it first and falls back to plain `adb`, with a note on how to get it. `references/drivers.md` has a table for each.
+
 ## 0.9.0 — 2026-11-13
 Status line HUD: what the agent could not see from inside the session.
 - `mola statusline` adds an environment line after the run line: `verify ✗ L1 of L3 (7m ago) · gaps 2: superagent.layerfs, superagent.cad2gis (45m ago; mola doctor)`.

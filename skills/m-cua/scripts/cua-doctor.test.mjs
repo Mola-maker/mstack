@@ -162,3 +162,53 @@ test("run as a command it prints one block per driver with the fix line", (t) =>
   assert.match(r.stdout, /android: missing/);
   assert.match(r.stdout, /web: missing/);
 });
+
+// ---------------------------------------------------------------- mola-cua
+
+const MOLA_STATUS = (devices) => `{"version":"2.6","ok":true,"command":"status","data":{"platform":"android","version":"0.1.0","adb":{"path":"/sdk/platform-tools/adb","version":"x"},"devices":${JSON.stringify(devices)},"ready":${devices.some((d) => d.state === "device")}}}`;
+
+test("mola-cua on PATH is the android driver: ready with its devices, and adb is not asked", (t) => {
+  const d = scratch(t);
+  fake(d, "mola-cua", [MOLA_STATUS([{ serial: "emulator-5554", state: "device" }, { serial: "R58M", state: "unauthorized" }])]);
+  fake(d, "adb", ["this adb must not be consulted"], 7);
+  const r = main(["--need", "android", "--json"], env([d]), d);
+  assert.equal(r.code, 0);
+  const a = drivers(r).android;
+  assert.equal(a.tool, "mola-cua");
+  assert.equal(a.state, "ready");
+  assert.deepEqual(a.devices, ["emulator-5554"]);
+});
+
+test("mola-cua with no usable device is no-device and says which devices it saw", (t) => {
+  const d = scratch(t);
+  fake(d, "mola-cua", [MOLA_STATUS([{ serial: "R58M", state: "unauthorized" }])]);
+  const a = drivers(main(["--need", "android", "--json"], env([d]), d)).android;
+  assert.equal(a.state, "no-device");
+  assert.match(a.detail, /R58M unauthorized/);
+  fake(d, "mola-cua", [MOLA_STATUS([])]);
+  assert.match(drivers(main(["--need", "android", "--json"], env([d]), d)).android.detail, /no device or emulator/);
+});
+
+test("mola-cua that reports an error is broken and passes its own suggestion on", (t) => {
+  const d = scratch(t);
+  fake(d, "mola-cua", ['{"version":"2.6","ok":false,"command":"status","error":{"code":"PLATFORM_NOT_SUPPORTED","message":"adb was not found","suggestion":"Install Android SDK Platform-Tools"}}'], 1);
+  const r = main(["--need", "android", "--json"], env([d]), d);
+  assert.equal(r.code, 1);
+  const a = drivers(r).android;
+  assert.equal(a.state, "broken");
+  assert.equal(a.fix, "Install Android SDK Platform-Tools");
+  fake(d, "mola-cua", ["garbage"], 3);
+  assert.equal(drivers(main(["--need", "android", "--json"], env([d]), d)).android.state, "broken");
+});
+
+test("without mola-cua, plain adb still counts and the result says how to get mola-cua", (t) => {
+  const d = scratch(t);
+  fake(d, "adb", ["List of devices attached", "emulator-5554\tdevice"]);
+  const r = main(["--need", "android", "--json"], env([d]), d);
+  assert.equal(r.code, 0);
+  const a = drivers(r).android;
+  assert.equal(a.tool, "adb");
+  assert.match(a.note, /mola-cua/);
+  const text = main(["--need", "android"], env([d]), d).text;
+  assert.match(text, /\n {2}note: plain adb only/);
+});

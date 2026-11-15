@@ -30,9 +30,38 @@ Rules that save retries:
 - Dense apps: `snapshot --skeleton` first, then `snapshot --root '<ref>'` for one region.
 - Measured on Windows 11 through the npm launcher (2026-11-12, v1.3.0): `list-apps` about 0.25 s, a window snapshot about 0.5 s. Install size 31 MB.
 
-## android: adb
+## android: mola-cua (plain adb as the fallback)
 
-No extra agent is installed on the device; everything goes through `adb`. With several devices attached, pass `-s <serial>` on every command.
+`mola-cua` (github.com/Mola-maker/agent-desktop, directory `mola-cua/`) drives a device or emulator over `adb` with the same model as the desktop driver: a snapshot is a tree, every element you can act on or read has a ref, every command prints one JSON envelope. The doctor says whether it is installed; when it is not, use the plain `adb` table further down.
+
+| Step | Command |
+|---|---|
+| Check | `mola-cua status` (adb found, devices, `ready`) |
+| Before launching | `mola-cua health <package> --clear` (empties the crash log, so an old crash is not counted) |
+| Install (L3) | `mola-cua install <apk>` |
+| Launch (L3) | `mola-cua launch <package>`; `data.already_running: true` means it was not a cold start |
+| Not crashed (L3) | `mola-cua health <package>` → `running: true`, `crashed: false` |
+| Observe | `mola-cua snapshot --app <package> -i --compact` |
+| Find | `mola-cua find --id <resource id> --first`, or `--text`, `--name`, `--role`; the ref is `data.match.ref_id` |
+| Act | `mola-cua click '<ref>'`, `mola-cua set-value '<ref>' '<text>'`, `mola-cua press back` |
+| Wait | `mola-cua wait --text "<text>" --timeout 10000` (add `--gone` to wait for it to leave) |
+| Assert (L4) | `mola-cua get '<ref>' --property text`, `mola-cua is '<ref>' --property checked`, or `find … --count` |
+| Evidence | the last `snapshot` output; `mola-cua screenshot <file.png>` for a person |
+| Clean up | `mola-cua close-app <package>` |
+
+What its answers mean:
+
+- **A ref is re-found before every action.** `STALE_REF`: the element is gone, take a new snapshot. `AMBIGUOUS_TARGET`: several elements now match, take a new snapshot. Never reuse a ref from before the screen changed.
+- **`error.disposition.delivery` says whether input reached the device.** `not_delivered`: retry is safe. `delivery_uncertain` or `delivered_unverified`: do not retry blindly; observe first, because the tap or the text may have landed.
+- **`set-value` reads the field back.** `verified: true` is the proof. `verified: false` comes with a reason (a password field, or text equal to the placeholder): confirm another way. `ACTION_FAILED` carries `expected` and `found`.
+- **A row is named by the first texts inside it** (`Wi-Fi · Connected`). `find --text Wi-Fi --first` returns the text element; clicking it taps inside the row.
+- **More than one device**: `AMBIGUOUS_TARGET` until you pass `--device <serial>`.
+- A dump takes one to several seconds. Use `wait` for a named text or id, not repeated snapshots.
+- Not confirmed on a real device yet: `set-value` typing and `install` (the tool's README says what was run). If `set-value` fails on your device, report `expected` and `found`; do not switch to raw `input text` and claim it worked.
+
+### Without mola-cua: plain adb
+
+With several devices attached, pass `-s <serial>` on every command.
 
 | Step | Command |
 |---|---|
@@ -46,13 +75,15 @@ No extra agent is installed on the device; everything goes through `adb`. With s
 | Evidence | save the final dump; `adb exec-out screencap -p > shot.png` for a person |
 | Clean up | `adb shell am force-stop <package>` |
 
-Rules:
+Rules for the fallback:
 
 - Find the node in the dump every time and compute the tap point from its `bounds`. Never store coordinates in the script: they change with screen size and density.
 - Clear logcat before launching (`adb logcat -c`) so an old crash is not counted.
 - `uiautomator dump` fails while an animation runs ("could not get idle state"): retry up to 3 times, 1 s apart, then report.
-- A WebView or a game surface exposes few nodes. Say so in the report; that screen is not covered at L4 by this driver.
+- An empty text field reports its placeholder as `text` (the dump also has a `hint` attribute): equal text and hint means empty.
 - From Git Bash, `/dev/tty` and `/sdcard/...` arguments are rewritten into Windows paths: prefix the command with `MSYS_NO_PATHCONV=1`.
+
+Both ways: a WebView or a game surface exposes few nodes. Say so in the report; that screen is not covered at L4 by this driver.
 
 ## web: Playwright
 
