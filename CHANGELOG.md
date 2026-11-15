@@ -2,6 +2,7 @@
 
 ## Unreleased
 - **m-cua, Android**: `mola-cua` (github.com/Mola-maker/agent-desktop, `mola-cua/`) is the Android driver when installed: refs that are re-found before every action, errors that say whether input reached the device, `set-value` that reads the field back. `cua-doctor.mjs` probes it first and falls back to plain `adb`, with a note on how to get it. `references/drivers.md` has a table for each.
+
 ## 0.10.0 — 2026-11-14
 One theme for every surface, and the web console becomes the control room.
 - **Theme** (`@mola/plugin-sdk`: `THEME`, `SEMANTIC`, `themePalette`, `themeCss`, `contrast`): the molamaker blue and pink ramp from the owner's UI kit, three levels of lift for a 2.5D look, motion times, day and night grounds. The terminal and the browser read the same tokens. The status line's environment part is painted in the theme's tones; `NO_COLOR` turns it off.

@@ -51,11 +51,12 @@ Rules that save retries:
 
 What its answers mean:
 
-- **A ref is re-found before every action.** `STALE_REF`: the element is gone, take a new snapshot. `AMBIGUOUS_TARGET`: several elements now match, take a new snapshot. Never reuse a ref from before the screen changed.
+- **A ref is re-found before every action.** `STALE_REF`: the element is gone, take a new snapshot. `AMBIGUOUS_TARGET` with no `error.details.candidates`: several elements now match, take a new snapshot. Never reuse a ref from before the screen changed.
 - **`error.disposition.delivery` says whether input reached the device.** `not_delivered`: retry is safe. `delivery_uncertain` or `delivered_unverified`: do not retry blindly; observe first, because the tap or the text may have landed.
 - **`set-value` reads the field back.** `verified: true` is the proof. `verified: false` comes with a reason (a password field, or text equal to the placeholder): confirm another way. `ACTION_FAILED` carries `expected` and `found`.
 - **A row is named by the first texts inside it** (`Wi-Fi · Connected`). `find --text Wi-Fi --first` returns the text element; clicking it taps inside the row.
-- **More than one device**: `AMBIGUOUS_TARGET` until you pass `--device <serial>`.
+- **More than one device**: `AMBIGUOUS_TARGET` whose `error.details.candidates` lists device serials. A new snapshot does not help: pass `--device <serial>` (or set `ANDROID_SERIAL`) on every command.
+- **Where the doctor looks for it**: PATH, then cargo's bin directory (`cargo install` puts it there). `MOLA_CUA_BIN=<full path>` names a build that is not installed; the doctor then reports `not-on-path` and you call that path.
 - A dump takes one to several seconds. Use `wait` for a named text or id, not repeated snapshots.
 - Not confirmed on a real device yet: `set-value` typing and `install` (the tool's README says what was run). If `set-value` fails on your device, report `expected` and `found`; do not switch to raw `input text` and claim it worked.
 

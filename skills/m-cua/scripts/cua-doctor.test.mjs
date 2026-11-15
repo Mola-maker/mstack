@@ -212,3 +212,41 @@ test("without mola-cua, plain adb still counts and the result says how to get mo
   const text = main(["--need", "android"], env([d]), d).text;
   assert.match(text, /\n {2}note: plain adb only/);
 });
+
+test("MOLA_CUA_BIN off PATH is not-on-path (usable by full path), never ready-by-name", (t) => {
+  const d = scratch(t);
+  const off = join(d, "build");
+  fake(off, "mola-cua", [MOLA_STATUS([{ serial: "emulator-5554", state: "device" }])]);
+  const bin = join(off, WIN ? "mola-cua.cmd" : "mola-cua");
+  const r = main(["--need", "android", "--json"], env([d], { MOLA_CUA_BIN: bin }), d);
+  assert.equal(r.code, 0);
+  const a = drivers(r).android;
+  assert.equal(a.state, "not-on-path");
+  assert.ok(a.fix.includes(bin), a.fix);
+  assert.deepEqual(a.devices, ["emulator-5554"]);
+});
+
+test("MOLA_CUA_BIN pointing at a missing file is broken and names the variable", (t) => {
+  const d = scratch(t);
+  fake(d, "adb", ["List of devices attached", "emulator-5554\tdevice"]);
+  const r = main(["--need", "android", "--json"], env([d], { MOLA_CUA_BIN: join(d, "gone", "mola-cua") }), d);
+  assert.equal(r.code, 1);
+  const a = drivers(r).android;
+  assert.equal(a.state, "broken");
+  assert.match(a.fix, /MOLA_CUA_BIN points at a missing file/);
+});
+
+test("mola-cua in cargo's bin directory but not on PATH is found and reported not-on-path", (t) => {
+  const d = scratch(t);
+  fake(join(d, "cargo", "bin"), "mola-cua", [MOLA_STATUS([{ serial: "emulator-5554", state: "device" }])]);
+  const a = drivers(main(["--need", "android", "--json"], env([d], { CARGO_HOME: join(d, "cargo") }), d)).android;
+  assert.equal(a.tool, "mola-cua");
+  assert.equal(a.state, "not-on-path");
+});
+
+test("the no-device fix line gives the emulator path for both steps", (t) => {
+  const d = scratch(t);
+  fake(d, "mola-cua", [MOLA_STATUS([])]);
+  const a = drivers(main(["--need", "android", "--json"], env([d]), d)).android;
+  assert.match(a.fix, /emulator" -list-avds, then ".*emulator" -avd <name>/);
+});

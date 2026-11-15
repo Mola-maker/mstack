@@ -64,7 +64,13 @@ const MOLA_CUA_BUILD = "git clone https://github.com/Mola-maker/agent-desktop &&
  * driver reference has the commands) and the result says what is being missed.
  */
 export function probeAndroid(env = process.env) {
-  const hit = env.MOLA_CUA_BIN ? { bin: env.MOLA_CUA_BIN, onPath: false } : locate("mola-cua", [], env);
+  // MOLA_CUA_BIN names the binary outright (a build output that is not installed). It must exist: a stale
+  // path is reported as that, with the variable named, not as "Android unusable".
+  if (env.MOLA_CUA_BIN && !existsSync(env.MOLA_CUA_BIN)) {
+    return { driver: "android", tool: "mola-cua", state: "broken", bin: env.MOLA_CUA_BIN, fix: `MOLA_CUA_BIN points at a missing file: ${env.MOLA_CUA_BIN}; fix it, or unset it to use mola-cua from PATH or plain adb` };
+  }
+  const cargoBins = [env.CARGO_HOME && join(env.CARGO_HOME, "bin"), env.HOME && join(env.HOME, ".cargo", "bin"), env.USERPROFILE && join(env.USERPROFILE, ".cargo", "bin")];
+  const hit = env.MOLA_CUA_BIN ? { bin: env.MOLA_CUA_BIN, onPath: false } : locate("mola-cua", cargoBins, env);
   if (!hit) {
     const adb = probeAdb(env);
     return { ...adb, note: `plain adb only; for refs and verified input build mola-cua: ${MOLA_CUA_BUILD}` };
@@ -79,9 +85,12 @@ export function probeAndroid(env = process.env) {
   if (!online.length) {
     const why = devices.length ? `devices present but not usable: ${devices.map((d) => `${d.serial} ${d.state}`).join(", ")}` : "no device or emulator attached";
     const emu = st.data?.adb?.path ? findIn([join(dirname(dirname(String(st.data.adb.path))), "emulator")], "emulator", env) : null;
-    return { driver: "android", tool: "mola-cua", state: "no-device", bin: hit.bin, fix: `start an emulator ("${emu ?? "<Android SDK>/emulator/emulator"}" -list-avds, then -avd <name>; in PowerShell put & before the quoted path) or plug in a device with USB debugging authorised`, detail: why };
+    const emulator = emu ?? "<Android SDK>/emulator/emulator";
+    return { driver: "android", tool: "mola-cua", state: "no-device", bin: hit.bin, fix: `start an emulator ("${emulator}" -list-avds, then "${emulator}" -avd <name>; in PowerShell put & before the quoted path) or plug in a device with USB debugging authorised`, detail: why };
   }
-  return { driver: "android", tool: "mola-cua", state: "ready", bin: hit.bin, devices: online, version: st.data?.version };
+  return hit.onPath
+    ? { driver: "android", tool: "mola-cua", state: "ready", bin: hit.bin, devices: online, version: st.data?.version }
+    : { driver: "android", tool: "mola-cua", state: "not-on-path", bin: hit.bin, devices: online, fix: `call it by full path, or add its directory to PATH: ${hit.bin}` };
 }
 
 /** Android through plain adb: the fallback when mola-cua is not installed. */
