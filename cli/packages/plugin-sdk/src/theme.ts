@@ -15,7 +15,8 @@
 export const THEME = {
   blue: { 50: "#f7fbff", 100: "#eaf3ff", 300: "#b7d4ff", 500: "#5d93dc", 600: "#3f72bd", 700: "#2b5597" },
   pink: { 100: "#fde8f1", 300: "#f2a5c4", 500: "#dd668d" },
-  ink: { 900: "#1f2c44", 600: "#4a5b78", 400: "#8496b3" },
+  /** 500 is the quiet text on the day ground (AA on every day surface); 400 is the quiet tone on dark terminals */
+  ink: { 900: "#1f2c44", 600: "#4a5b78", 500: "#586884", 400: "#8496b3" },
   /** dark ground for terminals and the console's night mode: the same blues over a deep navy */
   night: { 900: "#0f1726", 800: "#172238", 700: "#22314e" },
   radius: { sm: "10px", md: "16px", lg: "24px", pill: "999px" },
@@ -82,9 +83,10 @@ export function themeCss(): string {
     "t-press": t.motion.press, "t-hover": t.motion.hover, "t-settle": t.motion.settle, ease: t.motion.ease,
     "font-sans": t.font.sans, "font-mono": t.font.mono,
   };
-  const light = { ground: t.blue[50], surface: "#ffffff", "surface-2": t.blue[100], line: t.blue[300], ink: t.ink[900], "ink-2": t.ink[600], muted: t.ink[400] };
+  // `ok-text` is the ok tone as small text: the ramp's 500 is a fill colour and too light for 13 px type by day
+  const light = { ground: t.blue[50], surface: "#ffffff", "surface-2": t.blue[100], line: t.blue[300], ink: t.ink[900], "ink-2": t.ink[600], muted: t.ink[500], "ok-text": t.blue[600] };
   const night = {
-    ground: t.night[900], surface: t.night[800], "surface-2": t.night[700], line: "#33466b", ink: "#e8f0ff", "ink-2": "#b9c8e6", muted: "#7f93b8",
+    ground: t.night[900], surface: t.night[800], "surface-2": t.night[700], line: "#33466b", ink: "#e8f0ff", "ink-2": "#b9c8e6", muted: "#8ea1c4", "ok-text": t.blue[300],
     "lift-1": "inset 0 1px 0 rgba(255,255,255,.06), 0 4px 12px rgba(0,0,0,.30)",
     "lift-2": "inset 0 1px 0 rgba(255,255,255,.06), 0 10px 29px rgba(0,0,0,.38)",
     "lift-3": "inset 0 1px 0 rgba(255,255,255,.06), 0 15px 35px rgba(0,0,0,.46)",

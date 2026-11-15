@@ -93,8 +93,9 @@ export function doctorCachePath(env: NodeJS.ProcessEnv = process.env): string {
   return path.join(env.MOLA_HOME || path.join(os.homedir(), ".mola"), "doctor-last.json");
 }
 
+// control characters, line separators and bidi overrides: none of them belongs in a one-line message
 // eslint-disable-next-line no-control-regex
-const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
+const CONTROL = /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
 
 /** The last doctor result: the checks that failed or warned. Null when doctor has not run. */
 export function doctorStatus(env: NodeJS.ProcessEnv = process.env): DoctorStatus | null {

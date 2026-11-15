@@ -22,7 +22,7 @@ button{font:inherit;color:inherit}
 .top{display:flex;align-items:baseline;gap:14px;padding:22px clamp(16px,4vw,40px) 6px}
 .top h1{font-size:22px;font-weight:700;letter-spacing:.02em;margin:0}
 .top .conn{font-size:13px;color:var(--m-muted)}
-.top .conn[data-live="1"]{color:var(--m-ok)}
+.top .conn[data-live="1"]{color:var(--m-ok-text)}
 .top .mode{margin-left:auto;border:1px solid var(--m-line);background:var(--m-surface);border-radius:var(--m-radius-pill);padding:4px 14px;cursor:pointer;font-size:13px}
 .desk{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(280px,1fr);gap:clamp(18px,3vw,36px);padding:14px clamp(16px,4vw,40px) 48px;align-items:start}
 @media (max-width:860px){.desk{grid-template-columns:1fr}}
@@ -46,7 +46,7 @@ mola-run .stages{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 4px;padding:0
 mola-run .stages li{font-size:12.5px;padding:2px 10px;border-radius:var(--m-radius-pill);background:var(--m-surface-2);color:var(--m-ink-2)}
 mola-run .stages li[data-s="running"]{background:var(--m-blue-600);color:#fff}
 mola-run .stages li[data-s="done"]{background:transparent;border:1px solid var(--m-line)}
-mola-run .stages li[data-s="failed"]{background:var(--m-pink-500);color:#fff}
+mola-run .stages li[data-s="failed"]{background:var(--m-pink-100);color:#8a1f45;border:1px solid var(--m-pink-500)}
 mola-run .stages li[data-s="skipped"]{opacity:.45;text-decoration:line-through}
 mola-run .agents{margin:10px 0 0;padding:0;list-style:none;display:grid;gap:6px}
 mola-run .agents li{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:baseline;font-size:13.5px}
@@ -106,6 +106,8 @@ function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){retur
 function dur(ms){var s=Math.max(0,Math.round(ms/1000));if(s<60)return s+" 秒";var m=Math.floor(s/60);return m<60?m+" 分钟":Math.floor(m/60)+" 小时 "+(m%60)+" 分"}
 function ago(at){if(!at)return"";var m=Math.max(0,Math.round((Date.now()-at)/60000));return m<1?"刚刚":m<60?m+" 分钟前":m<2880?Math.round(m/60)+" 小时前":Math.round(m/1440)+" 天前"}
 var STAGE={queued:"排队",running:"进行中",done:"完成",failed:"失败",skipped:"跳过"};
+// a stage's state is also a mark in front of its name: colour alone says nothing on a grey screen
+var MARK={queued:"○",running:"▸",done:"✓",failed:"✗",skipped:"–"};
 var AGENT={working:"在干活",blocked:"等你",done:"做完了",failed:"失败了",idle:"空闲"};
 function stateOf(p){
   if(p.status==="blocked")return"needs-you";
@@ -125,7 +127,7 @@ Object.defineProperty(MolaRun.prototype,"run",{set:function(p){
   this.dataset.state=stateOf(p);
   var live=p.status==="running"||p.status==="blocked";
   var h='<p class="task">'+esc(p.intent)+'</p><div class="where path">'+esc(p.cwd)+'</div><ol class="stages">';
-  p.stages.forEach(function(s){h+='<li data-s="'+esc(s.status)+'" title="'+esc(STAGE[s.status]||s.status)+'">'+esc(s.name)+"</li>"});
+  (p.stages||[]).forEach(function(s){var w=STAGE[s.status]||s.status;h+='<li data-s="'+esc(s.status)+'" title="'+esc(w)+'" aria-label="'+esc(s.name+"："+w)+'">'+esc((MARK[s.status]||"?")+" "+s.name)+"</li>"});
   h+='</ol><div class="where"><span class="num" data-since="'+esc(p.startedAt)+'" data-until="'+(live?"":esc(p.updatedAt))+'"></span>，花费 <span class="num">$'+Number(p.costUsd||0).toFixed(2)+"</span></div>";
   if(p.workers&&p.workers.length){
     h+='<ul class="agents">';

@@ -162,6 +162,17 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
   const heartbeatMs = opts.heartbeatMs ?? 15000;
   const clients = new Set<() => void>();
   let doctorRun: Promise<unknown> | undefined;
+  // The environment is read once per poll interval, however many pages are connected.
+  let snapshotAt = 0;
+  let snapshotJson = "";
+  const snapshot = (): string => {
+    if (Date.now() - snapshotAt >= pollMs) {
+      snapshotJson = JSON.stringify(envSnapshot(cwds, opts.env));
+      snapshotAt = Date.now();
+    }
+    return snapshotJson;
+  };
+  const isJson = (req: http.IncomingMessage): boolean => (req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase() === "application/json";
 
   const authorized = (req: http.IncomingMessage, url: URL): boolean => {
     if (!token) return true;
@@ -197,15 +208,18 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
     if (!authorized(req, url)) return send(res, 401, { error: "unauthorized" });
 
     if (method === "GET" && segs.length === 2 && segs[1] === "runs") return send(res, 200, allRuns(cwds));
-    if (method === "GET" && segs.length === 2 && segs[1] === "env") return send(res, 200, envSnapshot(cwds, opts.env));
+    if (method === "GET" && segs.length === 2 && segs[1] === "env") return send(res, 200, JSON.parse(snapshot()));
     if (method === "POST" && segs.length === 2 && segs[1] === "doctor") {
+      // Same guard as the other POSTs: a form or no-cors request from another site cannot send this content type.
+      if (!isJson(req)) return send(res, 415, { error: "content-type must be application/json" });
       if (!opts.runDoctor) return send(res, 501, { error: "this server cannot run the checks" });
       // one run at a time: a second press while checks run joins the first
       doctorRun ??= opts.runDoctor().finally(() => {
         doctorRun = undefined;
       });
       await doctorRun;
-      return send(res, 200, envSnapshot(cwds, opts.env));
+      snapshotAt = 0;
+      return send(res, 200, JSON.parse(snapshot()));
     }
 
     if (method === "GET" && segs.length === 2 && segs[1] === "stream") {
@@ -219,10 +233,10 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
       const seen = new Map<string, string>();
       let envSig = "";
       const tick = (): void => {
-        const snapshot = JSON.stringify(envSnapshot(cwds, opts.env));
-        if (snapshot !== envSig) {
-          envSig = snapshot;
-          res.write(`event: env\ndata: ${snapshot}\n\n`);
+        const now = snapshot();
+        if (now !== envSig) {
+          envSig = now;
+          res.write(`event: env\ndata: ${now}\n\n`);
         }
         for (const r of allRuns(cwds)) {
           const key = `${r.cwd}|${r.id}`;
@@ -270,8 +284,7 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
     }
 
     if (method === "POST") {
-      const ctype = (req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
-      if (ctype !== "application/json") return send(res, 415, { error: "content-type must be application/json" });
+      if (!isJson(req)) return send(res, 415, { error: "content-type must be application/json" });
       let body: unknown;
       try {
         const raw = await readBody(req);

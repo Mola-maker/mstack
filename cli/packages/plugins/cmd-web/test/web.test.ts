@@ -306,3 +306,34 @@ test("the page is self-contained: theme variables inline, no external URL, and i
   const script = /<script>([\s\S]*)<\/script>/.exec(html)![1];
   assert.doesNotThrow(() => new Function(script), "the inline script has a syntax error");
 });
+
+test("POST /api/doctor refuses what a cross-site form can send: any content type but JSON, or none", async () => {
+  const { cwd, env } = world();
+  let runs = 0;
+  const runDoctor = async (): Promise<void> => {
+    runs++;
+  };
+  await withWeb({ cwds: [cwd], env, runDoctor }, async (_w, base) => {
+    assert.equal((await post(base, "/api/doctor", "{}", "text/plain")).status, 415);
+    assert.equal((await post(base, "/api/doctor", "a=b", "application/x-www-form-urlencoded")).status, 415);
+    assert.equal((await fetch(base + "/api/doctor", { method: "POST" })).status, 415);
+    assert.equal(runs, 0);
+    assert.equal((await post(base, "/api/doctor", "{}")).status, 200);
+    assert.equal(runs, 1);
+  });
+});
+
+test("the environment is read once per poll interval, however many clients ask", async () => {
+  const { cwd, env } = world();
+  await withWeb({ cwds: [cwd], env, pollMs: 60_000 }, async (_w, base) => {
+    const first = (await get(base, "/api/env")).body;
+    fs.writeFileSync(path.join(cwd, ".mstack", "verify", "status.json"), JSON.stringify({ ts: new Date().toISOString(), ok: true, message: "x" }));
+    assert.equal((await get(base, "/api/env")).body, first, "a second read inside the interval hit the files again");
+  });
+});
+
+test("the page marks a stage's state with a glyph, not with colour alone", () => {
+  const html = pageHtml();
+  for (const mark of ["○", "▸", "✓", "✗", "–"]) assert.ok(html.includes('"' + mark + '"'), mark);
+  assert.match(html, /aria-label=/);
+});

@@ -19,6 +19,12 @@ test("text is readable on both grounds; state colours are legible beside their g
   // state colours always sit next to a glyph or a word: 3:1 (large text / graphics) on the night ground and the terminal
   for (const tone of [SEMANTIC.ok, SEMANTIC.warn, SEMANTIC.fail]) assert.ok(contrast(tone, THEME.night[900]) >= 3, tone);
   assert.ok(contrast(SEMANTIC.fail, "#ffffff") >= 3, "fail on a card");
+  // quiet text (paths, times, notes) is body-size text: AA on every surface it sits on, day and night
+  for (const ground of [THEME.blue[50], "#ffffff", THEME.blue[100]]) assert.ok(contrast(THEME.ink[500], ground) >= 4.5, `day muted on ${ground}`);
+  for (const ground of [THEME.night[900], THEME.night[800], THEME.night[700]]) assert.ok(contrast("#8ea1c4", ground) >= 4.5, `night muted on ${ground}`);
+  assert.ok(contrast(THEME.blue[600], THEME.blue[50]) >= 4.5, "ok as small text by day");
+  assert.ok(contrast(THEME.blue[300], THEME.night[900]) >= 4.5, "ok as small text by night");
+  assert.ok(contrast("#ffffff", THEME.blue[600]) >= 4.5, "white on the primary button");
 });
 
 test("the terminal palette paints in 24-bit colour, and is the identity when colour is off", () => {
