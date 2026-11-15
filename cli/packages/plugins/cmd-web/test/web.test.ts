@@ -337,3 +337,15 @@ test("the page marks a stage's state with a glyph, not with colour alone", () =>
   for (const mark of ["○", "▸", "✓", "✗", "–"]) assert.ok(html.includes('"' + mark + '"'), mark);
   assert.match(html, /aria-label=/);
 });
+
+test("a re-check answers with what it just wrote, even when an older snapshot is cached", async () => {
+  const { cwd, env } = world();
+  const runDoctor = async (): Promise<void> => {
+    fs.writeFileSync(path.join(env.MOLA_HOME!, "doctor-last.json"), JSON.stringify({ ts: new Date().toISOString(), total: 5, gaps: [] }));
+  };
+  await withWeb({ cwds: [cwd], env, runDoctor, pollMs: 60_000 }, async (_w, base) => {
+    assert.equal(JSON.parse((await get(base, "/api/env")).body).doctor.gaps.length, 1); // fills the cache
+    assert.equal(JSON.parse((await post(base, "/api/doctor", "{}")).body).doctor.gaps.length, 0);
+    assert.equal(JSON.parse((await get(base, "/api/env")).body).doctor.gaps.length, 0);
+  });
+});
