@@ -220,3 +220,132 @@ test("approve, deny and stop write the right files", async () => {
     assert.equal((await post(base, "/api/runs/ghost/stop", "{}")).status, 404);
   });
 });
+
+// ---------------------------------------------------------------- environment, re-check, the page
+
+import { envSnapshot, pageHtml } from "@mola/plugin-cmd-web";
+
+/** A project with a git marker and a verdict, and a mola home with a doctor result. */
+function world(): { cwd: string; env: NodeJS.ProcessEnv } {
+  const cwd = tmp();
+  fs.mkdirSync(path.join(cwd, ".git"));
+  fs.mkdirSync(path.join(cwd, ".mstack", "verify"), { recursive: true });
+  fs.writeFileSync(path.join(cwd, ".mstack", "verify", "status.json"), JSON.stringify({ ts: new Date().toISOString(), ok: false, message: "verify gate: required L3, found L1 for the current code (tree abc)" }));
+  const home = tmp();
+  fs.writeFileSync(path.join(home, "doctor-last.json"), JSON.stringify({ ts: new Date().toISOString(), total: 5, gaps: [{ id: "tool.git", ok: false, message: "git not found\u001b[2J" }] }));
+  return { cwd, env: { MOLA_HOME: home } as NodeJS.ProcessEnv };
+}
+
+test("GET /api/env: the verdict per project, the doctor gaps without control characters, the roles", async () => {
+  const { cwd, env } = world();
+  await withWeb({ cwds: [cwd], env }, async (_w, base) => {
+    const e = JSON.parse((await get(base, "/api/env")).body) as ReturnType<typeof envSnapshot>;
+    const mine = e.projects.find((p) => p.cwd === path.resolve(cwd))!;
+    assert.deepEqual({ ok: mine.verify!.ok, required: mine.verify!.required, found: mine.verify!.found }, { ok: false, required: "L3", found: "L1" });
+    assert.deepEqual(e.doctor!.gaps, [{ id: "tool.git", ok: false, message: "git not found [2J" }]);
+    // the roles come from the repo's own routing file, found from the package
+    assert.deepEqual(e.roles.map((r) => r.role).sort(), ["build", "bulk", "operate", "think"]);
+    assert.ok(e.roles.find((r) => r.role === "bulk")!.kinds.includes("test"));
+  });
+});
+
+test("the stream sends the environment first, and again when the verdict changes", async () => {
+  const { cwd, env } = world();
+  await withWeb({ cwds: [cwd], env, pollMs: 30 }, async (_w, base) => {
+    const ac = new AbortController();
+    const res = await fetch(base + "/api/stream", { signal: ac.signal });
+    const reader = res.body!.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    const envEvents = (): string[] => buf.split("\n\n").filter((b) => b.startsWith("event: env")).map((b) => b.split("\ndata: ")[1]);
+    const until = async (n: number): Promise<void> => {
+      const deadline = Date.now() + 5000;
+      while (envEvents().length < n && Date.now() < deadline) buf += dec.decode((await reader.read()).value ?? new Uint8Array(), { stream: true });
+    };
+    await until(1);
+    assert.equal(JSON.parse(envEvents()[0]).projects.find((p: { verify: unknown }) => p.verify).verify.ok, false);
+    fs.writeFileSync(path.join(cwd, ".mstack", "verify", "status.json"), JSON.stringify({ ts: new Date().toISOString(), ok: true, message: "receipt at the required level" }));
+    await until(2);
+    assert.equal(envEvents().length, 2, "an unchanged environment is not sent again; a changed one is");
+    assert.equal(JSON.parse(envEvents()[1]).projects.find((p: { verify: unknown }) => p.verify).verify.ok, true);
+    ac.abort();
+  });
+});
+
+test("POST /api/doctor runs the checks once for concurrent presses and answers with the new environment; 501 without a runner", async () => {
+  const { cwd, env } = world();
+  let runs = 0;
+  const runDoctor = async (): Promise<void> => {
+    runs++;
+    await new Promise((r) => setTimeout(r, 60));
+    fs.writeFileSync(path.join(env.MOLA_HOME!, "doctor-last.json"), JSON.stringify({ ts: new Date().toISOString(), total: 5, gaps: [] }));
+  };
+  await withWeb({ cwds: [cwd], env, runDoctor }, async (_w, base) => {
+    const [a, b] = await Promise.all([post(base, "/api/doctor", "{}"), post(base, "/api/doctor", "{}")]);
+    assert.equal(a.status, 200);
+    assert.equal(b.status, 200);
+    assert.equal(runs, 1);
+    assert.deepEqual(JSON.parse(a.body).doctor.gaps, []);
+  });
+  await withWeb({ cwds: [cwd], env }, async (_w, base) => {
+    assert.equal((await post(base, "/api/doctor", "{}")).status, 501);
+  });
+  await withWeb({ cwds: [cwd], env, runDoctor, token: "t0ken-t0ken" }, async (_w, base) => {
+    assert.equal((await post(base, "/api/doctor", "{}")).status, 401);
+    assert.equal((await get(base, "/api/env")).status, 401);
+  });
+});
+
+test("the page is self-contained: theme variables inline, no external URL, and its script parses", () => {
+  const html = pageHtml();
+  assert.match(html, /--m-blue-500: #5d93dc/);
+  assert.match(html, /customElements\.define\("mola-run"/);
+  // nothing is fetched from another origin: no http(s) URL and no protocol-relative one in src/href/url()
+  assert.doesNotMatch(html, /(src|href)="(https?:)?\/\//);
+  assert.doesNotMatch(html, /url\((["']?)(https?:)?\/\//);
+  const script = /<script>([\s\S]*)<\/script>/.exec(html)![1];
+  assert.doesNotThrow(() => new Function(script), "the inline script has a syntax error");
+});
+
+test("POST /api/doctor refuses what a cross-site form can send: any content type but JSON, or none", async () => {
+  const { cwd, env } = world();
+  let runs = 0;
+  const runDoctor = async (): Promise<void> => {
+    runs++;
+  };
+  await withWeb({ cwds: [cwd], env, runDoctor }, async (_w, base) => {
+    assert.equal((await post(base, "/api/doctor", "{}", "text/plain")).status, 415);
+    assert.equal((await post(base, "/api/doctor", "a=b", "application/x-www-form-urlencoded")).status, 415);
+    assert.equal((await fetch(base + "/api/doctor", { method: "POST" })).status, 415);
+    assert.equal(runs, 0);
+    assert.equal((await post(base, "/api/doctor", "{}")).status, 200);
+    assert.equal(runs, 1);
+  });
+});
+
+test("the environment is read once per poll interval, however many clients ask", async () => {
+  const { cwd, env } = world();
+  await withWeb({ cwds: [cwd], env, pollMs: 60_000 }, async (_w, base) => {
+    const first = (await get(base, "/api/env")).body;
+    fs.writeFileSync(path.join(cwd, ".mstack", "verify", "status.json"), JSON.stringify({ ts: new Date().toISOString(), ok: true, message: "x" }));
+    assert.equal((await get(base, "/api/env")).body, first, "a second read inside the interval hit the files again");
+  });
+});
+
+test("the page marks a stage's state with a glyph, not with colour alone", () => {
+  const html = pageHtml();
+  for (const mark of ["○", "▸", "✓", "✗", "–"]) assert.ok(html.includes('"' + mark + '"'), mark);
+  assert.match(html, /aria-label=/);
+});
+
+test("a re-check answers with what it just wrote, even when an older snapshot is cached", async () => {
+  const { cwd, env } = world();
+  const runDoctor = async (): Promise<void> => {
+    fs.writeFileSync(path.join(env.MOLA_HOME!, "doctor-last.json"), JSON.stringify({ ts: new Date().toISOString(), total: 5, gaps: [] }));
+  };
+  await withWeb({ cwds: [cwd], env, runDoctor, pollMs: 60_000 }, async (_w, base) => {
+    assert.equal(JSON.parse((await get(base, "/api/env")).body).doctor.gaps.length, 1); // fills the cache
+    assert.equal(JSON.parse((await post(base, "/api/doctor", "{}")).body).doctor.gaps.length, 0);
+    assert.equal(JSON.parse((await get(base, "/api/env")).body).doctor.gaps.length, 0);
+  });
+});

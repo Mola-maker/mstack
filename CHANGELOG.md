@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.0 — 2026-11-14
+One theme for every surface, and the web console becomes the control room.
+- **Theme** (`@mola/plugin-sdk`: `THEME`, `SEMANTIC`, `themePalette`, `themeCss`, `contrast`): the molamaker blue and pink ramp from the owner's UI kit, three levels of lift for a 2.5D look, motion times, day and night grounds. The terminal and the browser read the same tokens. The status line's environment part is painted in the theme's tones; `NO_COLOR` turns it off.
+- **`mola web`** is redesigned as a control room. Runs are slabs whose side face shows the state: blue while agents work, pink and raised while a run waits for you, thin when it is over. Beside them: the acceptance ladder for the current code (level proven, level required), the environment gaps from the last doctor run with a button to check again, and the role table. Approve, deny and stop are where they were.
+- New endpoints: `GET /api/env`, `POST /api/doctor` (one run at a time), and an `env` event on the stream that is sent only when something changed.
+- The page is one inline document: no framework, no request to another origin, two custom elements that re-render only when their own data changed.
+- `@mola/plugin-sdk` gains `verifyStatus`, `doctorStatus` and `runDoctorChecks`: the status line, the console and `mola doctor` read and write the environment facts through one place.
+
 ## 0.9.0 — 2026-11-13
 Status line HUD: what the agent could not see from inside the session.
 - `mola statusline` adds an environment line after the run line: `verify ✗ L1 of L3 (7m ago) · gaps 2: superagent.layerfs, superagent.cad2gis (45m ago; mola doctor)`.

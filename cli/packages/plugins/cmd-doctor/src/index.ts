@@ -11,9 +11,7 @@
  */
 
 import type { CheckResult, DoctorCheck, PluginContext } from "@mola/plugin-sdk";
-import * as os from "node:os";
-import * as path from "node:path";
-import { definePlugin, detectColor, ExitCode, palette, statusGlyph, writeJsonAtomic } from "@mola/plugin-sdk";
+import { definePlugin, detectColor, doctorCachePath, ExitCode, palette, runDoctorChecks, statusGlyph } from "@mola/plugin-sdk";
 
 function nodeCheck(): DoctorCheck {
   return {
@@ -47,18 +45,9 @@ function planOkCheck(ctx: PluginContext): DoctorCheck {
   };
 }
 
-interface ReportedCheck {
-  id: string;
-  description?: string;
-  ok: boolean;
-  warn?: boolean;
-  message?: string;
-  exitCode?: number;
-}
-
 /** Where the last doctor result is kept for the status line (`mola statusline` reads it; it never runs checks). */
 export function doctorCacheFile(env: NodeJS.ProcessEnv = process.env): string {
-  return path.join(env.MOLA_HOME || path.join(os.homedir(), ".mola"), "doctor-last.json");
+  return doctorCachePath(env);
 }
 
 export default definePlugin({
@@ -73,28 +62,7 @@ export default definePlugin({
         if (args.flags.envs) io.note("doctor --envs arrives with environment adapters in B3; skipped");
         if (args.flags.fix) io.note("doctor --fix: no auto-fixes exist in B1; reporting only");
 
-        const checks: ReportedCheck[] = [];
-        for (const check of ctx.doctor.list()) {
-          let result: CheckResult;
-          try {
-            result = await check.run();
-          } catch (err) {
-            // a crashing check is a failing check (EX_SOFTWARE)
-            result = {
-              ok: false,
-              message: `check crashed: ${err instanceof Error ? err.message : String(err)}`,
-              exitCode: ExitCode.Software,
-            };
-          }
-          checks.push({
-            id: check.id,
-            description: check.description,
-            ok: result.ok,
-            ...(result.ok && result.warn ? { warn: true } : {}),
-            message: result.message,
-            exitCode: result.ok ? undefined : (result.exitCode ?? ExitCode.Unavailable),
-          });
-        }
+        const checks = await runDoctorChecks(ctx.doctor.list());
 
         if (!io.json) {
           // failures first, each with a glyph; the message is the fix when one exists
@@ -109,16 +77,6 @@ export default definePlugin({
           checks,
           summary: { total: checks.length, failed: checks.filter((c) => !c.ok).length },
         });
-
-        try {
-          writeJsonAtomic(doctorCacheFile(), {
-            ts: new Date().toISOString(),
-            total: checks.length,
-            gaps: checks.filter((c) => !c.ok || c.warn).map((c) => ({ id: c.id, ok: c.ok, message: c.message ?? "" })),
-          });
-        } catch {
-          // the cache is a convenience; a read-only home must not fail doctor
-        }
 
         const failing = checks.find((c) => !c.ok);
         return (failing?.exitCode ?? ExitCode.Ok) as ExitCode;
