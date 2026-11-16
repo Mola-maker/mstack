@@ -4,13 +4,14 @@
 // and return an after image. This script does not locate the target and never
 // treats delivered_unverified as task success.
 // Usage:
-//   node cua-visual.mjs observe --app <app> --out-dir <dir> [--window-id <id>] [--bin <agent-desktop>]
+//   node cua-visual.mjs observe --app <app> --out-dir <dir> --headed-visual [--window-id <id>] [--bin <agent-desktop>]
 //   node cua-visual.mjs act --observe <observe.json> --png-x <n> --png-y <n> --headed-visual [--bin <agent-desktop>]
 // Exit 0: the command finished and printed an envelope (observe packed, or act
 // delivered a click and an after image). Exit 1: refused or the driver failed.
 // Exit 2: bad arguments. Task success is decided by the model from the after image.
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -18,9 +19,9 @@ const RUN_TIMEOUT_MS = 15000;
 const EPS = 0.5;
 
 const MAPPING_FORMULA = "screen = bounds.origin + png / scale_factor";
-const FRESHNESS_KIND = "window_id_and_bounds";
+const FRESHNESS_KIND = "window_id_bounds_and_png_bytes";
 const FRESHNESS_REASON =
-  "Act re-reads list-windows for the observed window id and refuses if that window is gone or its bounds changed. There is no wall-clock TTL: model think time (an 80s gap was recorded between a still-unmoved window's screenshot and the click) does not stale the mapping by itself.";
+  "Window id and bounds only prove the window has not moved. Act also SHA-256-compares a fresh focused screenshot to the bytes hashed at observe time. If any pixel changed (scroll, sort, menu, overlay, pointer in the capture, animation), it returns the new frame and does not click. A wall-clock TTL is not used: elapsed time does not prove the pixels are unchanged, and a short TTL would not prove they are either. Observe focuses first so the hashed frame is already in the focused state that act will re-check.";
 
 export function pngToScreen(bounds, scaleFactor, pngX, pngY) {
   const scale = Number(scaleFactor);
@@ -29,6 +30,11 @@ export function pngToScreen(bounds, scaleFactor, pngX, pngY) {
     x: Math.round(Number(bounds.x) + Number(pngX) / scale),
     y: Math.round(Number(bounds.y) + Number(pngY) / scale),
   };
+}
+
+export function sha256File(path) {
+  if (!existsSync(path)) throw new Error(`screenshot file missing: ${path}`);
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
 export function pngInImage(pngX, pngY, width, height) {
@@ -135,14 +141,41 @@ function listWindowsData(data) {
   return [];
 }
 
-export function observeFromDriver({ bin, app, windowId, outDir, env, runner = callDriver }) {
+export function observeFromDriver({ bin, app, windowId, outDir, headedVisual, env, runner = callDriver }) {
+  if (!headedVisual) {
+    return {
+      ok: false,
+      error: {
+        message: "this command requires explicit --headed-visual; default remains semantic-only and will not move the pointer or take focus",
+        code: "HEADED_VISUAL_REQUIRED",
+      },
+    };
+  }
   const listed = runner(bin, ["list-windows", "--app", app], "list-windows");
   if (!listed.ok) return listed;
   const windows = listWindowsData(listed.data);
   const picked = selectWindow(windows, { app, windowId });
   if (!picked.ok) return { ok: false, error: { message: picked.error, candidates: picked.candidates } };
-  const window = picked.window;
+  let window = picked.window;
   if (!window.bounds) return { ok: false, error: { message: "list-windows entry has no bounds" } };
+  const focus = runner(bin, ["--headed", "focus-window", "--window-id", window.id], "focus-window");
+  if (!focus.ok) return focus;
+  const focused = focus.data?.focused;
+  if (focused?.id && focused.id !== window.id) {
+    return { ok: false, error: { message: "focus-window did not focus the observed window id", observed: window.id, focused: focused.id } };
+  }
+  if (focused?.bounds && !boundsEqual(window.bounds, focused.bounds)) {
+    return {
+      ok: false,
+      error: {
+        message: "window bounds changed after focus-window; take a fresh observe",
+        code: "STALE_BOUNDS",
+        observed: window.bounds,
+        live: focused.bounds,
+      },
+    };
+  }
+  if (focused) window = { ...window, ...focused, bounds: focused.bounds || window.bounds, is_focused: true };
   mkdirSync(outDir, { recursive: true });
   const beforePath = join(outDir, "before.png");
   const shotArgs = ["screenshot", "--app", app, "--window-id", window.id, beforePath];
@@ -159,6 +192,10 @@ export function observeFromDriver({ bin, app, windowId, outDir, env, runner = ca
       },
     };
   }
+  const shotPath = shotData.path || beforePath;
+  let sha256;
+  try { sha256 = sha256File(shotPath); }
+  catch (err) { return { ok: false, error: { message: err.message, path: shotPath } }; }
   const record = {
     app,
     window: {
@@ -171,11 +208,12 @@ export function observeFromDriver({ bin, app, windowId, outDir, env, runner = ca
       process_instance: window.process_instance,
     },
     screenshot: {
-      path: shotData.path || beforePath,
+      path: shotPath,
       width: shotData.width,
       height: shotData.height,
       scale_factor: shotData.scale_factor,
       format: shotData.format,
+      sha256,
     },
     mapping: {
       space: "window_png_to_screen",
@@ -187,7 +225,7 @@ export function observeFromDriver({ bin, app, windowId, outDir, env, runner = ca
     model_must: "Locate the target in data.screenshot.path and pass those png-pixel coordinates to act --png-x --png-y. This observe step does not detect or click the target.",
     bin,
     out_dir: outDir,
-    driver_calls: [listed.args, shot.args],
+    driver_calls: [listed.args, focus.args, shot.args],
   };
   writeFileSync(join(outDir, "observe.json"), JSON.stringify({ ok: true, command: "observe", data: record }, null, 2));
   return { ok: true, data: record };
@@ -198,7 +236,7 @@ export function actFromDriver({ bin, observe, pngX, pngY, headedVisual, env, run
     return {
       ok: false,
       error: {
-        message: "act requires explicit --headed-visual; default remains semantic-only and will not move the pointer",
+        message: "this command requires explicit --headed-visual; default remains semantic-only and will not move the pointer or take focus",
         code: "HEADED_VISUAL_REQUIRED",
       },
     };
@@ -207,6 +245,26 @@ export function actFromDriver({ bin, observe, pngX, pngY, headedVisual, env, run
   const shot = observe.screenshot;
   const bounds = observe.mapping?.bounds || window.bounds;
   const scale = observe.mapping?.scale_factor ?? shot.scale_factor;
+  const beforePath = shot.path;
+  const recordedHash = shot.sha256;
+  if (!recordedHash || !beforePath) {
+    return { ok: false, error: { message: "observe record is missing screenshot sha256 or path; run observe again", code: "BEFORE_EVIDENCE_MISSING" } };
+  }
+  let fileHash;
+  try { fileHash = sha256File(beforePath); }
+  catch (err) { return { ok: false, error: { message: err.message, path: beforePath, code: "BEFORE_EVIDENCE_MISSING" } }; }
+  if (fileHash !== recordedHash) {
+    return {
+      ok: false,
+      error: {
+        code: "BEFORE_EVIDENCE_CHANGED",
+        message: "The observe before.png does not match the hash recorded at observe time. It will not be used as a click map. Run observe again.",
+        path: beforePath,
+        recorded_sha256: recordedHash,
+        file_sha256: fileHash,
+      },
+    };
+  }
   if (!pngInImage(pngX, pngY, shot.width, shot.height)) {
     return {
       ok: false,
@@ -247,10 +305,35 @@ export function actFromDriver({ bin, observe, pngX, pngY, headedVisual, env, run
       },
     };
   }
-  const click = runner(bin, ["--headed", "mouse-click", "--xy", `${screen.x},${screen.y}`], "mouse-click");
-  if (!click.ok) return click;
   const outDir = observe.out_dir;
   mkdirSync(outDir, { recursive: true });
+  const currentPath = join(outDir, "current.png");
+  const current = runner(bin, ["screenshot", "--app", observe.app, "--window-id", window.id, currentPath], "screenshot");
+  if (!current.ok) return current;
+  const currentFile = current.data?.path || currentPath;
+  let currentHash;
+  try { currentHash = sha256File(currentFile); }
+  catch (err) { return { ok: false, error: { message: err.message, path: currentFile } }; }
+  if (currentHash !== recordedHash) {
+    return {
+      ok: false,
+      error: {
+        code: "CONTENT_CHANGED",
+        message: "The current window screenshot differs from the observe frame. Stored png coordinates are not used. Run observe again and locate the target in the new frame.",
+        observed_sha256: recordedHash,
+        current_sha256: currentHash,
+        current_screenshot: {
+          path: currentFile,
+          width: current.data?.width,
+          height: current.data?.height,
+          scale_factor: current.data?.scale_factor,
+          format: current.data?.format,
+        },
+      },
+    };
+  }
+  const click = runner(bin, ["--headed", "mouse-click", "--xy", `${screen.x},${screen.y}`], "mouse-click");
+  if (!click.ok) return click;
   const afterPath = join(outDir, "after.png");
   const after = runner(bin, ["screenshot", "--app", observe.app, "--window-id", window.id, afterPath], "screenshot");
   if (!after.ok) return after;
@@ -271,13 +354,13 @@ export function actFromDriver({ bin, observe, pngX, pngY, headedVisual, env, run
         format: after.data?.format,
       },
       delivery,
-      task_succeeded: false,
+      task_succeeded: null,
       verification: {
-        status: "needs_model_review",
-        reason: "delivered_unverified is not task success. The model must confirm the intended change in data.after_screenshot.path.",
+        status: "pending",
+        reason: "ok: true and delivered_unverified are not task success or failure. The model must confirm the intended change in data.after_screenshot.path, then record pass or fail.",
       },
-      model_must: "Inspect data.after_screenshot.path and decide whether the task succeeded. Do not treat data.delivery or ok: true as confirmation.",
-      driver_calls: [listed.args, focus.args, click.args, after.args],
+      model_must: "Inspect data.after_screenshot.path and set verification to pass or fail. Do not treat data.delivery, ok: true, or task_succeeded: null as the outcome.",
+      driver_calls: [listed.args, focus.args, current.args, click.args, after.args],
     },
   };
 }
@@ -290,7 +373,7 @@ function clickFocusSummary(envelope) {
 
 function usage(exit = 2) {
   process.stderr.write(`Usage:
-  node cua-visual.mjs observe --app <app> --out-dir <dir> [--window-id <id>] [--bin <agent-desktop>]
+  node cua-visual.mjs observe --app <app> --out-dir <dir> --headed-visual [--window-id <id>] [--bin <agent-desktop>]
   node cua-visual.mjs act --observe <observe.json> --png-x <n> --png-y <n> --headed-visual [--bin <agent-desktop>]
 `);
   process.exit(exit);
@@ -305,7 +388,7 @@ export function main(argv = process.argv.slice(2)) {
     const outDir = flag(argv, "--out-dir");
     const windowId = flag(argv, "--window-id");
     if (!app || !outDir) usage();
-    const result = observeFromDriver({ bin, app, windowId, outDir });
+    const result = observeFromDriver({ bin, app, windowId, outDir, headedVisual: argv.includes("--headed-visual") });
     if (!result.ok) fail(result.error?.message || "observe failed", result.error, 1);
     printOk("observe", result.data);
     return 0;

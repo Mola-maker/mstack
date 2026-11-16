@@ -55,6 +55,7 @@ function fakeDriver(dir, hooks = {}) {
     clickFail: hooks.clickFail || null,
     boundsAfterFocus: hooks.boundsAfterFocus || null,
     boundsOnSecondList: hooks.boundsOnSecondList || null,
+    screenshotBodies: (hooks.screenshotBodies || ["fake-png"]).slice(),
   };
   writeFileSync(statePath, JSON.stringify(initial));
   const script = `#!/usr/bin/env node
@@ -81,7 +82,8 @@ if (cmd === "list-windows") {
 } else if (cmd === "screenshot") {
   if (st.screenshotFail) { save(); out(st.screenshotFail); process.exit(0); }
   const path = args.filter((a) => !a.startsWith("--") && a !== "screenshot" && a !== flag("--app") && a !== flag("--window-id")).at(-1);
-  writeFileSync(path, "fake-png");
+  const body = st.screenshotBodies.length > 1 ? st.screenshotBodies.shift() : st.screenshotBodies[0];
+  writeFileSync(path, body);
   save();
   out({ version: "2.6", ok: true, command: "screenshot", data: { format: "png", path, ...st.screenshotSize } });
   process.exit(0);
@@ -141,15 +143,19 @@ test("observe packs list-windows and a screenshot and does not click", (t) => {
   const dir = scratch(t);
   const fake = fakeDriver(dir);
   const outDir = join(dir, "out");
-  const result = observeFromDriver({ bin: fake.bin, app: "thunar", outDir });
+  const denied = observeFromDriver({ bin: fake.bin, app: "thunar", outDir, headedVisual: false });
+  assert.equal(denied.ok, false);
+  assert.equal(denied.error.code, "HEADED_VISUAL_REQUIRED");
+  const result = observeFromDriver({ bin: fake.bin, app: "thunar", outDir, headedVisual: true });
   assert.equal(result.ok, true);
   assert.equal(result.data.window.id, "w-1.50-org-a11y-atspi-accessible-76");
   assert.equal(result.data.screenshot.width, 650);
+  assert.ok(result.data.screenshot.sha256);
   assert.match(result.data.model_must, /does not detect or click/);
-  assert.equal(result.data.freshness.kind, "window_id_and_bounds");
-  assert.doesNotMatch(result.data.freshness.reason, /TTL of \d+ s/);
-  const calls = fake.read().calls.map((a) => a[0]);
-  assert.deepEqual(calls, ["list-windows", "screenshot"]);
+  assert.equal(result.data.freshness.kind, "window_id_bounds_and_png_bytes");
+  assert.doesNotMatch(result.data.freshness.reason, /80s/);
+  const cmds = fake.read().calls.map((a) => (a[0] === "--headed" ? a[1] : a[0]));
+  assert.deepEqual(cmds, ["list-windows", "focus-window", "screenshot"]);
   assert.equal(fake.read().clickXy, null);
 });
 
@@ -160,13 +166,13 @@ test("observe refuses ambiguous windows and a size mismatch", (t) => {
     { id: "w-2", app_name: "thunar", visible: true, bounds: { ...REAL_BOUNDS }, title: "native-doc - Thunar" },
   ];
   const amb = fakeDriver(join(dir, "amb"), { windows: twins });
-  const r1 = observeFromDriver({ bin: amb.bin, app: "thunar", outDir: join(dir, "a") });
+  const r1 = observeFromDriver({ bin: amb.bin, app: "thunar", outDir: join(dir, "a"), headedVisual: true });
   assert.equal(r1.ok, false);
   assert.match(r1.error.message, /ambiguous/);
   assert.equal(amb.read().calls.some((c) => c[0] === "screenshot"), false);
 
   const mismatch = fakeDriver(join(dir, "mis"), { screenshotSize: { width: 100, height: 100, scale_factor: 1.0 } });
-  const r2 = observeFromDriver({ bin: mismatch.bin, app: "thunar", outDir: join(dir, "b") });
+  const r2 = observeFromDriver({ bin: mismatch.bin, app: "thunar", outDir: join(dir, "b"), headedVisual: true });
   assert.equal(r2.ok, false);
   assert.match(r2.error.message, /does not match window bounds/);
 });
@@ -175,7 +181,7 @@ test("act requires --headed-visual and does not click without it", (t) => {
   const dir = scratch(t);
   const fake = fakeDriver(dir);
   const outDir = join(dir, "out");
-  const obs = observeFromDriver({ bin: fake.bin, app: "thunar", outDir });
+  const obs = observeFromDriver({ bin: fake.bin, app: "thunar", outDir, headedVisual: true });
   const denied = actFromDriver({ bin: fake.bin, observe: obs.data, pngX: REAL_PNG.x, pngY: REAL_PNG.y, headedVisual: false });
   assert.equal(denied.ok, false);
   assert.equal(denied.error.code, "HEADED_VISUAL_REQUIRED");
@@ -186,42 +192,45 @@ test("act rejects an out-of-image point and stale bounds, and never marks task s
   const dir = scratch(t);
   const outDir = join(dir, "out");
   const fake = fakeDriver(dir);
-  const obs = observeFromDriver({ bin: fake.bin, app: "thunar", outDir });
+  const obs = observeFromDriver({ bin: fake.bin, app: "thunar", outDir, headedVisual: true });
   const oob = actFromDriver({ bin: fake.bin, observe: obs.data, pngX: 900, pngY: 10, headedVisual: true });
   assert.equal(oob.ok, false);
   assert.match(oob.error.message, /outside/);
   assert.equal(fake.read().clickXy, null);
 
   const stale = fakeDriver(join(dir, "stale"), { boundsOnSecondList: { x: 10, y: 10, width: 650, height: 514 } });
-  const obs2 = observeFromDriver({ bin: stale.bin, app: "thunar", outDir: join(dir, "out2") });
+  const obs2 = observeFromDriver({ bin: stale.bin, app: "thunar", outDir: join(dir, "out2"), headedVisual: true });
   const r = actFromDriver({ bin: stale.bin, observe: obs2.data, pngX: REAL_PNG.x, pngY: REAL_PNG.y, headedVisual: true });
   assert.equal(r.ok, false);
   assert.equal(r.error.code, "STALE_BOUNDS");
   assert.equal(stale.read().clickXy, null);
 });
 
-test("headed act focuses, clicks the mapped screen point, returns an after image, and leaves task_succeeded false", (t) => {
+test("headed act focuses, clicks the mapped screen point, returns an after image, and leaves task_succeeded null pending review", (t) => {
   const dir = scratch(t);
   const fake = fakeDriver(dir);
   const outDir = join(dir, "out");
-  const obs = observeFromDriver({ bin: fake.bin, app: "thunar", outDir });
+  const obs = observeFromDriver({ bin: fake.bin, app: "thunar", outDir, headedVisual: true });
   const r = actFromDriver({ bin: fake.bin, observe: obs.data, pngX: REAL_PNG.x, pngY: REAL_PNG.y, headedVisual: true });
   assert.equal(r.ok, true);
   assert.deepEqual(r.data.screen, REAL_SCREEN);
   assert.equal(r.data.delivery, "delivered_unverified");
-  assert.equal(r.data.task_succeeded, false);
-  assert.equal(r.data.verification.status, "needs_model_review");
+  assert.equal(r.data.task_succeeded, null);
+  assert.equal(r.data.verification.status, "pending");
   assert.ok(r.data.after_screenshot.path.endsWith("after.png"));
   assert.deepEqual(fake.read().clickXy, REAL_SCREEN);
   const cmds = fake.read().calls.map((a) => (a[0] === "--headed" ? a[1] : a[0]));
-  assert.deepEqual(cmds, ["list-windows", "screenshot", "list-windows", "focus-window", "mouse-click", "screenshot"]);
+  assert.deepEqual(cmds, ["list-windows", "focus-window", "screenshot", "list-windows", "focus-window", "screenshot", "mouse-click", "screenshot"]);
 });
 
 test("CLI observe and act write envelopes; act without the flag exits 1", (t) => {
   const dir = scratch(t);
   const fake = fakeDriver(dir);
   const outDir = join(dir, "out");
-  const obs = spawnSync(process.execPath, [cli, "observe", "--app", "thunar", "--out-dir", outDir, "--bin", fake.bin], { encoding: "utf8" });
+  const noObsFlag = spawnSync(process.execPath, [cli, "observe", "--app", "thunar", "--out-dir", outDir, "--bin", fake.bin], { encoding: "utf8" });
+  assert.equal(noObsFlag.status, 1);
+  assert.match(noObsFlag.stdout, /HEADED_VISUAL_REQUIRED|headed-visual/);
+  const obs = spawnSync(process.execPath, [cli, "observe", "--app", "thunar", "--out-dir", outDir, "--headed-visual", "--bin", fake.bin], { encoding: "utf8" });
   assert.equal(obs.status, 0, obs.stdout + obs.stderr);
   const env = JSON.parse(obs.stdout);
   assert.equal(env.ok, true);
@@ -234,6 +243,38 @@ test("CLI observe and act write envelopes; act without the flag exits 1", (t) =>
   assert.equal(act.status, 0, act.stdout + act.stderr);
   const out = JSON.parse(act.stdout);
   assert.equal(out.ok, true);
-  assert.equal(out.data.task_succeeded, false);
+  assert.equal(out.data.task_succeeded, null);
+  assert.equal(out.data.verification.status, "pending");
   assert.deepEqual(out.data.screen, REAL_SCREEN);
+});
+
+test("same window and bounds with changed pixels does not mouse-click and returns a new frame", (t) => {
+  const dir = scratch(t);
+  const fake = fakeDriver(dir, { screenshotBodies: ["frame-a", "frame-b"] });
+  const outDir = join(dir, "out");
+  const obs = observeFromDriver({ bin: fake.bin, app: "thunar", outDir, headedVisual: true });
+  assert.equal(obs.ok, true);
+  const r = actFromDriver({ bin: fake.bin, observe: obs.data, pngX: REAL_PNG.x, pngY: REAL_PNG.y, headedVisual: true });
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, "CONTENT_CHANGED");
+  assert.ok(r.error.current_screenshot.path.endsWith("current.png"));
+  assert.notEqual(r.error.observed_sha256, r.error.current_sha256);
+  assert.equal(fake.read().clickXy, null);
+  const clicked = fake.read().calls.some((a) => a.includes("mouse-click"));
+  assert.equal(clicked, false);
+});
+
+test("rewriting before.png after observe is rejected and does not click", (t) => {
+  const dir = scratch(t);
+  const fake = fakeDriver(dir);
+  const outDir = join(dir, "out");
+  const obs = observeFromDriver({ bin: fake.bin, app: "thunar", outDir, headedVisual: true });
+  writeFileSync(obs.data.screenshot.path, "tampered-before-bytes");
+  const r = actFromDriver({ bin: fake.bin, observe: obs.data, pngX: REAL_PNG.x, pngY: REAL_PNG.y, headedVisual: true });
+  assert.equal(r.ok, false);
+  assert.equal(r.error.code, "BEFORE_EVIDENCE_CHANGED");
+  assert.notEqual(r.error.recorded_sha256, r.error.file_sha256);
+  assert.equal(fake.read().clickXy, null);
+  const clicked = fake.read().calls.some((a) => a.includes("mouse-click"));
+  assert.equal(clicked, false);
 });
