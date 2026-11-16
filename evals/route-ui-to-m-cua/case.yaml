@@ -1,0 +1,24 @@
+schema_version: "1.1"
+name: route-ui-to-m-cua
+description: "A natural-language request to operate an existing desktop UI fires m-cua and must not start /go. A live model has not been run against this case."
+tags: [routing, trigger]
+execution:
+  prompt: "帮我打开文件管理器，找到标记完成.txt 并点开它，确认窗口里能看到这个文件名。"
+  max_turns: 8
+  timeout_seconds: 300
+  allowed_tools: [Read, Glob, Grep]
+runs: 3
+graders:
+  - type: tool_used
+    name: fires-m-cua
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?m-cua"'
+    min: 1
+    arm: with-only
+  - type: tool_used
+    name: must-not-start-go
+    tool: SlashCommand
+    input_match: '(?:^|[/\s"])go(?:\s|"|$)'
+    min: 0
+    max: 0
+    arm: with-only

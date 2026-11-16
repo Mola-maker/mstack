@@ -1,6 +1,6 @@
 # Drivers (m-cua)
 
-One section per driver: how it reads the UI, how it acts, how it waits, what the script asserts on. Run `cua-doctor.mjs --need <driver>` first.
+One section per driver: how it reads the UI, how it acts, how it waits, what the script asserts on. Run `cua-doctor.mjs --need <driver>` first. Pick the CLI by the surface: desktop windows use `agent-desktop`; `mola-cua snapshot`, `find`, `click` and `wait` talk to Android over adb. Passing `--app` does not change that. Unknown `mola-cua` subcommands can forward to `agent-desktop` if `MOLA_CUA_AGENT_DESKTOP` is the `agent-desktop` executable (not a crate or target directory).
 
 ## desktop: agent-desktop
 
@@ -21,6 +21,10 @@ agent-desktop <command> --help
 | Wait | `agent-desktop wait --app <app> --text "<text>"`, or `--wait-for role:text` on a snapshot or action |
 | Assert | `agent-desktop find` / `get` / `is`, then compare the JSON in the script |
 | Replay | in the script, look the element up again each run: `agent-desktop find --app <app> --role button --name "<name>" --first` returns `data.match.ref_id`; pass that ref to `click` or `get`. Do not use `batch` for replay: it takes fixed refs, and a ref dies with its snapshot |
+
+On Linux the probe and every later command must inherit `DISPLAY`, `DBUS_SESSION_BUS_ADDRESS` and `XDG_RUNTIME_DIR` from the graphical terminal you can see (and `WAYLAND_DISPLAY` when the session is Wayland). Read them from that shell, or from a process on that screen (`tr '\0' '\n' < /proc/<pid>/environ`). Do not set `XDG_RUNTIME_DIR` to the parent of a session-bus socket just because the socket file exists: the AT-SPI socket often lives in a different runtime directory than the session bus. If several displays or buses are present, `busctl --user --list` should mention that screen's window manager, panel or terminal.
+
+Doctor states for this driver: `ready` / `not-on-path` mean `status` is granted and `list-apps` already names at least one application. That is not proof that a given control is readable or that the user task passed. `no-app` means the bus answered but the tree is empty (agent-desktop: "answered, empty"). Start a new app after the bus is up; applications that were already running do not register. Do not restart the accessibility bus or close a shared browser to recover. A recorded desktop miss, and how to score it, is in `acceptance.md`.
 
 Rules that save retries:
 

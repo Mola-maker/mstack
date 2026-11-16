@@ -1,0 +1,330 @@
+{
+  "version": "2.6",
+  "ok": true,
+  "command": "snapshot",
+  "data": {
+    "app": "thunar",
+    "complete": true,
+    "ref_count": 28,
+    "snapshot_id": "srratm4gofiqc",
+    "tree": {
+      "available_actions": [
+        "Click",
+        "Select"
+      ],
+      "children": [
+        {
+          "available_actions": [
+            "Click"
+          ],
+          "description": "Reload the current folder",
+          "name": "Reload",
+          "ref_id": "@srratm4gofiqc:e2",
+          "role": "menuitem",
+          "states": [
+            "selected"
+          ]
+        },
+        {
+          "available_actions": [
+            "Click"
+          ],
+          "description": "Open/Close Split View",
+          "name": "Split View",
+          "ref_id": "@srratm4gofiqc:e3",
+          "role": "menuitem"
+        },
+        {
+          "available_actions": [
+            "Click",
+            "Select"
+          ],
+          "children": [
+            {
+              "available_actions": [
+                "Click"
+              ],
+              "description": "Modern approach with buttons that correspond to folders",
+              "name": "Buttons Style",
+              "ref_id": "@srratm4gofiqc:e5",
+              "role": "menuitem",
+              "states": [
+                "offscreen"
+              ]
+            },
+            {
+              "available_actions": [
+                "Click"
+              ],
+              "description": "Traditional text box showing the current path",
+              "name": "Text Style",
+              "ref_id": "@srratm4gofiqc:e6",
+              "role": "menuitem",
+              "states": [
+                "checked",
+                "offscreen"
+              ]
+            }
+          ],
+          "name": "Location Selector",
+          "ref_id": "@srratm4gofiqc:e4",
+          "role": "menu"
+        },
+        {
+          "available_actions": [
+            "Click",
+            "Select"
+          ],
+          "children": [
+            {
+              "available_actions": [
+                "Click"
+              ],
+              "description": "Toggles the visibility of the shortcuts pane",
+              "name": "Shortcuts",
+              "ref_id": "@srratm4gofiqc:e8",
+              "role": "menuitem",
+              "states": [
+                "checked",
+                "offscreen"
+              ]
+            },
+            {
+              "available_actions": [
+                "Click"
+              ],
+              "description": "Toggles the visibility of the tree pane",
+              "name": "Tree",
+              "ref_id": "@srratm4gofiqc:e9",
+              "role": "menuitem",
+              "states": [
+                "offscreen"
+              ]
+            },
+            {
+              "available_actions": [
+                "Click"
+              ],
+              "description": "Change the visibility of this window's image preview",
+              "name": "Image Preview",
+              "ref_id": "@srratm4gofiqc:e10",
+              "role": "menuitem",
+              "states": [
+                "offscreen"
+              ]
+            }
+          ],
+          "name": "Side Pane",
+          "ref_id": "@srratm4gofiqc:e7",
+          "role": "menu"
+        },
+        {
+          "available_actions": [
+            "Click"
+          ],
+          "description": "Change the visibility of this window's statusbar",
+          "name": "Statusbar",
+          "ref_id": "@srratm4gofiqc:e11",
+          "role": "menuitem",
+          "states": [
+            "checked"
+          ]
+        },
+        {
+          "available_actions": [
+            "Click"
+          ],
+          "description": "Change the visibility of this window's menubar",
+          "name": "Menubar",
+          "ref_id": "@srratm4gofiqc:e12",
+          "role": "menuitem",
+          "states": [
+            "checked"
+          ]
+        },
+        {
+          "available_actions": [
+            "Click"
+          ],
+          "description": "Configure the toolbar",
+          "name": "Configure Toolbar...",
+          "ref_id": "@srratm4gofiqc:e13",
+          "role": "menuitem"
+        },
+        {
+          "available_actions": [
+            "Click"
+          ],
+          "description": "Toggles the display of hidden files in the current window",
+          "name": "Show Hidden Files",
+          "ref_id": "@srratm4gofiqc:e14",
+          "role": "menuitem"
+        },
+        {
+          "available_actions": [
+            "Click",
+            "Select"
+          ],
+          "children": [
+            {
+              "available_actions": [
+                "Click"
+              ],
+              "description": "Keep items sorted by their name",
+              "name": "By Name",
+              "ref_id": "@srratm4gofiqc:e16",
+              "role": "menuitem",
+              "states": [
+                "checked",
+                "offscreen"
+              ]
+            },
+            {
+              "available_actions": [
+                "Click"
+              ],
+              "description": "Keep items sorted by their size",
+              "name": "By Size",
+              "ref_id": "@srratm4gofiqc:e17",
+              "role": "menuitem",
+              "states": [
+                "offscreen"
+              ]
+            },
+            {
+              "available_actions": [
+                "Click"
+              ],
+              "description": "Keep items sorted by their type",
+              "name": "By Type",
+              "ref_id": "@srratm4gofiqc:e18",
+              "role": "menuitem",
+              "states": [
+                "offscreen"
+              ]
+            },
+            {
+              "available_actions": [
+                "Click"
+              ],
+              "description": "Keep items sorted by their modification date",
+              "name": "By Modification Date",
+              "ref_id": "@srratm4gofiqc:e19",
+              "role": "menuitem",
+              "states": [
+                "offscreen"
+              ]
+            },
+            {
+              "available_actions": [
+                "Click"
+              ],
+              "description": "Sort items in ascending order",
+              "name": "Ascending",
+              "ref_id": "@srratm4gofiqc:e20",
+              "role": "menuitem",
+              "states": [
+                "checked",
+                "offscreen"
+              ]
+            },
+            {
+              "available_actions": [
+                "Click"
+              ],
+              "description": "Sort items in descending order",
+              "name": "Descending",
+              "ref_id": "@srratm4gofiqc:e21",
+              "role": "menuitem",
+              "states": [
+                "offscreen"
+              ]
+            },
+            {
+              "available_actions": [
+                "Click"
+              ],
+              "description": "Reverse the sort order",
+              "name": "Reversed Order",
+              "ref_id": "@srratm4gofiqc:e22",
+              "role": "menuitem",
+              "states": [
+                "offscreen"
+              ]
+            }
+          ],
+          "name": "Arrange Items",
+          "ref_id": "@srratm4gofiqc:e15",
+          "role": "menu"
+        },
+        {
+          "available_actions": [
+            "Click"
+          ],
+          "description": "Show the contents in more detail",
+          "name": "Zoom In",
+          "ref_id": "@srratm4gofiqc:e23",
+          "role": "menuitem"
+        },
+        {
+          "available_actions": [
+            "Click"
+          ],
+          "description": "Show the contents in less detail",
+          "name": "Zoom Out",
+          "ref_id": "@srratm4gofiqc:e24",
+          "role": "menuitem"
+        },
+        {
+          "available_actions": [
+            "Click"
+          ],
+          "description": "Show the contents at the normal size",
+          "name": "Normal Size",
+          "ref_id": "@srratm4gofiqc:e25",
+          "role": "menuitem"
+        },
+        {
+          "available_actions": [
+            "Click"
+          ],
+          "description": "Display folder content in an icon view",
+          "name": "Icon View",
+          "ref_id": "@srratm4gofiqc:e26",
+          "role": "menuitem",
+          "states": [
+            "checked"
+          ]
+        },
+        {
+          "available_actions": [
+            "Click"
+          ],
+          "description": "Display folder content in a detailed list view",
+          "name": "List View",
+          "ref_id": "@srratm4gofiqc:e27",
+          "role": "menuitem"
+        },
+        {
+          "available_actions": [
+            "Click"
+          ],
+          "description": "Display folder content in a compact list view",
+          "name": "Compact View",
+          "ref_id": "@srratm4gofiqc:e28",
+          "role": "menuitem"
+        }
+      ],
+      "name": "View",
+      "ref_id": "@srratm4gofiqc:e1",
+      "role": "menu",
+      "states": [
+        "selected"
+      ]
+    },
+    "window": {
+      "id": "w-1.15-org-a11y-atspi-accessible-76",
+      "title": "native-doc - Thunar"
+    }
+  }
+}

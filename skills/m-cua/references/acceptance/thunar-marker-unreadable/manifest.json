@@ -1,0 +1,13 @@
+{
+  "target_name": "标记完成.txt",
+  "app": "thunar",
+  "window_title": "native-doc - Thunar",
+  "expected": "unreadable",
+  "notes": [
+    "Doctor became ready and list-apps named thunar after a new Thunar window registered. That is not task success.",
+    "find --name 标记完成.txt returned ok:true with match:null twice (exit 0). A null match is a miss.",
+    "The filename was visible as an icon in screenshots (not in this fixture) but never appeared as an accessible name in the snapshot tree. That is an upstream agent-desktop/AT-SPI gap, not something mstack can fix in the driver.",
+    "One semantic click opened the View menu (delivered_unverified). The log has no click on List View. The later snapshot still had Icon View checked and an Icon view group.",
+    "No file was selected, and no folder was created. Do not treat this recording as a pass. When a later driver recording exposes the target name, the same checker should exit 0."
+  ]
+}

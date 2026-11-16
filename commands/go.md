@@ -13,6 +13,8 @@ $ARGUMENTS
 
 If the intent is empty, read `.mstack/runs/*/progress.json` for a run with status running or blocked and resume it; if there is none, ask for the intent in one short line.
 
+If the intent is only to operate a real, already-existing UI (a desktop app, a device or emulator, or a browser page) and is not to build, prove, accept, or verify a software change, do not start this pipeline. Load `m-cua` and follow it: doctor first, then observe, act, observe, then a replayable script. Do not ask the user to type driver commands. Routing is not a promise that every app can be driven. Desktop windows use `agent-desktop`; do not send desktop work through `mola-cua snapshot`, `find`, `click`, or `wait` (those are Android). If the intent is to build or fix software and also prove it through a real UI, or to accept a change by driving the UI, keep this pipeline: the verify stage uses `m-verify`, which calls `m-cua` for L3/L4 when the proof is a window, a device or a page.
+
 ## 0. Start the run (visible from the first second)
 
 - Pick the stages. `think` only if the intent is vague (you could not write a 3-step plan from it without guessing the goal). `ship` only if it asks for a PR, push, 提PR, 推送 or ship. `scout` always, except for a fix you can already point to by file:line. Then `plan,implement,verify,review`. A one-line fix still goes through verify.

@@ -1,0 +1,24 @@
+schema_version: "1.1"
+name: route-browser-to-m-cua
+description: "A natural-language request to operate an existing browser page fires m-cua and must not start /go. A live model has not been run against this case."
+tags: [routing, trigger]
+execution:
+  prompt: "帮我在浏览器里打开这个页面，点标记完成，直到页面显示已完成。"
+  max_turns: 8
+  timeout_seconds: 300
+  allowed_tools: [Read, Glob, Grep]
+runs: 3
+graders:
+  - type: tool_used
+    name: fires-m-cua
+    tool: Skill
+    input_match: '"skill"\s*:\s*"(?:[\w-]+:)?m-cua"'
+    min: 1
+    arm: with-only
+  - type: tool_used
+    name: must-not-start-go
+    tool: SlashCommand
+    input_match: '(?:^|[/\s"])go(?:\s|"|$)'
+    min: 0
+    max: 0
+    arm: with-only

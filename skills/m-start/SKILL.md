@@ -28,6 +28,8 @@ No exceptions: a terse prompt is not a reason to guess the phase; "I remember wh
 | "This goal looks abandoned, I'll close it for them." | Staleness is advisory. Report it with its resume hint; the user decides. |
 | "The user just said 提PR, I'll push now." | Route to `m-ship`; push and PR are outward-facing and stop for approval there. |
 | "I'll skip the routing line and start working." | The routing line is what lets the user catch a wrong pick in one glance. |
+| "打开文件管理器点一下 is a one-sentence task, so /go." | Operating an already-existing UI is `m-cua`, not the build pipeline. `/go` still owns "build or fix X and prove it in the UI". |
+| "改完了真机验收一下, 打开应用点一遍" | That is proof of a change: route to `m-verify`, or `/go` if it is a whole unstaged task. Do not start a fresh `m-cua` route, and do not interrupt a running `/go`. |
 
 Red flags — stop and route: you edited a file before naming a skill; you cite a goal's status without having opened its state file; you ran `rm` or edited on stale state; your routing line names two skills.
 
@@ -37,12 +39,14 @@ Red flags — stop and route: you edited a file before naming a skill; you cite 
    - A goal file whose `## Closeout` contains no `status:` line, while its `state.json` is missing, counts as abnormally interrupted (the loop died before writing either). A `## Closeout` that holds only the placeholder text from creation is not a closeout.
    - A team run (`.mstack/team/<slug>/`) is stale when the newest `v<N>.md` has no `status:` line and its mtime is older than 2 hours. `status: active|done|failed` is written into each round file's round-close block (`m-team` owns that line); resume from that file plus `history.md`.
    - `done` and `failed` are terminal and never stale. Anything you cannot read, say you could not read.
-3. A whole task stated as one sentence ("做X", "修好Y", "加个Z，提PR") with no stage named → run the `/go` pipeline (the plugin's `commands/go.md`): it picks the stages itself and writes `.mstack/runs/<id>/progress.json` so the user can watch. Also resume any run there with status running or blocked before starting new work.
-4. Otherwise classify the request against the 10 core principles (below) and the skill one-liners. Report which skill you picked and why, in one line, then load that skill's SKILL.md and follow it.
-5. If `.mstack/` shows work in progress, resume it: trust the state files over your memory; do not redo steps already marked done.
-6. If no single skill obviously applies, prefer `m-think` for anything new or ambiguous; prefer `m-debug` for a broken behavior; route "提PR/提交/发布" to `m-ship`, "review一下/审一下" to `m-review`, "分派/并行" to `m-dispatch`, "组队/team/一直优化/卡在局部最优" to `m-team`.
-7. Any judgement the steps do not cover (two skills tie, state unreadable) becomes one line in your routing report: `Ruling: decision | reason | cost if wrong`.
-8. Follow the reporting format (one-line conclusion → what changed with file:line → how it was verified → what you did not do / risks) in Chinese, matching the user's language.
+3. If a `/go` run in `.mstack/runs/` has status running or blocked, resume it from that run's progress file. Do not start `m-cua` or a new `/go` in its place.
+4. If the request is only to operate a real, already-existing UI (click or type in a desktop app, on a device or emulator, or on a page in a browser) and is not to build, prove, accept, or verify a software change, route to `m-cua`. Say the routing line, load `m-cua`, and follow it (doctor first, then observe, act, observe, then a replayable script and a receipt). Do not start the `/go` pipeline, and do not ask the user to type driver commands. Routing does not mean every app can be driven: the doctor and `m-cua` stop conditions still apply. Desktop windows are driven with `agent-desktop`; `mola-cua snapshot`, `find`, `click`, and `wait` are Android and must not be used as the desktop entry. Proof or acceptance of a change ("改完了真机验收一下", "验证刚才的修复，打开应用点一遍") goes to `m-verify`, or to `/go` when it is a whole unstaged task; `m-verify` may later call `m-cua` for L3/L4.
+5. A whole task stated as one sentence ("做X", "修好Y", "加个Z，提PR") with no stage named, and that is not the operate-UI case in step 4, → run the `/go` pipeline (the plugin's `commands/go.md`): it picks the stages itself and writes `.mstack/runs/<id>/progress.json` so the user can watch. If that task also needs a real-UI proof, `/go`'s verify stage reaches `m-cua` through `m-verify` for L3/L4.
+6. Otherwise classify the request against the 10 core principles (below) and the skill one-liners. Report which skill you picked and why, in one line, then load that skill's SKILL.md and follow it.
+7. If `.mstack/` shows work in progress, resume it: trust the state files over your memory; do not redo steps already marked done.
+8. If no single skill obviously applies, prefer `m-think` for anything new or ambiguous; prefer `m-debug` for a broken behavior; route "点一下/操作界面/computer use" to `m-cua` only when it is the operate-existing-UI case in step 4, "验证一下/验收刚才的修复" to `m-verify`, "提PR/提交/发布" to `m-ship`, "review一下/审一下" to `m-review`, "分派/并行" to `m-dispatch`, "组队/team/一直优化/卡在局部最优" to `m-team`.
+9. Any judgement the steps do not cover (two skills tie, state unreadable) becomes one line in your routing report: `Ruling: decision | reason | cost if wrong`.
+10. Follow the reporting format (one-line conclusion → what changed with file:line → how it was verified → what you did not do / risks) in Chinese, matching the user's language.
 
 ### The 10 core principles (other skills cite these by number)
 
