@@ -4,18 +4,73 @@
     {
       "name": "bare",
       "format": "claude-json",
-      "argv": ["claude", "-p", "{prompt}", "--output-format", "json", "--permission-mode", "acceptEdits", "--max-budget-usd", "1", "--no-session-persistence", "--setting-sources", "project", "--disable-slash-commands"]
+      "argv": [
+        "claude",
+        "-p",
+        "{prompt}",
+        "--output-format",
+        "json",
+        "--permission-mode",
+        "acceptEdits",
+        "--max-budget-usd",
+        "1",
+        "--no-session-persistence",
+        "--setting-sources",
+        "project",
+        "--disable-slash-commands"
+      ]
     },
     {
       "name": "mstack",
       "format": "claude-json",
-      "argv": ["claude", "-p", "{prompt}", "--output-format", "json", "--permission-mode", "acceptEdits", "--max-budget-usd", "1", "--no-session-persistence", "--setting-sources", "project", "--plugin-dir", "{repo}"]
+      "argv": [
+        "claude",
+        "-p",
+        "{prompt}",
+        "--output-format",
+        "json",
+        "--permission-mode",
+        "acceptEdits",
+        "--max-budget-usd",
+        "1",
+        "--no-session-persistence",
+        "--setting-sources",
+        "project",
+        "--plugin-dir",
+        "{repo}"
+      ]
     },
     {
       "name": "omc",
       "enabled": false,
       "format": "claude-json",
-      "argv": ["claude", "-p", "{prompt}", "--output-format", "json", "--permission-mode", "acceptEdits", "--max-budget-usd", "1", "--no-session-persistence", "--setting-sources", "project", "--plugin-dir", "<path to the oh-my-claudecode plugin directory>"]
+      "argv": [
+        "claude",
+        "-p",
+        "{prompt}",
+        "--output-format",
+        "json",
+        "--permission-mode",
+        "acceptEdits",
+        "--max-budget-usd",
+        "1",
+        "--no-session-persistence",
+        "--setting-sources",
+        "project",
+        "--plugin-dir",
+        "<path to the oh-my-claudecode plugin directory>"
+      ]
+    },
+    {
+      "name": "codex-bare",
+      "enabled": false,
+      "format": "text",
+      "_comment": "the same tasks on another harness: `codex exec` prints the final message as text, so cost and turns are not recorded. Check the flags on your install first; this entry was not run.",
+      "argv": [
+        "codex",
+        "exec",
+        "{prompt}"
+      ]
     }
   ]
 }

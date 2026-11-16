@@ -15,6 +15,7 @@
   "requires": [],
   "capabilities": ["command.web"],
   "permissions": {
+    "process.exec": ["node"],
     "fs.read": ["**/.mstack/runs/**"],
     "fs.write": ["**/.mstack/runs/**"],
     "mola": ["commands", "config.read", "doctor"]

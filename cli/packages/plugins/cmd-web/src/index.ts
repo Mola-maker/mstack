@@ -11,6 +11,7 @@ import * as http from "node:http";
 import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
+import { spawn } from "node:child_process";
 import type { PluginContext } from "@mola/plugin-sdk";
 import {
   decideApproval,
@@ -39,6 +40,24 @@ const LOOPBACK = new Set(["127.0.0.1", "::1", "localhost"]);
 const TAIL_LINES = 40;
 const MAX_BODY = 64 * 1024;
 
+/** What the console asks for when someone starts a run from the page. */
+export interface LaunchRequest {
+  /** one of the watched directories */
+  cwd: string;
+  task: string;
+  kind?: string;
+}
+
+export interface LaunchHandle {
+  pid?: number;
+  /** resolves when the process has ended, however it ended; the server counts runs in flight with it */
+  exited: Promise<void>;
+}
+
+const MAX_TASK = 4000;
+/** runs the page may have in flight at once: a phone left open must not be able to fill the machine */
+const MAX_LAUNCHED = 3;
+
 export interface WebOptions {
   host?: string;
   port?: number;
@@ -50,6 +69,8 @@ export interface WebOptions {
   heartbeatMs?: number;
   /** runs the doctor checks and stores the result (`POST /api/doctor`); absent → 501 */
   runDoctor?: () => Promise<unknown>;
+  /** starts `mola run` for the page (`POST /api/launch`); absent → 501 */
+  startRun?: (req: LaunchRequest) => LaunchHandle;
   /** where the doctor result and the routing file are looked up (tests) */
   env?: NodeJS.ProcessEnv;
 }
@@ -162,6 +183,7 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
   const heartbeatMs = opts.heartbeatMs ?? 15000;
   const clients = new Set<() => void>();
   let doctorRun: Promise<unknown> | undefined;
+  let launched = 0;
   // The environment is read once per poll interval, however many pages are connected.
   let snapshotAt = 0;
   let snapshotJson = "";
@@ -220,6 +242,37 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
       await doctorRun;
       snapshotAt = 0;
       return send(res, 200, JSON.parse(snapshot()));
+    }
+
+    if (method === "POST" && segs.length === 2 && segs[1] === "launch") {
+      if (!isJson(req)) return send(res, 415, { error: "content-type must be application/json" });
+      if (!opts.startRun) return send(res, 501, { error: "this server cannot start runs" });
+      let body: { task?: unknown; cwd?: unknown; kind?: unknown };
+      try {
+        const raw = await readBody(req);
+        body = raw.trim() ? JSON.parse(raw) : {};
+      } catch {
+        return send(res, 400, { error: "invalid JSON body" });
+      }
+      const task = typeof body.task === "string" ? body.task.trim() : "";
+      // a leading "-" would be read by the CLI as a flag
+      if (!task || task.length > MAX_TASK || task.startsWith("-")) return send(res, 400, { error: `task must be 1 to ${MAX_TASK} characters and must not start with "-"` });
+      // only a directory this server watches; no path from the page is ever used as given
+      const cwd = body.cwd === undefined ? cwds[0] : cwds.find((c) => c === body.cwd);
+      if (!cwd) return send(res, 400, { error: "cwd is not a watched directory" });
+      if (body.kind !== undefined && !(typeof body.kind === "string" && /^[a-z][a-z-]{0,30}$/.test(body.kind))) return send(res, 400, { error: "bad kind" });
+      if (launched >= MAX_LAUNCHED) return send(res, 429, { error: `${MAX_LAUNCHED} runs started from the page are still going; wait for one to end` });
+      let handle: LaunchHandle;
+      try {
+        handle = opts.startRun({ cwd, task, ...(typeof body.kind === "string" ? { kind: body.kind } : {}) });
+      } catch (err) {
+        return send(res, 500, { error: `could not start: ${err instanceof Error ? err.message : String(err)}` });
+      }
+      launched++;
+      void handle.exited.catch(() => undefined).finally(() => {
+        launched--;
+      });
+      return send(res, 202, { started: true, cwd, ...(handle.pid ? { pid: handle.pid } : {}) });
     }
 
     if (method === "GET" && segs.length === 2 && segs[1] === "stream") {
@@ -361,6 +414,17 @@ function tailscaleHint(): string | undefined {
   return undefined;
 }
 
+/** `mola run "<task>" [--kind k]` as a child of this process: argv only, no shell, output dropped (the run's own files are what the page reads). */
+export function launchRun(req: LaunchRequest, entry: string | undefined = process.argv[1]): LaunchHandle {
+  if (!entry) throw new Error("cannot find the mola entry point");
+  const child = spawn(process.execPath, [entry, "run", req.task, ...(req.kind ? ["--kind", req.kind] : [])], { cwd: req.cwd, stdio: "ignore", windowsHide: true });
+  const exited = new Promise<void>((resolve) => {
+    child.once("exit", () => resolve());
+    child.once("error", () => resolve());
+  });
+  return { ...(child.pid ? { pid: child.pid } : {}), exited };
+}
+
 export default definePlugin({
   activate(ctx: PluginContext) {
     ctx.commands.register({
@@ -380,7 +444,14 @@ export default definePlugin({
         const configured = ctx.config.get<unknown>("web.cwds", []);
         const cfgCwds = Array.isArray(configured) ? configured.filter((c): c is string => typeof c === "string") : [];
         const cwds = [...cwdFlags(args.flags.cwd, process.argv), ...cfgCwds].map((c) => path.resolve(io.cwd, c));
-        const web = await startWeb({ host, port, ...(token ? { token } : {}), cwds: [io.cwd, ...cwds], runDoctor: () => runDoctorChecks(ctx.doctor.list()) });
+        const web = await startWeb({
+          host,
+          port,
+          ...(token ? { token } : {}),
+          cwds: [io.cwd, ...cwds],
+          runDoctor: () => runDoctorChecks(ctx.doctor.list()),
+          startRun: (req) => launchRun(req),
+        });
         io.out(`mola web listening on ${web.url}`);
         if (!isLoopback(host)) {
           const ts = tailscaleHint();

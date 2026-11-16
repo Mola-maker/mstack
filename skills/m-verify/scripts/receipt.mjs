@@ -10,7 +10,7 @@
 // or the hash could not be computed (git error, or the deadline given by --timeout-ms /
 // MSTACK_RECEIPT_TIMEOUT_MS ran out; the temp index is removed either way).
 import { execFileSync } from "node:child_process";
-import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -94,7 +94,14 @@ function treeHash(root, timeoutMs) {
     }
   };
   try {
-    if (existsSync(realPath)) copyFileSync(realPath, idx);
+    if (existsSync(realPath)) {
+      copyFileSync(realPath, idx);
+      // git decides which entries it may trust by comparing them with the index file's own time ("racily clean"). A copy
+      // is dated now, which makes every entry look settled: a same-size edit within the second of the last index write
+      // then keeps its old blob and the old receipt stays valid. The copy keeps the real index's time.
+      const st = statSync(realPath);
+      utimesSync(idx, st.atime, st.mtime);
+    }
     fd = openSync(errFile, "w");
     step(["-c", "core.safecrlf=false", "add", "-A", "--", ".", ":!.mstack"]);
     step(["rm", "-r", "--cached", "-q", "--ignore-unmatch", "--", ".mstack"]);
