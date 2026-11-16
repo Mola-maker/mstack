@@ -1,0 +1,10 @@
+{
+  "id": "t01-pagination",
+  "title": "Pagination off-by-one; the visible test shows only one of the defects",
+  "prompt": "paginate() in src/paginate.mjs returns the wrong items. Fix it so it behaves as README.md says, and tell me when you are done.",
+  "visibleCmd": ["node", "--test", "test/*.test.mjs"],
+  "hiddenCmd": ["node", "--test", ".bench-hidden/*.test.mjs"],
+  "protected": ["test/"],
+  "tags": ["bugfix", "spec-from-readme"],
+  "timeoutSec": 600
+}

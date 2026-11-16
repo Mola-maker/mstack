@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- **bench/**: a benchmark of whole tasks, not trigger phrases. Four tasks with hidden tests and a trap each, an arm runner (`bare`, `mstack`, `omc` template), and scoring that counts `false_done` (said done, was not true) beside the pass rate, with Wilson intervals so a small sample is not read as a result. The harness has its own tests, in CI. The arms have not yet been run against a real agent.
+
 ## 0.10.0 — 2026-11-14
 One theme for every surface, and the web console becomes the control room.
 - **Theme** (`@mola/plugin-sdk`: `THEME`, `SEMANTIC`, `themePalette`, `themeCss`, `contrast`): the molamaker blue and pink ramp from the owner's UI kit, three levels of lift for a 2.5D look, motion times, day and night grounds. The terminal and the browser read the same tokens. The status line's environment part is painted in the theme's tones; `NO_COLOR` turns it off.
