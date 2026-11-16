@@ -13,7 +13,7 @@ jobs:
       - name: Acceptance checks (FRAMEWORK.md §8)
         run: node scripts/check.mjs
       - name: Hook, guard and /go progress script tests
-        run: node --test hooks/hooks.test.mjs scripts/go-progress.test.mjs skills/m-cua/scripts/cua-doctor.test.mjs scripts/route-contract.test.mjs skills/m-cua/scripts/assert-named-target.test.mjs
+        run: node --test hooks/hooks.test.mjs scripts/go-progress.test.mjs skills/m-cua/scripts/cua-doctor.test.mjs scripts/route-contract.test.mjs skills/m-cua/scripts/assert-named-target.test.mjs skills/m-cua/scripts/cua-visual.test.mjs
       - name: Frontmatter parses as YAML
         run: |
           pip install --quiet pyyaml
