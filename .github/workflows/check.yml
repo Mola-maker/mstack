@@ -12,8 +12,8 @@ jobs:
           node-version: 22
       - name: Acceptance checks (FRAMEWORK.md §8)
         run: node scripts/check.mjs
-      - name: Hook, guard and /go progress script tests
-        run: node --test hooks/hooks.test.mjs scripts/go-progress.test.mjs bench/bench.test.mjs
+      - name: Skill script, hook, guard, /go progress and bench tests
+        run: node --test "skills/*/scripts/*.test.mjs" "hooks/*.test.mjs" "scripts/*.test.mjs" "bench/*.test.mjs"
       - name: Frontmatter parses as YAML
         run: |
           pip install --quiet pyyaml

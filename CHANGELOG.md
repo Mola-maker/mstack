@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- **Enforcement, opt-in.** (1) The verify gate has a block mode: `block` in `.mstack/verify/gate` refuses a stop below the required level, once per turn; a check that cannot run never blocks, and three blocks in a row fall back to the reminder (the count is `blocks` in `status.json`). (2) `hooks.json` wires the branch guard (`guard-git.mjs plugin-hook`), silent unless the project has `.mstack/guard.json` or `MOLA_GUARD=1`, so installing the plugin does not start refusing anyone's own commits on main.
 - **bench/**: a benchmark of whole tasks, not trigger phrases. Four tasks with hidden tests and a trap each, an arm runner (`bare`, `mstack`, `omc` template), and scoring that counts `false_done` (said done, was not true) beside the pass rate, with Wilson intervals so a small sample is not read as a result. The harness has its own tests, in CI. The arms have not yet been run against a real agent.
 
 ## 0.10.0 — 2026-11-14
