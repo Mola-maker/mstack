@@ -56,16 +56,38 @@ export function hexToRgb(hex: string): [number, number, number] {
 
 export type ThemePaint = (text: string) => string;
 
+/** 24: 24-bit colour; 8: the 256-colour palette, which every terminal that has colour at all understands. */
+export type ColorDepth = 24 | 8;
+
+/** 24-bit only where the terminal says it can (COLORTERM, Windows Terminal, a "direct"/"truecolor" TERM); else 256 colours. */
+export function colorDepth(env: NodeJS.ProcessEnv = process.env): ColorDepth {
+  if (/^(truecolor|24bit)$/i.test(env.COLORTERM ?? "") || env.WT_SESSION || /direct|truecolor|24bit/i.test(env.TERM ?? "")) return 24;
+  return 8;
+}
+
+/** The nearest xterm-256 index: the 6x6x6 cube or the grey ramp, whichever is closer. */
+function nearest256(r: number, g: number, b: number): number {
+  const lvl = (v: number): number => (v < 48 ? 0 : v < 115 ? 1 : Math.min(5, Math.floor((v - 35) / 40)));
+  const cube = [r, g, b].map(lvl);
+  const val = (i: number): number => (i === 0 ? 0 : 55 + 40 * i);
+  const cubeDist = (r - val(cube[0]!)) ** 2 + (g - val(cube[1]!)) ** 2 + (b - val(cube[2]!)) ** 2;
+  const grey = Math.max(0, Math.min(23, Math.round(((r + g + b) / 3 - 8) / 10)));
+  const gv = 8 + 10 * grey;
+  const greyDist = (r - gv) ** 2 + (g - gv) ** 2 + (b - gv) ** 2;
+  return greyDist < cubeDist ? 232 + grey : 16 + 36 * cube[0]! + 6 * cube[1]! + cube[2]!;
+}
+
+function fg(hex: string, depth: ColorDepth): ThemePaint {
+  const [r, g, b] = hexToRgb(hex);
+  return depth === 24 ? (s) => `\x1b[38;2;${r};${g};${b}m${s}\x1b[39m` : ((n) => (s: string) => `\x1b[38;5;${n}m${s}\x1b[39m`)(nearest256(r, g, b));
+}
+
 /**
  * ANSI painters in the theme's colours (24-bit). `color: false` makes every painter the identity function:
  * pipes, tests and NO_COLOR get plain text.
  */
-export function themePalette(color: boolean): Record<Tone, ThemePaint> & { color: boolean } {
-  const make = (hex: string): ThemePaint => {
-    if (!color) return (s) => s;
-    const [r, g, b] = hexToRgb(hex);
-    return (s) => `\x1b[38;2;${r};${g};${b}m${s}\x1b[39m`;
-  };
+export function themePalette(color: boolean, depth: ColorDepth = 24): Record<Tone, ThemePaint> & { color: boolean } {
+  const make = (hex: string): ThemePaint => (color ? fg(hex, depth) : (s) => s);
   return { color, ok: make(SEMANTIC.ok), accent: make(SEMANTIC.accent), warn: make(SEMANTIC.warn), fail: make(SEMANTIC.fail), muted: make(SEMANTIC.muted) };
 }
 
@@ -120,9 +142,9 @@ export function contrast(a: string, b: string): number {
  * against it: cyan is work in progress (blue), yellow is "needs a person" (pink), green is done (pale blue),
  * red is failure (deep pink), dim is the quiet tone. `color: false` is plain text, as with `palette(false)`.
  */
-export function themedPalette(color: boolean): Palette {
-  const t = themePalette(color);
-  const done = color ? (text: string) => { const [r, g, b] = hexToRgb(THEME.blue[300]); return `\x1b[38;2;${r};${g};${b}m${text}\x1b[39m`; } : (text: string) => text;
+export function themedPalette(color: boolean, depth: ColorDepth = 24): Palette {
+  const t = themePalette(color, depth);
+  const done = color ? fg(THEME.blue[300], depth) : (text: string) => text;
   return {
     color,
     bold: color ? (text: string) => `\x1b[1m${text}\x1b[22m` : (text: string) => text,

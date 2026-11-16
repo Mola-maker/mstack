@@ -9,7 +9,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { spawn as spawnChild } from "node:child_process";
 import type { PluginContext } from "@mola/plugin-sdk";
-import { definePlugin, detectColor, envParts, ExitCode, MolaError, type EnvPart } from "@mola/plugin-sdk";
+import { definePlugin, colorDepth, detectColor, envParts, ExitCode, MolaError, type EnvPart } from "@mola/plugin-sdk";
 import {
   applyEffects,
   buildLaunch,
@@ -161,7 +161,7 @@ export function runTui(opts: TuiOptions): Promise<TuiResult> {
     const paint = (force = false): void => {
       if (finished) return;
       paintTimer = undefined;
-      const lines = render(state, { cols: state.cols, rows: state.rows, color, env: envNow() });
+      const lines = render(state, { cols: state.cols, rows: state.rows, color, depth: colorDepth(), env: envNow() });
       const frame = lines.join("\n");
       if (!force && frame === lastFrame) return;
       lastFrame = frame;

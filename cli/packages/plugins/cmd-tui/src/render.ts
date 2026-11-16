@@ -10,6 +10,7 @@ import {
   formatProgressLine,
   table,
   themedPalette,
+  type ColorDepth,
   type EnvPart,
   type Palette,
   type StageStatus,
@@ -21,6 +22,8 @@ export interface RenderOptions {
   cols: number;
   rows: number;
   color: boolean;
+  /** colour depth (`colorDepth()` from the SDK); omitted → 24-bit */
+  depth?: ColorDepth;
   /** the environment facts for the title bar (`envParts` from the SDK); omitted → not shown */
   env?: EnvPart[];
 }
@@ -333,7 +336,7 @@ function heights(total: number, needs: number[], caps: number[]): number[] {
 
 export function render(s: State, o: RenderOptions): string[] {
   const { cols, rows } = o;
-  const pal = themedPalette(o.color);
+  const pal = themedPalette(o.color, o.depth);
   const out: string[] = [];
   const bodyH = Math.max(1, rows - 3);
 

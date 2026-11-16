@@ -644,3 +644,11 @@ test("in colour the TUI uses the theme: pink for what failed, 24-bit blue for wo
   const off = themedPalette(false);
   for (const k of ["bold", "dim", "red", "green", "yellow", "cyan"] as const) assert.equal(off[k]("x"), "x");
 });
+
+test("on a terminal without 24-bit colour the frame has no 24-bit sequence, and the title still carries the facts", () => {
+  const cwd = tmp();
+  const lines = render(stateFor(cwd), { cols: 140, rows: 20, color: true, depth: 8, env: [{ text: "verify ✗ L1 of L3", tone: "fail", note: "(last stop)" }] });
+  const frame = lines.join("\n");
+  assert.doesNotMatch(frame, /\x1b\[38;2;/);
+  assert.match(lines[0], /\x1b\[38;5;\d+mverify ✗ L1 of L3/);
+});

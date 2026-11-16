@@ -2,6 +2,7 @@
 
 ## Unreleased
 - **TUI in the theme, on the same state as the web console.** `mola tui` paints with the molamaker tones (blue for work in progress, pink for what waits on you, deep pink for failure) and its title bar shows the same verify verdict and doctor gaps as the status line and `mola web`. All three read them through `envParts` / `verifyStatus` / `doctorStatus` in `@mola/plugin-sdk`, so the TUI and the browser can be open together and agree.
+- **TUI colour depth.** `colorDepth()` in the SDK says 24-bit only where the terminal does (`COLORTERM=truecolor|24bit`, Windows Terminal, a `direct`/`truecolor` TERM); `themePalette(color, depth)` and `themedPalette(color, depth)` fall back to the nearest 256-colour index otherwise. The TUI picks the depth itself; the status line is unchanged.
 
 ## 0.10.0 — 2026-11-14
 One theme for every surface, and the web console becomes the control room.
