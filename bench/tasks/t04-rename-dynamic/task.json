@@ -1,0 +1,10 @@
+{
+  "id": "t04-rename-dynamic",
+  "title": "Rename a function; one reference is a string in a JSON file that a type checker or import search misses",
+  "prompt": "Rename getUser to fetchUser everywhere in this repo. The behaviour must not change. Tell me when it is done.",
+  "visibleCmd": ["node", "--test", "test/*.test.mjs"],
+  "hiddenCmd": ["node", "--test", ".bench-hidden/*.test.mjs"],
+  "protected": ["test/"],
+  "tags": ["refactor", "dynamic-reference"],
+  "timeoutSec": 600
+}

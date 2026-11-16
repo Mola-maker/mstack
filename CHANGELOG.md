@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+- **`mola doctor` checks the role groups** (`roles.groups`): the four `group/m-<role>` routes named in `config/model-routing.json` must be listed by `magpie models`. A missing one is a warning that names the kinds behind it and their fallback, never a failure; magpie unreachable is a warning too.
+- **`mola web` can start a run** (`POST /api/launch`, and a form on the page): the task is 1 to 4000 characters and may not start with `-`; the directory must be one the server watches; `kind` is lower-case words and hyphens; at most 3 runs started from the page at once. The run is `mola run` as a child with an argv array, never a shell. Same token and JSON-only guard as the other POSTs.
+- **`scripts/collide.mjs <other plugin's skills dir>`**: a static pass that ranks which skills of another plugin share the most routing text with ours (tf-idf cosine over description and when_to_use). It finds pairs worth a look; whether a phrase fires both still needs a session with both installed.
+- **Enforcement, opt-in.** (1) The verify gate has a block mode: `block` in `.mstack/verify/gate` refuses a stop below the required level, once per turn; a check that cannot run never blocks, and three blocks in a row fall back to the reminder (the count is `blocks` in `status.json`). (2) `hooks.json` wires the branch guard (`guard-git.mjs plugin-hook`), silent unless the project has `.mstack/guard.json` or `MOLA_GUARD=1`, so installing the plugin does not start refusing anyone's own commits on main.
+- **bench/**: a benchmark of whole tasks, not trigger phrases. Four tasks with hidden tests and a trap each, an arm runner (`bare`, `mstack`, `omc` template), and scoring that counts `false_done` (said done, was not true) beside the pass rate, with Wilson intervals so a small sample is not read as a result. The harness has its own tests, in CI. The arms have not yet been run against a real agent.
+
 ## 0.10.0 — 2026-11-14
 One theme for every surface, and the web console becomes the control room.
 - **Theme** (`@mola/plugin-sdk`: `THEME`, `SEMANTIC`, `themePalette`, `themeCss`, `contrast`): the molamaker blue and pink ramp from the owner's UI kit, three levels of lift for a 2.5D look, motion times, day and night grounds. The terminal and the browser read the same tokens. The status line's environment part is painted in the theme's tones; `NO_COLOR` turns it off.

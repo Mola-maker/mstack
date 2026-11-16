@@ -77,11 +77,11 @@ mstack 的 `hooks/hooks.json` 已注册 `hooks/stop-verify.mjs`，但默认什�
 
 - 事件名 `Stop`：主 agent 答完时触发。用户中断不触发；API 错误走 `StopFailure`。
 - stdin 的 JSON 含通用字段（`session_id`、`transcript_path`、`cwd`、`permission_mode`、`hook_event_name`），加上 `stop_hook_active`、`last_assistant_message`、`background_tasks`、`session_crons`。本钩子只用 `cwd` 和 `stop_hook_active`。`stop_hook_active` 为 `true` 表示 Claude Code 已因某个 stop 钩子在续跑；本钩子此时直接退出，不重复提醒。
-- 会让 Claude 继续的写法有三种：`decision: "block"`（要 `reason`）、退出码 2（stderr 当理由）、`hookSpecificOutput.additionalContext`。本钩子一种都不用。`continue: false` 会整个停下，也不用。
+- 会让 Claude 继续的写法有三种：`decision: "block"`（要 `reason`）、退出码 2（stderr 当理由）、`hookSpecificOutput.additionalContext`。默认模式一种都不用；只有 gate 文件写了 `block` 才用 `decision: "block"`（见下）。`continue: false` 会整个停下，一直不用。
 - 只给用户看一行提示：stdout 打一个 JSON 对象 `{"systemMessage": "..."}`，退出码 0。文档：`systemMessage` 是"显示给用户的警告"，所有事件都接受；Stop 一节没有写它被丢弃（别的事件如 PreCompact、SessionEnd 明写丢弃）。成功钩子的普通 stdout 不会出现在对话里，所以不能只 `console.log` 文本。
 - `systemMessage` 和普通 stdout 上限 10000 字符。
 - Stop 没有匹配器（文档："no matcher support"），`hooks.json` 里的条目不写 `matcher`。
-- 8 次连续续跑的上限只约束会续跑的钩子，本钩子不续跑。
+- 8 次连续续跑的上限只约束会续跑的钩子；默认模式不续跑，拦截模式每轮最多让它续跑一次（见下）。
 
 ### 打开与关闭
 
@@ -92,3 +92,14 @@ mstack 的 `hooks/hooks.json` 已注册 `hooks/stop-verify.mjs`，但默认什�
 - 门开着而检查本身失败或超时：不再静默（静默等于悄悄把提醒关掉）。钩子照样退出 0、不下 `decision`，但用 `systemMessage` 打一行 "verify gate could not be evaluated: <原因>"，例如 `tree hash timed out after 4000 ms` 或 git 的报错。
 - 耗时：哈希要把变更和未跟踪文件都 `git add` 进临时索引，代价随这些文件的数量增长；`receipt.mjs` 自带截止时间（钩子传 `--timeout-ms`，默认 4000，可用环境变量 `MSTACK_STOP_VERIFY_TIMEOUT_MS` 改），到点自己退出并清理 `.git/mstack-tmp/` 里的临时索引。钩子总超时是 10 秒。仓库太大时用户会每轮都看到超时那一行；办法是关门，或缩小未跟踪文件（补 `.gitignore`）。
 - 已知限制：只改文档也要新回执；嫌烦就关掉门，不要降所需层级。
+
+### 拦截模式（可选，更严）
+
+- 打开：gate 文件的第一个词写 `block`（`echo block > .mstack/verify/gate`）。空文件仍是提醒模式。
+- 效果：代码低于所需层级时，这次结束被拒绝一次（`decision: "block"`，理由写明差距和要做的事），让代理先证明，或明说证明不了。
+- 三道保险，防止它变成陷阱：检查本身失败或超时时**不拦**；这轮已经因钩子在续跑时（`stop_hook_active`）**不再拦**；连续拦了 `MSTACK_STOP_VERIFY_MAX_BLOCKS` 次（默认 3）还没有一次通过，就退回成提醒并说明已到上限。连续次数记在 `.mstack/verify/status.json` 的 `blocks` 字段，通过一次就清零。
+
+### 分支守卫（可选）
+
+- `hooks.json` 里有一条 PreToolUse(Bash) 指向 `hooks/guard-git.mjs plugin-hook`，**默认什么也不做**。项目里有 `.mstack/guard.json`（`{}` 即可），或环境里设了 `MOLA_GUARD=1`，它才对受保护分支（默认 `main`、`master`、`release/*`）上的提交、合并、推送和强推给出拒绝。
+- 这样装了插件不会让人在自己的 main 上被拦；要拦的项目自己选。`guard.json` 里的 `protected` 只能加分支，不能去掉默认的。

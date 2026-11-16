@@ -12,7 +12,7 @@
   "capabilities": ["command.model"],
   "permissions": {
     "process.exec": ["magpie", "magpie.exe"],
-    "mola": ["events", "commands", "config.read", "state.kv"]
+    "mola": ["events", "commands", "config.read", "state.kv", "doctor"]
   },
   "hooks": {
     "emit": [],
