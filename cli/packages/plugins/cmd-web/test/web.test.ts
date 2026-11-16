@@ -416,3 +416,25 @@ test("the page has the launch form and posts to /api/launch; its script still pa
   const script = /<script>([\s\S]*)<\/script>/.exec(html)![1]!;
   assert.doesNotThrow(() => new Function(script));
 });
+
+test("without a token, a request addressed to another host name is refused (DNS rebinding)", async () => {
+  const cwd = tmp();
+  run(cwd, "r1");
+  await withWeb({ cwds: [cwd], startRun: () => ({ exited: Promise.resolve() }) }, async (w) => {
+    const ask = (host: string, p: string, method = "GET", body?: string): Promise<number> =>
+      new Promise((resolve, reject) => {
+        const req = http.request({ host: "127.0.0.1", port: w.port, path: p, method, headers: { Host: host, ...(body ? { "Content-Type": "application/json" } : {}) } }, (res) => {
+          res.resume();
+          resolve(res.statusCode ?? 0);
+        });
+        req.on("error", reject);
+        req.end(body);
+      });
+    assert.equal(await ask(`evil.example:${w.port}`, "/api/runs"), 403);
+    assert.equal(await ask(`evil.example:${w.port}`, "/api/launch", "POST", JSON.stringify({ task: "rm everything" })), 403);
+    assert.equal(await ask(`evil.example:${w.port}`, "/"), 403);
+    assert.equal(await ask(`127.0.0.1:${w.port}`, "/api/runs"), 200);
+    assert.equal(await ask(`localhost:${w.port}`, "/api/runs"), 200);
+    assert.equal(await ask(`[::1]:${w.port}`, "/api/runs"), 200);
+  });
+});

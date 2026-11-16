@@ -109,6 +109,13 @@ export type TaggedRun = RunProgress & { cwd: string; approval?: Approval };
 
 export const isLoopback = (host: string): boolean => LOOPBACK.has(host);
 
+/** The host name of a Host header: "127.0.0.1:7333" → "127.0.0.1", "[::1]:7333" → "::1", "LocalHost" → "localhost". */
+export function hostName(header: string | undefined): string {
+  const h = (header ?? "").trim().toLowerCase();
+  if (h.startsWith("[")) return h.slice(1, h.indexOf("]") > 0 ? h.indexOf("]") : undefined);
+  return h.split(":")[0];
+}
+
 /** Constant-time string compare (hash first so lengths do not leak). */
 export function tokenEquals(a: string, b: string): boolean {
   const ha = crypto.createHash("sha256").update(a).digest();
@@ -215,6 +222,11 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
     const url = new URL(req.url ?? "/", "http://localhost");
     const method = req.method ?? "GET";
     const segs = url.pathname.split("/").filter(Boolean);
+
+    // Without a token the only guard is that the server listens on loopback. A page on another site can still
+    // reach it by pointing its own host name at 127.0.0.1 (DNS rebinding); its requests then carry that name in
+    // Host. Serve only requests addressed to a loopback name. With a token, the token is the guard.
+    if (!token && !isLoopback(hostName(req.headers.host))) return send(res, 403, { error: "host not allowed" });
 
     if (url.pathname === "/" && method === "GET") {
       res.writeHead(200, {

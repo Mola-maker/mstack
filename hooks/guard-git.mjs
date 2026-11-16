@@ -609,13 +609,20 @@ function readStdin() {
 /** Has this project opted in to the guard? `.mstack/guard.json` at the repo root, or MOLA_GUARD=1 in the environment. */
 export function guardEnabled(cwd, env = process.env) {
   if (env.MOLA_GUARD === "1") return true;
+  // This runs before every Bash call in every project with the plugin installed, so it reads the disk instead of
+  // starting git: the nearest directory holding `.git` (a directory, or the file a worktree has) is the repo root.
   try {
-    const r = spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd, encoding: "utf8", timeout: 3000, stdio: ["ignore", "pipe", "ignore"] });
-    const top = r.status === 0 ? r.stdout.trim() : "";
-    return !!top && fs.existsSync(path.join(top, ".mstack", "guard.json"));
+    let dir = path.resolve(cwd);
+    for (let i = 0; i < 64; i++) {
+      if (fs.existsSync(path.join(dir, ".git"))) return fs.existsSync(path.join(dir, ".mstack", "guard.json"));
+      const parent = path.dirname(dir);
+      if (parent === dir) return false;
+      dir = parent;
+    }
   } catch {
-    return false;
+    // unreadable directory: not opted in
   }
+  return false;
 }
 
 function claudeHook(raw = readStdin(), { optIn = false } = {}) {

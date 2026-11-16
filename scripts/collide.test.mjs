@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { collisions, loadSkills, routingText, terms } from "./collide.mjs";
 
 const skill = (dir, name, description, when) => {
@@ -38,5 +39,5 @@ test("a skill that says the same thing under another name is the top pair; an un
 });
 
 test("our own repo loads: 17 skills with routing text", () => {
-  assert.equal(loadSkills(new URL("../skills", import.meta.url).pathname).length, 17);
+  assert.equal(loadSkills(fileURLToPath(new URL("../skills", import.meta.url))).length, 17);
 });
