@@ -148,7 +148,7 @@ export function runTui(opts: TuiOptions): Promise<TuiResult> {
     };
 
     // The verdict and the doctor result change at most every few seconds; a frame can be painted ten times a second.
-    let envAt = 0;
+    let envAt = -Infinity;
     let envCache: EnvPart[] = [];
     const envNow = (): EnvPart[] => {
       if (now() - envAt >= 1000) {

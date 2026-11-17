@@ -652,3 +652,17 @@ test("on a terminal without 24-bit colour the frame has no 24-bit sequence, and 
   assert.doesNotMatch(frame, /\x1b\[38;2;/);
   assert.match(lines[0], /\x1b\[38;5;\d+mverify ✗ L1 of L3/);
 });
+
+test("runTui: the environment facts are on the first frame, even with a clock that starts at 0", async () => {
+  const cwd = tmp();
+  run(cwd, "r-env");
+  const f = fakeIO({ cols: 160, rows: 30 });
+  let calls = 0;
+  const env = (): EnvPart[] => (calls++, [{ text: "verify ✗ L1 of L3", tone: "fail", note: "(last stop)" }]);
+  const done = runTui({ cwds: [cwd], io: f.io, color: false, ...FAST, now: () => 0, env });
+  await until(() => f.writes.some((w) => w.includes("r-env")));
+  assert.ok(f.writes.find((w) => w.includes("r-env"))!.includes("verify ✗ L1 of L3"));
+  assert.equal(calls, 1, "asked once; the frozen clock keeps the cached facts");
+  f.keys.emit("d", "q");
+  await done;
+});
