@@ -5,6 +5,7 @@
 // A driver is one of: ready | not-on-path (installed and working, but only by the full path printed) | no-device | missing | broken.
 // ready and not-on-path are both usable.
 import { existsSync, statSync } from "node:fs";
+const isFile = (p) => { try { return statSync(p).isFile(); } catch { return false; } };
 import { spawnSync } from "node:child_process";
 import { join, delimiter, dirname, basename } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -56,7 +57,45 @@ export function probeDesktop(env = process.env) {
     : { driver: "desktop", tool: "agent-desktop", state: "not-on-path", bin: hit.bin, fix: `call it by full path, or add its directory to PATH: ${hit.bin}` };
 }
 
+const MOLA_CUA_BUILD = "git clone https://github.com/Mola-maker/agent-desktop && cd agent-desktop/mola-cua && cargo build --release, then put target/release/mola-cua on PATH";
+
+/**
+ * Android. `mola-cua` is preferred: it gives refs that are re-found before every action, says whether input
+ * reached the device, and reads fields back. It finds adb itself. Without it, plain `adb` still works (the
+ * driver reference has the commands) and the result says what is being missed.
+ */
 export function probeAndroid(env = process.env) {
+  // MOLA_CUA_BIN names the binary outright (a build output that is not installed). It must exist: a stale
+  // path is reported as that, with the variable named, not as "Android unusable".
+  if (env.MOLA_CUA_BIN && !isFile(env.MOLA_CUA_BIN)) {
+    return { driver: "android", tool: "mola-cua", state: "broken", bin: env.MOLA_CUA_BIN, fix: `MOLA_CUA_BIN is not a file (a missing path, or a directory): ${env.MOLA_CUA_BIN}; fix it, or unset it to use mola-cua from PATH or plain adb` };
+  }
+  const cargoBins = [env.CARGO_HOME && join(env.CARGO_HOME, "bin"), env.HOME && join(env.HOME, ".cargo", "bin"), env.USERPROFILE && join(env.USERPROFILE, ".cargo", "bin")];
+  const hit = env.MOLA_CUA_BIN ? { bin: env.MOLA_CUA_BIN, onPath: false } : locate("mola-cua", cargoBins, env);
+  if (!hit) {
+    const adb = probeAdb(env);
+    return { ...adb, note: `plain adb only; for refs and verified input build mola-cua: ${MOLA_CUA_BUILD}` };
+  }
+  const r = run(hit.bin, ["status"], env);
+  let st = null;
+  for (const line of r.out.split("\n")) { try { const j = JSON.parse(line); if (j.command === "status") st = j; } catch { /* not JSON */ } }
+  if (!st) return { driver: "android", tool: "mola-cua", state: "broken", bin: hit.bin, fix: "run `mola-cua status` and read the error", detail: (r.error || r.out).slice(0, 200) };
+  if (!st.ok) return { driver: "android", tool: "mola-cua", state: "broken", bin: hit.bin, fix: String(st.error?.suggestion ?? "run `mola-cua status` and read the error").slice(0, 300), detail: String(st.error?.message ?? "").slice(0, 200) };
+  const devices = Array.isArray(st.data?.devices) ? st.data.devices : [];
+  const online = devices.filter((d) => d?.state === "device").map((d) => String(d.serial));
+  if (!online.length) {
+    const why = devices.length ? `devices present but not usable: ${devices.map((d) => `${d.serial} ${d.state}`).join(", ")}` : "no device or emulator attached";
+    const emu = st.data?.adb?.path ? findIn([join(dirname(dirname(String(st.data.adb.path))), "emulator")], "emulator", env) : null;
+    const emulator = emu ?? "<Android SDK>/emulator/emulator";
+    return { driver: "android", tool: "mola-cua", state: "no-device", bin: hit.bin, fix: `start an emulator ("${emulator}" -list-avds, then "${emulator}" -avd <name>; in PowerShell put & before the quoted path) or plug in a device with USB debugging authorised`, detail: why };
+  }
+  return hit.onPath
+    ? { driver: "android", tool: "mola-cua", state: "ready", bin: hit.bin, devices: online, version: st.data?.version }
+    : { driver: "android", tool: "mola-cua", state: "not-on-path", bin: hit.bin, devices: online, fix: `call it by full path, or add its directory to PATH: ${hit.bin}` };
+}
+
+/** Android through plain adb: the fallback when mola-cua is not installed. */
+export function probeAdb(env = process.env) {
   const sdks = [env.ANDROID_HOME, env.ANDROID_SDK_ROOT, env.LOCALAPPDATA && join(env.LOCALAPPDATA, "Android", "Sdk"), env.HOME && join(env.HOME, "Android", "Sdk"), env.HOME && join(env.HOME, "Library", "Android", "sdk")];
   const hit = locate("adb", sdks.filter(Boolean).map((s) => join(s, "platform-tools")), env);
   if (!hit) return { driver: "android", tool: "adb", state: "missing", fix: "install Android SDK Platform-Tools (https://developer.android.com/tools/releases/platform-tools) and put platform-tools on PATH" };
@@ -100,7 +139,7 @@ export function main(argv, env = process.env, cwd = process.cwd()) {
   const ok = need.length ? usable.length === results.length : usable.length > 0;
   const text = json
     ? JSON.stringify({ ok, drivers: results })
-    : results.map((r) => `${r.driver}: ${r.state} (${r.tool}${r.bin ? " at " + r.bin : ""})${r.detail ? " - " + r.detail : ""}${r.fix ? "\n  fix: " + r.fix : ""}`).join("\n");
+    : results.map((r) => `${r.driver}: ${r.state} (${r.tool}${r.bin ? " at " + r.bin : ""})${r.detail ? " - " + r.detail : ""}${r.fix ? "\n  fix: " + r.fix : ""}${r.note ? "\n  note: " + r.note : ""}`).join("\n");
   return { code: ok ? 0 : 1, text };
 }
 

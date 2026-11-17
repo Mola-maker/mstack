@@ -162,3 +162,41 @@ export async function runDoctorChecks(checks: readonly DoctorCheck[], env: NodeJ
   }
   return out;
 }
+
+/** One fact of the environment line: what to say, in which tone, and the quiet note after it. */
+export interface EnvPart {
+  text: string;
+  tone: "ok" | "warn" | "fail";
+  note: string;
+}
+
+/**
+ * The environment facts as parts every surface can lay out its own way (the status line joins them, the TUI
+ * puts them in its title bar). Empty when nothing is recorded. Never throws.
+ */
+export function envParts(cwd: string, now = Date.now(), env: NodeJS.ProcessEnv = process.env): EnvPart[] {
+  const parts: EnvPart[] = [];
+  try {
+    const st = verifyStatus(cwd);
+    if (st) {
+      const text =
+        st.ok === true
+          ? "verify ✓"
+          : st.ok === false
+            ? `verify ✗ ${st.found && st.required ? `${st.found} of ${st.required}` : "below the required level"}`
+            : "verify ? check could not run";
+      const when = ago(st.at, now);
+      parts.push({ text, tone: st.ok === true ? "ok" : st.ok === false ? "fail" : "warn", note: `(last stop${when ? ` ${when}` : ""})` });
+    }
+    const doc = doctorStatus(env);
+    if (doc) {
+      const ids = doc.gaps.map((g) => g.id);
+      const when = ago(doc.at, now);
+      const note = `(mola doctor${when ? ` ${when}` : ""})`;
+      parts.push(ids.length === 0 ? { text: "env ✓", tone: "ok", note } : { text: `gaps ${ids.length}: ${ids.slice(0, 3).join(", ")}${ids.length > 3 ? ", …" : ""}`, tone: "warn", note });
+    }
+  } catch {
+    return [];
+  }
+  return parts;
+}

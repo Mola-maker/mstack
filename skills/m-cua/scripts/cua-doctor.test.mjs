@@ -162,3 +162,96 @@ test("run as a command it prints one block per driver with the fix line", (t) =>
   assert.match(r.stdout, /android: missing/);
   assert.match(r.stdout, /web: missing/);
 });
+
+// ---------------------------------------------------------------- mola-cua
+
+const MOLA_STATUS = (devices) => `{"version":"2.6","ok":true,"command":"status","data":{"platform":"android","version":"0.1.0","adb":{"path":"/sdk/platform-tools/adb","version":"x"},"devices":${JSON.stringify(devices)},"ready":${devices.some((d) => d.state === "device")}}}`;
+
+test("mola-cua on PATH is the android driver: ready with its devices, and adb is not asked", (t) => {
+  const d = scratch(t);
+  fake(d, "mola-cua", [MOLA_STATUS([{ serial: "emulator-5554", state: "device" }, { serial: "R58M", state: "unauthorized" }])]);
+  fake(d, "adb", ["this adb must not be consulted"], 7);
+  const r = main(["--need", "android", "--json"], env([d]), d);
+  assert.equal(r.code, 0);
+  const a = drivers(r).android;
+  assert.equal(a.tool, "mola-cua");
+  assert.equal(a.state, "ready");
+  assert.deepEqual(a.devices, ["emulator-5554"]);
+});
+
+test("mola-cua with no usable device is no-device and says which devices it saw", (t) => {
+  const d = scratch(t);
+  fake(d, "mola-cua", [MOLA_STATUS([{ serial: "R58M", state: "unauthorized" }])]);
+  const a = drivers(main(["--need", "android", "--json"], env([d]), d)).android;
+  assert.equal(a.state, "no-device");
+  assert.match(a.detail, /R58M unauthorized/);
+  fake(d, "mola-cua", [MOLA_STATUS([])]);
+  assert.match(drivers(main(["--need", "android", "--json"], env([d]), d)).android.detail, /no device or emulator/);
+});
+
+test("mola-cua that reports an error is broken and passes its own suggestion on", (t) => {
+  const d = scratch(t);
+  fake(d, "mola-cua", ['{"version":"2.6","ok":false,"command":"status","error":{"code":"PLATFORM_NOT_SUPPORTED","message":"adb was not found","suggestion":"Install Android SDK Platform-Tools"}}'], 1);
+  const r = main(["--need", "android", "--json"], env([d]), d);
+  assert.equal(r.code, 1);
+  const a = drivers(r).android;
+  assert.equal(a.state, "broken");
+  assert.equal(a.fix, "Install Android SDK Platform-Tools");
+  fake(d, "mola-cua", ["garbage"], 3);
+  assert.equal(drivers(main(["--need", "android", "--json"], env([d]), d)).android.state, "broken");
+});
+
+test("without mola-cua, plain adb still counts and the result says how to get mola-cua", (t) => {
+  const d = scratch(t);
+  fake(d, "adb", ["List of devices attached", "emulator-5554\tdevice"]);
+  const r = main(["--need", "android", "--json"], env([d]), d);
+  assert.equal(r.code, 0);
+  const a = drivers(r).android;
+  assert.equal(a.tool, "adb");
+  assert.match(a.note, /mola-cua/);
+  const text = main(["--need", "android"], env([d]), d).text;
+  assert.match(text, /\n {2}note: plain adb only/);
+});
+
+test("MOLA_CUA_BIN off PATH is not-on-path (usable by full path), never ready-by-name", (t) => {
+  const d = scratch(t);
+  const off = join(d, "build");
+  fake(off, "mola-cua", [MOLA_STATUS([{ serial: "emulator-5554", state: "device" }])]);
+  const bin = join(off, WIN ? "mola-cua.cmd" : "mola-cua");
+  const r = main(["--need", "android", "--json"], env([d], { MOLA_CUA_BIN: bin }), d);
+  assert.equal(r.code, 0);
+  const a = drivers(r).android;
+  assert.equal(a.state, "not-on-path");
+  assert.ok(a.fix.includes(bin), a.fix);
+  assert.deepEqual(a.devices, ["emulator-5554"]);
+});
+
+test("MOLA_CUA_BIN pointing at a missing file is broken and names the variable", (t) => {
+  const d = scratch(t);
+  fake(d, "adb", ["List of devices attached", "emulator-5554\tdevice"]);
+  const r = main(["--need", "android", "--json"], env([d], { MOLA_CUA_BIN: join(d, "gone", "mola-cua") }), d);
+  assert.equal(r.code, 1);
+  const a = drivers(r).android;
+  assert.equal(a.state, "broken");
+  assert.match(a.fix, /MOLA_CUA_BIN is not a file/);
+  // a directory (the build folder instead of the binary) is not run; the variable is named
+  fake(join(d, "release"), "mola-cua", [MOLA_STATUS([])]);
+  const dirResult = drivers(main(["--need", "android", "--json"], env([d], { MOLA_CUA_BIN: join(d, "release") }), d)).android;
+  assert.equal(dirResult.state, "broken");
+  assert.match(dirResult.fix, /MOLA_CUA_BIN is not a file/);
+});
+
+test("mola-cua in cargo's bin directory but not on PATH is found and reported not-on-path", (t) => {
+  const d = scratch(t);
+  fake(join(d, "cargo", "bin"), "mola-cua", [MOLA_STATUS([{ serial: "emulator-5554", state: "device" }])]);
+  const a = drivers(main(["--need", "android", "--json"], env([d], { CARGO_HOME: join(d, "cargo") }), d)).android;
+  assert.equal(a.tool, "mola-cua");
+  assert.equal(a.state, "not-on-path");
+});
+
+test("the no-device fix line gives the emulator path for both steps", (t) => {
+  const d = scratch(t);
+  fake(d, "mola-cua", [MOLA_STATUS([])]);
+  const a = drivers(main(["--need", "android", "--json"], env([d]), d)).android;
+  assert.match(a.fix, /emulator" -list-avds, then ".*emulator" -avd <name>/);
+});

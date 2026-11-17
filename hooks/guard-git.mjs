@@ -606,6 +606,18 @@ function readStdin() {
   try { return fs.readFileSync(0, "utf8"); } catch { return ""; }
 }
 
+/** A `.git` git itself would accept: a directory holding HEAD, or the file a worktree or submodule has (`gitdir: …`).
+ *  An empty or stray `.git` is skipped, as `git rev-parse` skips it, so it cannot switch the guard off. */
+export function isGitDir(p) {
+  try {
+    const st = fs.statSync(p);
+    if (st.isDirectory()) return fs.existsSync(path.join(p, "HEAD"));
+    return st.isFile() && fs.readFileSync(p, "utf8").startsWith("gitdir:");
+  } catch {
+    return false;
+  }
+}
+
 /** Has this project opted in to the guard? `.mstack/guard.json` at the repo root, or MOLA_GUARD=1 in the environment. */
 export function guardEnabled(cwd, env = process.env) {
   if (env.MOLA_GUARD === "1") return true;
@@ -614,7 +626,7 @@ export function guardEnabled(cwd, env = process.env) {
   try {
     let dir = path.resolve(cwd);
     for (let i = 0; i < 64; i++) {
-      if (fs.existsSync(path.join(dir, ".git"))) return fs.existsSync(path.join(dir, ".mstack", "guard.json"));
+      if (isGitDir(path.join(dir, ".git"))) return fs.existsSync(path.join(dir, ".mstack", "guard.json"));
       const parent = path.dirname(dir);
       if (parent === dir) return false;
       dir = parent;

@@ -614,3 +614,55 @@ test("runTui: g launches through the injected spawn and selects the new run", as
 
 // keep the type import used even if the suite is trimmed
 export type { Event };
+
+// ------------------------------------------------------------------- theme and environment
+
+import { themedPalette, type EnvPart } from "@mola/plugin-sdk";
+
+test("the title bar shows the environment facts it is given, in plain text when colour is off", () => {
+  const cwd = tmp();
+  const env: EnvPart[] = [
+    { text: "verify ✗ L1 of L3", tone: "fail", note: "(last stop 7m ago)" },
+    { text: "gaps 2: tool.git, tool.adb", tone: "warn", note: "(mola doctor 45m ago)" },
+  ];
+  const plain = render(stateFor(cwd), { cols: 140, rows: 20, color: false, env });
+  assert.match(plain[0], /mola tui .*verify ✗ L1 of L3 \(last stop 7m ago\)  gaps 2: tool\.git, tool\.adb \(mola doctor 45m ago\)/);
+  assert.equal(displayWidth(plain[0]), 140);
+  // no env given: the title is what it was
+  assert.doesNotMatch(render(stateFor(cwd), { cols: 140, rows: 20, color: false })[0], /verify|gaps/);
+  // a narrow terminal cuts the bar, never wraps it
+  assert.equal(displayWidth(render(stateFor(cwd), { cols: 50, rows: 20, color: false, env })[0]), 50);
+});
+
+test("in colour the TUI uses the theme: pink for what failed, 24-bit blue for work in progress", () => {
+  const cwd = tmp();
+  const lines = render(stateFor(cwd), { cols: 140, rows: 20, color: true, env: [{ text: "verify ✗ L1 of L3", tone: "fail", note: "(last stop)" }] });
+  assert.ok(lines[0].includes("\x1b[38;2;221;102;141mverify ✗ L1 of L3"), JSON.stringify(lines[0]));
+  const pal = themedPalette(true);
+  assert.equal(pal.cyan("x"), "\x1b[38;2;93;147;220mx\x1b[39m");
+  assert.equal(pal.yellow("x"), "\x1b[38;2;242;165;196mx\x1b[39m");
+  const off = themedPalette(false);
+  for (const k of ["bold", "dim", "red", "green", "yellow", "cyan"] as const) assert.equal(off[k]("x"), "x");
+});
+
+test("on a terminal without 24-bit colour the frame has no 24-bit sequence, and the title still carries the facts", () => {
+  const cwd = tmp();
+  const lines = render(stateFor(cwd), { cols: 140, rows: 20, color: true, depth: 8, env: [{ text: "verify ✗ L1 of L3", tone: "fail", note: "(last stop)" }] });
+  const frame = lines.join("\n");
+  assert.doesNotMatch(frame, /\x1b\[38;2;/);
+  assert.match(lines[0], /\x1b\[38;5;\d+mverify ✗ L1 of L3/);
+});
+
+test("runTui: the environment facts are on the first frame, even with a clock that starts at 0", async () => {
+  const cwd = tmp();
+  run(cwd, "r-env");
+  const f = fakeIO({ cols: 160, rows: 30 });
+  let calls = 0;
+  const env = (): EnvPart[] => (calls++, [{ text: "verify ✗ L1 of L3", tone: "fail", note: "(last stop)" }]);
+  const done = runTui({ cwds: [cwd], io: f.io, color: false, ...FAST, now: () => 0, env });
+  await until(() => f.writes.some((w) => w.includes("r-env")));
+  assert.ok(f.writes.find((w) => w.includes("r-env"))!.includes("verify ✗ L1 of L3"));
+  assert.equal(calls, 1, "asked once; the frozen clock keeps the cached facts");
+  f.keys.emit("d", "q");
+  await done;
+});

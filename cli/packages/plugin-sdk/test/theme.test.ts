@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { contrast, hexToRgb, SEMANTIC, THEME, themeCss, themePalette } from "@mola/plugin-sdk";
+import { colorDepth, contrast, hexToRgb, themedPalette, SEMANTIC, THEME, themeCss, themePalette } from "@mola/plugin-sdk";
 
 test("tokens are the UI kit's ramp, as #rrggbb", () => {
   assert.equal(THEME.blue[500], "#5d93dc");
@@ -32,6 +32,21 @@ test("the terminal palette paints in 24-bit colour, and is the identity when col
   assert.equal(on.ok("x"), "\x1b[38;2;93;147;220mx\x1b[39m");
   const off = themePalette(false);
   for (const tone of ["ok", "accent", "warn", "fail", "muted"] as const) assert.equal(off[tone]("x"), "x");
+});
+
+test("24-bit only where the terminal says so; otherwise the nearest 256-colour index", () => {
+  assert.equal(colorDepth({ COLORTERM: "truecolor" }), 24);
+  assert.equal(colorDepth({ COLORTERM: "24bit" }), 24);
+  assert.equal(colorDepth({ WT_SESSION: "x" }), 24);
+  assert.equal(colorDepth({ TERM: "xterm-direct" }), 24);
+  assert.equal(colorDepth({ TERM: "xterm-256color" }), 8);
+  assert.equal(colorDepth({}), 8);
+  const p = themePalette(true, 8);
+  for (const tone of ["ok", "accent", "warn", "fail", "muted"] as const) assert.match(p[tone]("x"), /^\x1b\[38;5;\d{1,3}mx\x1b\[39m$/, tone);
+  assert.equal(themePalette(true, 8).ok("x"), "\x1b[38;5;68mx\x1b[39m", "#5d93dc is cube (1,2,4) = 68");
+  assert.equal(themePalette(false, 8).ok("x"), "x");
+  assert.match(themedPalette(true, 8).green("x"), /^\x1b\[38;5;/);
+  assert.doesNotMatch(themedPalette(true, 8).red("x"), /38;2;/);
 });
 
 test("the CSS carries every token for day and night, and turns motion off on request", () => {

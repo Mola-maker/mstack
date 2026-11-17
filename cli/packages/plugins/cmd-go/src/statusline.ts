@@ -8,7 +8,7 @@ import * as childProcess from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { activeProgress, ago, doctorStatus, formatProgressLine, themePalette, verifyStatus, writeJsonAtomic } from "@mola/plugin-sdk";
+import { activeProgress, envParts, formatProgressLine, themePalette, writeJsonAtomic } from "@mola/plugin-sdk";
 
 /** The directory Claude Code says it is in: workspace.current_dir, else cwd, else `fallback`. */
 export function cwdFromStdin(stdin: string, fallback: string): string {
@@ -43,32 +43,10 @@ export function ourLine(cwd: string, now = Date.now()): string {
  * meaning, so the plain form says the same.
  */
 export function envLine(cwd: string, now = Date.now(), env: NodeJS.ProcessEnv = process.env, color = false): string {
-  const parts: string[] = [];
   const p = themePalette(color);
-  try {
-    const st = verifyStatus(cwd);
-    if (st) {
-      const body =
-        st.ok === true
-          ? "verify ✓"
-          : st.ok === false
-            ? `verify ✗ ${st.found && st.required ? `${st.found} of ${st.required}` : "below the required level"}`
-            : "verify ? check could not run";
-      const when = ago(st.at, now);
-      const tone = st.ok === true ? p.ok : st.ok === false ? p.fail : p.warn;
-      parts.push(`${tone(body)} ${p.muted(`(last stop${when ? ` ${when}` : ""})`)}`);
-    }
-    const doc = doctorStatus(env);
-    if (doc) {
-      const ids = doc.gaps.map((g) => g.id);
-      const when = ago(doc.at, now);
-      const tail = p.muted(`(mola doctor${when ? ` ${when}` : ""})`);
-      parts.push(ids.length === 0 ? `${p.ok("env ✓")} ${tail}` : `${p.warn(`gaps ${ids.length}: ${ids.slice(0, 3).join(", ")}${ids.length > 3 ? ", …" : ""}`)} ${tail}`);
-    }
-  } catch {
-    return "";
-  }
-  return parts.join(p.muted(" · "));
+  return envParts(cwd, now, env)
+    .map((part) => `${p[part.tone](part.text)} ${p.muted(part.note)}`)
+    .join(p.muted(" · "));
 }
 
 /** Run the wrapped statusLine command with the same stdin; its trimmed stdout, or "" on any failure. */
