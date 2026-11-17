@@ -87,7 +87,7 @@ One Branch per worker instead of a worktree; git stays the record and does the i
 
 ```js
 import { client, close } from "@layerfs/node";
-// git archive $base | tar -x -C snap   → tracked files only, no .git
+// GIT_INDEX_FILE=tmp git read-tree $base && GIT_INDEX_FILE=tmp git checkout-index -a --prefix=snap/   (not git archive)
 const lfs = client({ home });                                    // close() before exit
 await lfs.project.init(`mstack/${repo}-${base7}`, snap);         // new base → new project
 await lfs.branch.fork(p, "agent-<task>", "main");                // names: no '/'
@@ -95,10 +95,11 @@ await lfs.file.edit(p, "agent-<task>", "/src/x.ts", { old, new: next, message: "
 const d = await lfs.branch.diff(p, "main", "agent-<task>", { paths_only: true });  // d.items[].path; page while d.has_more
 await lfs.branch.merge(p, "agent-int-1", "agent-a", "agent-b");   // only after the path checks below
 await lfs.project.export(p, freshTmp, { branch: "agent-int-1" });  // destination must be absent or empty
-// git worktree add -b agent/<slug> wt $base; rm its tracked files; copy freshTmp in; git add -A; commit; PR
+// git worktree add -b agent/<slug> wt $base; apply ONLY the diff's paths from freshTmp
+//   (gone → rm, folder → mkdir, symlink → same link text, file → copy + mode); delete freshTmp; git add -A; commit; PR
 ```
 
-- **Before merging**: refuse a Branch whose diff touches `/.git`; stop when two Branches share a path. `merge` conflicts only on the same lines and folds different lines of one file silently.
+- **Before merging**: refuse a Branch with any path that has a `.git` component (`/pkg/.git/HEAD` too); stop when two Branches share a path. `merge` conflicts only on the same lines and folds different lines of one file silently.
 - **Never `branch.publish`**: it overwrites main's newer files (`overwrote_count`) instead of merging.
 - **Never export into the repo folder** (`NotEmpty`): export to a fresh folder, then carry it into a git worktree.
 - **Tests on a Branch**: `project.export(p, tmp, { branch })` and run there. A `native` Sandbox needs root on Linux; Docker or VM Sandboxes are not proved here.

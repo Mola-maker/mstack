@@ -38,18 +38,24 @@ Probe: `research/layerfs2/probe.mjs` (run with `research/layerfs2/run.sh` inside
 - **`branch.merge` conflicts only on the same lines.** Two Branches that change different lines of one file merge silently. The rule "no two subtasks edit the same file" is checked on the paths, before merging (step 5).
 - **`branch.publish` overwrites; it does not merge.** A Branch based on an older main replaces main's newer files and reports `overwrote_count`, without a Conflict. This flow never publishes. Git does the integration with the rest of the world.
 - **`project.export` needs an absent or empty destination** (`NotEmpty` otherwise). Results go to a fresh folder, never into the repo.
-- **`project.init` imports whatever the folder holds, `.git` included.** Init from a `git archive` of the base commit: tracked files only, no `.git`. A worker can still create `/.git/...` in its Branch, so any diff touching `/.git` is refused.
+- **`project.init` imports whatever the folder holds, `.git` included.** Init from a `git checkout-index` of the base commit: tracked files as a checkout has them, with no `.git` and no gitlinks. Not `git archive`: it honours `export-ignore` and `export-subst`, and the accept step would then commit their deletion or expansion. A worker can still create `.git` folders in its Branch, so any diff path with a `.git` component (`/(^|\/)\.git(\/|$)/`, nested ones included) refuses the Branch.
 - `branch.diff` answers `{items: [{path, kind, type, …}], has_more, next_page_pos}`: read every page.
 - Every call is one attempt, with no retries. After a lost reply, read the state again (`branch.get`); never repeat the write blindly.
 - One store is held open per process: call `close()` before exit.
 
 ## The flow (m-dispatch step 4, Isolate, and step 6, Merge)
 
-Proved end to end on a real git repo: `research/layerfs2/accept.mjs` (`run.sh accept` in WSL). The output includes `refused: writes .git ["agent-evil"]`, `same file a & b ["/src.txt"]`, `merge a+c Merged`, `export has .git false`, `git diff --stat 2 files changed`, `main untouched true`.
+Proved end to end on a real git repo that has `export-ignore` and `export-subst` attributes, a relative symlink, an executable and a submodule gitlink: `research/layerfs2/accept.mjs` (`run.sh accept` in WSL). The probe shows:
+
+- a Branch where nobody wrote stages `(nothing)`;
+- the refused Branches are `["agent-evil","agent-nested"]`, one with a top-level `.git` and one with `/pkg/.git`;
+- for the shared-path check, `same file a & b ["/src.txt"]`;
+- the integration stages `M other.txt | M src.txt | D ver.txt`;
+- the link stays relative (`run.sh`), the executable bit stays, the gitlink stays `160000`, and `main` is untouched.
 
 1. **Once per dispatch**:
    - Record the base commit: `base=$(git rev-parse HEAD)`.
-   - `git archive $base | tar -x -C <snap>` gives the tracked files without `.git`.
+   - `GIT_INDEX_FILE=<tmp> git read-tree $base && GIT_INDEX_FILE=<tmp> git checkout-index -a --prefix=<snap>/` gives the tracked files as a checkout has them: no `.git`, no attribute rewriting, symlinks as symlinks, gitlinks left out.
    - `project.init(<store>/<repo>-<base short>, <snap>)`. A new base means a new project; there is no sync of main.
 2. **Per worker**:
    - `branch.fork(p, "agent-<task>", "main")`. Names cannot contain `/`.
@@ -63,13 +69,19 @@ Proved end to end on a real git repo: `research/layerfs2/accept.mjs` (`run.sh ac
 4. **Review**: the reviewer reads the diff items and `file.read` at the Branch. That is the same evidence as a git diff, without a checkout.
 5. **Checks before integrating**, for each Branch:
    - read every page of `branch.diff(p, "main", b, {paths_only: true})`;
-   - **refuse** the Branch if any path is `/.git` or under it;
+   - **refuse** the Branch if any path has a `.git` component (`/.git`, `/pkg/.git/HEAD`);
    - **stop** when two Branches share a path. Report the tasks and the file, then split or sequence them. Merge would fold different lines of one file without a word.
 6. **Integrate**: fold the Branches that passed with `branch.merge(p, "agent-int-<n>", a, b)`. A `Conflict` (same lines) creates nothing: report it. Verify (step 3) and review (step 4) the result.
-7. **Accept, through git only**:
+7. **Accept, through git only, carrying exactly the changed paths**:
    - `project.export(p, <fresh tmp>, {branch: "agent-int-<n>"})`;
    - `git worktree add -b agent/<slug> <wt> $base`;
-   - remove the worktree's tracked files (`git ls-files -z`), copy the export in (deletions are carried this way), `git add -A`, commit.
+   - for every path in the integration Branch's diff (all pages), and nothing else:
+     - gone from the export → remove it in the worktree;
+     - a folder → `mkdir -p`;
+     - a symlink → recreate it with the same link text (`readlink`), never followed or rewritten;
+     - a file → copy it and its mode.
+   - Delete the export, then `git add -A` and commit.
+   - Files the workers did not touch are never rewritten, so attributes, symlinks, gitlinks and untracked files stay as they were. A Branch with no changes commits nothing.
    - Then the usual review, PR and merge.
    - LayerFS `main` is never published; it stays the base snapshot. Git is the system of record; LayerFS is the workspace.
 8. **Hand-off between machines** (envs-collab B5): the unit to move is the store (`store push` / `store pull`), not a folder copy. Not part of this change.
