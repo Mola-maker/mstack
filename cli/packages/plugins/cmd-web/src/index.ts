@@ -17,6 +17,7 @@ import {
   decideApproval,
   definePlugin,
   doctorStatus,
+  herdrAgents,
   ExitCode,
   listProgress,
   loadRoutingFile,
@@ -28,11 +29,12 @@ import {
   verifyStatus,
   type Approval,
   type DoctorStatus,
+  type HerdrState,
   type RunProgress,
   type VerifyStatus,
 } from "@mola/plugin-sdk";
-import { PAGE_HTML } from "./page.js";
-export { pageHtml } from "./page.js";
+import { EMBED_HTML, PAGE_HTML } from "./page.js";
+export { embedHtml, pageHtml } from "./page.js";
 
 const USAGE = "usage: mola web [--port 7333] [--host 127.0.0.1] [--token <t>] [--cwd <dir> ...]";
 const ID_RE = /^[\w.-]+$/;
@@ -55,6 +57,7 @@ export interface LaunchHandle {
 }
 
 const MAX_TASK = 4000;
+const HERDR_EVERY_MS = 5000;
 /** runs the page may have in flight at once: a phone left open must not be able to fill the machine */
 const MAX_LAUNCHED = 3;
 
@@ -71,6 +74,8 @@ export interface WebOptions {
   runDoctor?: () => Promise<unknown>;
   /** starts `mola run` for the page (`POST /api/launch`); absent → 501 */
   startRun?: (req: LaunchRequest) => LaunchHandle;
+  /** herdr's agent list; default `herdrAgents()`, asked in the background at most every 5 s (tests pass a stand-in) */
+  herdr?: () => HerdrState | Promise<HerdrState>;
   /** where the doctor result and the routing file are looked up (tests) */
   env?: NodeJS.ProcessEnv;
 }
@@ -80,10 +85,12 @@ export interface EnvSnapshot {
   projects: Array<{ cwd: string; verify: VerifyStatus | null }>;
   doctor: DoctorStatus | null;
   roles: Array<{ role: string; group: string; leads?: string; unverified?: boolean; desc?: string; kinds: string[] }>;
+  /** herdr's agents when herdr is installed; absent: not installed (the console then shows nothing about it) */
+  herdr: HerdrState;
 }
 
 /** What the console shows beside the runs. Reads small files only. */
-export function envSnapshot(cwds: string[], env: NodeJS.ProcessEnv = process.env): EnvSnapshot {
+export function envSnapshot(cwds: string[], env: NodeJS.ProcessEnv = process.env, herdr: HerdrState = { state: "absent" }): EnvSnapshot {
   const table = loadRoutingFile({ env }).table;
   const roles = Object.entries(table?.roles ?? {}).map(([role, r]) => ({
     role,
@@ -93,7 +100,7 @@ export function envSnapshot(cwds: string[], env: NodeJS.ProcessEnv = process.env
     ...(r.desc ? { desc: r.desc } : {}),
     kinds: Object.entries(table?.tasks ?? {}).filter(([, t]) => t.role === role).map(([k]) => k),
   }));
-  return { projects: cwds.map((cwd) => ({ cwd, verify: verifyStatus(cwd) })), doctor: doctorStatus(env), roles };
+  return { projects: cwds.map((cwd) => ({ cwd, verify: verifyStatus(cwd) })), doctor: doctorStatus(env), roles, herdr };
 }
 
 export interface WebServer {
@@ -194,9 +201,31 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
   // The environment is read once per poll interval, however many pages are connected.
   let snapshotAt = 0;
   let snapshotJson = "";
+  // herdr is asked through its CLI (a process), so less often than the files are read
+  let herdrAt = 0;
+  let herdrState: HerdrState = { state: "absent" };
+  let herdrBusy = false;
+  // Never waits: returns what is known and, when it is old, asks herdr again in the background (one ask at a time).
+  // The next snapshot picks the answer up.
+  const herdrNow = (): HerdrState => {
+    if (!herdrBusy && Date.now() - herdrAt >= Math.max(pollMs, HERDR_EVERY_MS)) {
+      herdrBusy = true;
+      herdrAt = Date.now();
+      void Promise.resolve((opts.herdr ?? (() => herdrAgents(opts.env ?? process.env)))())
+        .then((h) => {
+          if (JSON.stringify(h) !== JSON.stringify(herdrState)) snapshotAt = 0;
+          herdrState = h;
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          herdrBusy = false;
+        });
+    }
+    return herdrState;
+  };
   const snapshot = (): string => {
     if (Date.now() - snapshotAt >= pollMs) {
-      snapshotJson = JSON.stringify(envSnapshot(cwds, opts.env));
+      snapshotJson = JSON.stringify(envSnapshot(cwds, opts.env, herdrNow()));
       snapshotAt = Date.now();
     }
     return snapshotJson;
@@ -228,14 +257,14 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
     // Host. Serve only requests addressed to a loopback name. With a token, the token is the guard.
     if (!token && !isLoopback(hostName(req.headers.host))) return send(res, 403, { error: "host not allowed" });
 
-    if (url.pathname === "/" && method === "GET") {
+    if ((url.pathname === "/" || url.pathname === "/embed") && method === "GET") {
       res.writeHead(200, {
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
         "Referrer-Policy": "no-referrer",
       });
-      res.end(PAGE_HTML);
+      res.end(url.pathname === "/embed" ? EMBED_HTML : PAGE_HTML);
       return;
     }
     if (segs[0] !== "api") return send(res, 404, { error: "not found" });

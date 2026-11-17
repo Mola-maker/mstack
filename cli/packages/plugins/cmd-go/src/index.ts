@@ -12,6 +12,7 @@ import type { ParsedArgs, PluginContext } from "@mola/plugin-sdk";
 import { definePlugin, ExitCode, MolaError } from "@mola/plugin-sdk";
 import { planDryRun, renderDryRun } from "./dryrun.js";
 import { describeEnd, loadRunContext, resumeRun, startRun, type GoEnv } from "./engine.js";
+import { releaseHerdr, reportRunToHerdr } from "@mola/plugin-sdk";
 import { cmdDecide, cmdList, cmdStatus, cmdStop } from "./manage.js";
 import { sendNotify } from "./notify.js";
 import { applyInstall, fastBase, planInstall, readStdin, renderStatusline, settingsPath } from "./statusline.js";
@@ -46,6 +47,11 @@ export default definePlugin({
       detect: true,
       notify: async (text, title) => {
         await sendNotify(ctx, { text, title });
+      },
+      // a run inside a herdr pane shows its state in herdr's sidebar, and gives the pane back when it ends
+      onProgress: (p) => {
+        if (p.status === "running" || p.status === "blocked") reportRunToHerdr(p);
+        else releaseHerdr();
       },
       ...overrides,
     });

@@ -32,6 +32,28 @@ codex exec "<task>"
 
 - `Agent`/`Task` tool with `subagent_type` (executor / explore / verifier), `run_in_background: true`. `explore` is the read-only name in the installed agent set; `explorer` was not verified.
 
+## herdr (when `herdr` is installed and its server runs)
+
+herdr (github.com/herdrdev/herdr) keeps each worker in a terminal pane that survives a closed client, and marks every pane `working`, `blocked` or `idle`. Use it when the person wants to watch or step into the workers, or when workers are interactive agents (Claude Code, Codex, OpenCode, …) rather than headless runs. `herdr status server --json` says whether its server runs; without it, use the other executors. The workspace, pane and agent commands print JSON (`status` needs `--json`); take IDs from the answer, never guess them.
+
+```sh
+# one workspace for the dispatch, one pane per worker, each in its own worktree
+ws=$(herdr workspace create --cwd <worktree-1> --label <run-id> --no-focus)
+pane=$(printf '%s' "$ws" | jq -r '.result.root_pane.pane_id')
+herdr agent start w-<task> --kind claude --pane "$pane"        # or codex, opencode, gemini, …
+herdr agent prompt w-<task> "<the brief>" --wait --timeout 1800000
+herdr agent read w-<task> --source recent-unwrapped --lines 200   # the RETURN block
+# a second worker: a pane in its own worktree, then the same three steps
+split=$(herdr pane split "$pane" --direction right --cwd <worktree-2> --no-focus); pane2=$(printf '%s' "$split" | jq -r '.result.pane.pane_id')
+```
+
+- **State, not polling.** `herdr agent wait <name> --timeout <ms>` returns when the worker is idle, done or blocked (`--until <state>` for one of them); `blocked` means it is asking a question. `agent prompt` to a blocked agent is refused with `agent_blocked` before anything is sent: read it, answer with `herdr agent prompt`, or report it. This replaces step 5's two status reads for the agent part; the worktree reads still apply.
+- **A timeout proves nothing.** `agent prompt --wait` timing out, or `agent_prompt_stalled`, does not mean the prompt was not delivered. Read the agent before prompting again, or the worker gets the brief twice.
+- **Names are per server.** `[a-z][a-z0-9_-]{0,31}`, unique; `w-<task>` keeps them apart from the person's own panes.
+- **Long answers**: a full-screen agent may not show its whole reply in `agent read`. Ask for the RETURN block as a file in the worktree (`.mstack/dispatch/<task>.md`) and read the file.
+- **What the person sees**: the herdr sidebar lists every worker and its state. A `mola` run started inside a herdr pane reports its own state there too (working, blocked with the reason, idle when over), and `mola web` lists herdr's agents beside mstack's runs.
+- Model routing still applies to what each agent runs: pass the role's model to the agent after `--` (for Claude Code, `-- --model <alias>`); DSH workers stay on magpie routes.
+
 ## Orca (not the default)
 
 Use this session's own subagent unless the job needs another vendor's agent, or a worktree a human will keep working in. Only then, and only when `orca` is on PATH, use the commands below. Desktop + CLI: each worker (Claude Code / Codex / OpenCode / Pi) gets its own worktree, and a phone can watch progress.

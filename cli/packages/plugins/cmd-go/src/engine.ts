@@ -66,6 +66,14 @@ export interface GoEnv {
   /** skip adapter detection (dry-run only) */
   detect: boolean;
   notify(text: string, title: string): Promise<void>;
+  /** called after every progress write; `mola go` tells herdr here (tests leave it out) */
+  onProgress?: (p: RunProgress) => void;
+}
+
+/** Write the run's progress, then let the caller act on it (herdr). */
+function save(env: GoEnv, p: RunProgress): void {
+  writeProgress(p);
+  env.onProgress?.(p);
 }
 
 /** `go-<yyyymmdd-hhmm>-<4 hex>` */
@@ -225,7 +233,7 @@ export async function waitForApproval(env: GoEnv, p: RunProgress, stage: StageNa
   p.status = "blocked";
   p.blocked = { reason: `approval needed: ${oneLine(action, 100)}`, approvalId: id };
   setNext(p);
-  writeProgress(p);
+  save(env, p);
   emit(env, "blocked", p, stage, "blocked");
   await env.notify(`${p.blocked.reason}\nmola go approve ${p.id}   |   mola go deny ${p.id}`, `mola go · ${stage} needs approval`);
 
@@ -237,7 +245,7 @@ export async function waitForApproval(env: GoEnv, p: RunProgress, stage: StageNa
       p.status = "running";
       delete p.blocked;
       setNext(p);
-      writeProgress(p);
+      save(env, p);
       return "approved";
     }
     if (a?.status === "denied") {
@@ -284,7 +292,7 @@ async function runStage(env: GoEnv, rc: RunContext, p: RunProgress, stage: Stage
   delete p.blocked;
   p.workers.push(worker);
   setNext(p);
-  writeProgress(p);
+  save(env, p);
   emit(env, "stage", p, stage, "running");
 
   const watcher = stopWatcher(env, p.id);
@@ -322,7 +330,7 @@ async function runStage(env: GoEnv, rc: RunContext, p: RunProgress, stage: Stage
     st.agent = usedAgent;
     worker.model = route;
     worker.agent = usedAgent;
-    writeProgress(p);
+    save(env, p);
 
     const onEvent = (e: HookEvent): void => {
       try {
@@ -338,7 +346,7 @@ async function runStage(env: GoEnv, rc: RunContext, p: RunProgress, stage: Stage
       lastWrite = now;
       worker.lastLine = text;
       worker.updatedAt = iso();
-      writeProgress(p);
+      save(env, p);
     };
 
     const runOnce = async (agentId: string, modelRoute: string): Promise<RunResult> => {
@@ -407,7 +415,7 @@ async function runStage(env: GoEnv, rc: RunContext, p: RunProgress, stage: Stage
   worker.costUsd = Math.round(cost * 10000) / 10000;
   worker.updatedAt = iso();
   setNext(p);
-  writeProgress(p);
+  save(env, p);
   emit(env, "stage", p, stage, st.status);
   return outcome;
 }
@@ -446,7 +454,7 @@ function finish(env: GoEnv, p: RunProgress, status: RunProgress["status"], reaso
   if (status === "blocked") p.blocked = { reason: reason ?? "blocked", ...(p.blocked?.approvalId ? { approvalId: p.blocked.approvalId } : {}) };
   else delete p.blocked;
   setNext(p);
-  writeProgress(p);
+  save(env, p);
   if (status === "blocked") emit(env, "blocked", p, p.stage, "blocked");
   emit(env, "done", p, p.stage, status);
   return status === "done" ? ExitCode.Ok : ExitCode.Error;
@@ -551,7 +559,7 @@ export async function startRun(env: GoEnv, opts: GoOptions): Promise<StartResult
   fs.mkdirSync(runDir(cwd, id), { recursive: true });
   fs.writeFileSync(path.join(runDir(cwd, id), "intent.md"), `# Intent\n\n${opts.intent}\n`, "utf8");
   setNext(p);
-  writeProgress(p);
+  save(env, p);
   emit(env, "started", p, p.stage, "running");
   env.io.note(`mola go: ${id} · ${activeOrder(p).join(" → ")}`);
   const code = await drive(env, rc, p, { auto: opts.auto, ...(opts.agent ? { agent: opts.agent } : {}) });
@@ -574,7 +582,7 @@ export async function resumeRun(env: GoEnv, id: string, opts: { auto: boolean; a
   p.status = "running";
   delete p.blocked;
   setNext(p);
-  writeProgress(p);
+  save(env, p);
   emit(env, "started", p, p.stage, "running");
   env.io.note(`mola go: resuming ${id} · ${activeOrder(p).filter((n) => stageOf(p, n).status !== "done").join(" → ")}`);
   const code = await drive(env, rc, p, opts);

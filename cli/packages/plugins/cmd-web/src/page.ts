@@ -89,6 +89,12 @@ mola-ladder .rung[data-need="1"]{color:var(--m-ink)}
 .gaps li[data-ok="0"]{border-left-color:var(--m-pink-500)}
 .gaps .id{font-family:var(--m-font-mono);font-size:12.5px;font-weight:700}
 .gaps .msg{font-size:13px;color:var(--m-ink-2);overflow-wrap:anywhere;margin:0}
+.hagents{margin:10px 0 0;padding:0;list-style:none;display:grid;gap:8px}
+.hagents li{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;align-items:baseline;font-size:13.5px}
+.hagents .path{grid-column:2}
+.hagents .dot{width:9px;height:9px;border-radius:50%;background:var(--m-line);align-self:center}
+.hagents .dot[data-s="working"]{background:var(--m-blue-500);box-shadow:0 0 0 4px var(--m-blue-100)}
+.hagents .dot[data-s="blocked"]{background:var(--m-pink-300);box-shadow:0 0 0 4px var(--m-pink-100)}
 .roles{width:100%;border-collapse:collapse;font-size:13.5px}
 .roles th{text-align:left;font-weight:700;padding:6px 10px 6px 0;vertical-align:top;white-space:nowrap}
 .roles td{padding:6px 0;vertical-align:top;color:var(--m-ink-2)}
@@ -212,6 +218,7 @@ function onRun(p){
 }
 
 var ROLE={think:"思考",build:"实现",operate:"操作",bulk:"批量"};
+var HERDR={working:"在干活",blocked:"等你",idle:"空闲",done:"做完了",unknown:"状态不明"};
 function onEnv(e){
   var box=document.getElementById("code");
   var withVerdict=e.projects.filter(function(p){return p.verify});
@@ -234,6 +241,18 @@ function onEnv(e){
   else{
     when.textContent=(e.doctor.gaps.length?"上次体检发现 "+e.doctor.gaps.length+" 处":"上次体检一切正常")+(e.doctor.at?"，"+ago(e.doctor.at):"")+"。";
     gaps.innerHTML=e.doctor.gaps.map(function(g){return'<li data-ok="'+(g.ok?1:0)+'"><span class="id">'+esc(g.id)+'</span><p class="msg">'+esc(g.message)+"</p></li>"}).join("");
+  }
+  var hs=document.getElementById("herdr"),hl=document.getElementById("herdrlist"),hn=document.getElementById("herdrnote");
+  var h=e.herdr||{state:"absent"};
+  hs.hidden=h.state==="absent";
+  if(h.state==="running"){
+    hn.textContent=h.agents.length?"herdr 里有 "+h.agents.length+" 个 agent。":"herdr 在运行，还没有 agent。";
+    hl.innerHTML=h.agents.map(function(a){
+      return'<li><span class="dot" data-s="'+esc(a.status==="done"?"done":a.status)+'"></span><span><b>'+esc(a.name||a.agent||a.pane)+"</b> "+esc(HERDR[a.status]||a.status)+(a.agent&&a.name?"，"+esc(a.agent):"")+"</span>"+(a.cwd?'<span class="path small">'+esc(a.cwd)+"</span>":"")+"</li>";
+    }).join("");
+  }else{
+    hl.innerHTML="";
+    hn.textContent=h.state==="stopped"?"herdr 已安装，但没有在运行。在终端运行 herdr 后这里会列出它的 agent。":"读不到 herdr："+(h.message||"未知原因");
   }
   document.getElementById("roles").innerHTML=e.roles.map(function(r){
     return"<tr><th>"+esc(ROLE[r.role]||r.role)+(r.unverified?'<span class="tag">未实测</span>':"")+"</th><td>"+esc(r.kinds.join("、"))+'<span class="grp">'+esc(r.group)+"</span></td></tr>";
@@ -291,6 +310,7 @@ export function pageHtml(): string {
     '<section class="launch"><h2>开一个任务</h2><textarea id="task" maxlength="4000" placeholder="要做的事，一句话说清楚结果" aria-label="任务"></textarea><div class="acts"><button class="btn" id="launch" type="button">开始</button></div><p class="small" id="launchmsg" role="status"></p></section>',
     '<section><h2>这份代码</h2><div id="code"><p class="small">读取中…</p></div></section>',
     '<section><h2>环境缺口</h2><p class="small" id="gapwhen"></p><ul class="gaps" id="gaps"></ul><div class="acts"><button class="btn" id="recheck" type="button">重新体检</button></div></section>',
+    '<section id="herdr" hidden><h2>herdr 里的 agent</h2><p class="small" id="herdrnote"></p><ul class="hagents" id="herdrlist"></ul></section>',
     '<section><h2>角色分工</h2><table class="roles"><tbody id="roles"></tbody></table></section>',
     "</aside></main>",
     `<script>${SCRIPT}</script></body></html>`,
@@ -298,3 +318,59 @@ export function pageHtml(): string {
 }
 
 export const PAGE_HTML = pageHtml();
+
+/**
+ * The one-line status `@mola/dsh-mstack` embeds beside a DSH session title (and any other host can): the verify
+ * verdict, the environment gaps, and how many runs work or wait for you, read every 5 s; the line is a link that
+ * opens the full console in a new tab. Text only, so it fits a 26 px frame.
+ */
+const EMBED_SCRIPT = `
+(function(){
+"use strict";
+var tk=new URLSearchParams(location.search).get("token")||"";
+function q(u){return tk?u+(u.indexOf("?")<0?"?":"&")+"token="+encodeURIComponent(tk):u}
+var runs={},env=null,line=document.getElementById("line");
+function part(cls,text){var s=document.createElement("span");s.className=cls;s.textContent=text;return s}
+function draw(){
+  var out=[];
+  var p=env&&env.projects.filter(function(x){return x.verify})[0];
+  if(p){var v=p.verify;out.push(v.ok===true?part("ok","verify ✓"):v.ok===false?part("fail","verify ✗ "+(v.found&&v.required?v.found+" / "+v.required:"未达标")):part("warn","verify ?"))}
+  if(env&&env.doctor){var n=env.doctor.gaps.length;out.push(n?part("warn","缺口 "+n):part("ok","环境 ✓"))}
+  var need=0,work=0;Object.keys(runs).forEach(function(k){var r=runs[k];if(r.status==="blocked")need++;else if(r.status==="running")work++});
+  if(need)out.push(part("fail","等你 "+need));
+  if(work)out.push(part("ok","在跑 "+work));
+  if(env&&env.herdr&&env.herdr.state==="running"){var hb=env.herdr.agents.filter(function(a){return a.status==="blocked"}).length;if(hb)out.push(part("fail","herdr 等你 "+hb))}
+  while(line.firstChild)line.removeChild(line.firstChild);
+  if(!out.length){line.appendChild(part("muted","mstack：还没有记录"));return}
+  out.forEach(function(s,i){if(i)line.appendChild(part("muted"," · "));line.appendChild(s)});
+}
+// Polls instead of holding a stream: a host may frame this line in many tabs, and a browser keeps only six
+// connections per server open; the full console keeps the stream.
+function poll(){
+  Promise.all([fetch(q("/api/env"),{cache:"no-store"}),fetch(q("/api/runs"),{cache:"no-store"})])
+    .then(function(rs){if(!rs[0].ok||!rs[1].ok)throw new Error(rs[0].status+"/"+rs[1].status);return Promise.all([rs[0].json(),rs[1].json()])})
+    .then(function(v){env=v[0];runs={};v[1].forEach(function(r){runs[r.cwd+"|"+r.id]=r});draw()})
+    .catch(function(){while(line.firstChild)line.removeChild(line.firstChild);line.appendChild(part("muted","mstack：连不上控制台"))});
+}
+poll();
+setInterval(poll,5000);
+line.href=q("/");
+})();
+`;
+
+export function embedHtml(): string {
+  return [
+    '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>mstack</title><link rel="icon" href="data:,">',
+    `<style>${themeCss()}`,
+    "html,body{margin:0;background:transparent;overflow:hidden}",
+    'body{font:12.5px/26px "Zen Maru Gothic","Yu Gothic UI","Microsoft YaHei UI",var(--m-font-sans);white-space:nowrap}',
+    "a{color:var(--m-ink);text-decoration:none}a:hover .muted,a:focus-visible .muted{text-decoration:underline}",
+    ".ok{color:var(--m-ok-text)}.warn{color:var(--m-ink-2)}.fail{color:#a8325a;font-weight:700}.muted{color:var(--m-muted)}",
+    ':root[data-theme="night"] .fail{color:var(--m-pink-300)}',
+    "</style></head><body>",
+    '<a id="line" target="_blank" rel="noopener"><span class="muted">mstack…</span></a>',
+    `<script>${EMBED_SCRIPT}</script></body></html>`,
+  ].join("\n");
+}
+
+export const EMBED_HTML = embedHtml();
