@@ -98,12 +98,23 @@ async function accept(branch, label) {
   applyChanges(items, exp, wt);
   rmSync(exp, { recursive: true, force: true }); // the export is gone before git looks: nothing may point into it
   git(wt, "add", "-A");
+  // every changed file must reach git: a path under a gitlink (or ignored by .gitignore) is dropped by `add -A`
+  const staged = new Set(git(wt, "diff", "--cached", "--name-only", "-z").split("\0").filter(Boolean));
+  const lost = items.filter((i) => i.type !== "dir" && i.type !== "directory" && !staged.has(i.path.replace(/^\/+/, ""))).map((i) => i.path);
+  if (lost.length > 0) throw Object.assign(new Error(`not carried into git: ${lost.join(", ")}`), { code: "NotCarried" });
   return { wt, staged: git(wt, "diff", "--cached", "--name-status") };
 }
 try {
   await lfs.store.create("mstack");
   await lfs.project.init(P, snap);
-  for (const b of ["agent-noop", "agent-a", "agent-b", "agent-c", "agent-evil", "agent-nested"]) await lfs.branch.fork(P, b, "main");
+  for (const b of ["agent-noop", "agent-a", "agent-b", "agent-c", "agent-evil", "agent-nested", "agent-e", "agent-f", "agent-g"]) await lfs.branch.fork(P, b, "main");
+  // e and f add different files in one new folder; g writes under the submodule path
+  for (const [b, f] of [["agent-e", "e"], ["agent-f", "f"]]) {
+    await lfs.file.mkdir(P, b, "/newdir", { message: b });
+    await lfs.file.write(P, b, `/newdir/${f}.txt`, `${f}\n`, { message: b });
+  }
+  await lfs.file.mkdir(P, "agent-g", "/dep", { message: "g" });
+  await lfs.file.write(P, "agent-g", "/dep/x.txt", "under a gitlink\n", { message: "g" });
   await lfs.file.edit(P, "agent-a", "/src.txt", { old: "1\n", new: "ONE\n", message: "a" });
   await lfs.file.edit(P, "agent-b", "/src.txt", { old: "8\n", new: "EIGHT\n", message: "b" });
   await lfs.file.write(P, "agent-c", "/other.txt", "other, changed by c\n", { message: "c" });
@@ -117,12 +128,25 @@ try {
 
   // 2. checks before any merge
   const changed = {};
-  for (const b of ["agent-noop", "agent-a", "agent-b", "agent-c", "agent-evil", "agent-nested"]) changed[b] = (await changes(lfs, P, b)).map((i) => i.path);
+  const files = {};
+  for (const b of ["agent-noop", "agent-a", "agent-b", "agent-c", "agent-evil", "agent-nested", "agent-e", "agent-f", "agent-g"]) {
+    const items = await changes(lfs, P, b);
+    changed[b] = items.map((i) => i.path);
+    files[b] = items.filter((i) => i.type !== "dir" && i.type !== "directory").map((i) => i.path); // folders are not "the same file"
+  }
   out("changed paths", changed);
+  out("item types seen", [...new Set(Object.keys(files).flatMap((b) => changed[b].filter((p) => !files[b].includes(p))))]);
   out("refused: a .git component", Object.entries(changed).filter(([, ps]) => ps.some((x) => GIT_COMPONENT.test(x))).map(([b]) => b));
-  const overlap = (x, y) => changed[x].filter((p) => changed[y].includes(p));
+  const overlap = (x, y) => files[x].filter((p) => files[y].includes(p));
   out("same file a & b", overlap("agent-a", "agent-b"));
   out("same file a & c", overlap("agent-a", "agent-c"));
+  out("same file e & f (one new dir)", overlap("agent-e", "agent-f"));
+  try {
+    await accept("agent-g", "g");
+    out("g under a gitlink", "accepted (WRONG)");
+  } catch (e) {
+    out("g under a gitlink", `${e.code}: ${e.message}`);
+  }
 
   // 3. a Branch where nobody wrote commits nothing
   out("no-op staged", (await accept("agent-noop", "noop")).staged || "(nothing)");

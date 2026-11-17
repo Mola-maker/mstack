@@ -51,6 +51,8 @@ Proved end to end on a real git repo that has `export-ignore` and `export-subst`
 - the refused Branches are `["agent-evil","agent-nested"]`, one with a top-level `.git` and one with `/pkg/.git`;
 - for the shared-path check, `same file a & b ["/src.txt"]`;
 - the integration stages `M other.txt | M src.txt | D ver.txt`;
+- two workers adding files under one new folder do not collide (`same file e & f (one new dir) []`);
+- a write under the gitlink path fails the accept (`NotCarried: not carried into git: /dep/x.txt`);
 - the link stays relative (`run.sh`), the executable bit stays, the gitlink stays `160000`, and `main` is untouched.
 
 1. **Once per dispatch**:
@@ -70,7 +72,7 @@ Proved end to end on a real git repo that has `export-ignore` and `export-subst`
 5. **Checks before integrating**, for each Branch:
    - read every page of `branch.diff(p, "main", b, {paths_only: true})`;
    - **refuse** the Branch if any path has a `.git` component (`/.git`, `/pkg/.git/HEAD`);
-   - **stop** when two Branches share a path. Report the tasks and the file, then split or sequence them. Merge would fold different lines of one file without a word.
+   - **stop** when two Branches share a file path (items whose `type` is not a folder: two workers adding files under one new folder do not collide). Report the tasks and the file, then split or sequence them. Merge would fold different lines of one file without a word.
 6. **Integrate**: fold the Branches that passed with `branch.merge(p, "agent-int-<n>", a, b)`. A `Conflict` (same lines) creates nothing: report it. Verify (step 3) and review (step 4) the result.
 7. **Accept, through git only, carrying exactly the changed paths**:
    - `project.export(p, <fresh tmp>, {branch: "agent-int-<n>"})`;
@@ -80,7 +82,9 @@ Proved end to end on a real git repo that has `export-ignore` and `export-subst`
      - a folder → `mkdir -p`;
      - a symlink → recreate it with the same link text (`readlink`), never followed or rewritten;
      - a file → copy it and its mode.
-   - Delete the export, then `git add -A` and commit.
+   - Delete the export, then `git add -A`.
+   - **Check that every changed file reached git**: each non-folder diff path must appear in `git diff --cached --name-only` (deletions included). A path under a submodule gitlink, or one `.gitignore` hides, is dropped by `git add -A` without an error; fail the accept and report it instead of committing a PR that silently lost a worker's edit.
+   - Commit.
    - Files the workers did not touch are never rewritten, so attributes, symlinks, gitlinks and untracked files stay as they were. A Branch with no changes commits nothing.
    - Then the usual review, PR and merge.
    - LayerFS `main` is never published; it stays the base snapshot. Git is the system of record; LayerFS is the workspace.
