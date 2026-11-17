@@ -117,7 +117,7 @@ test("skills: the mstack root is found through MOLA_MSTACK_DIR", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mola-skills-"));
   fs.mkdirSync(path.join(dir, "skills", "m-goal"), { recursive: true });
   fs.mkdirSync(path.join(dir, ".claude-plugin"), { recursive: true });
-  fs.writeFileSync(path.join(dir, ".claude-plugin", "plugin.json"), "{}");
+  fs.writeFileSync(path.join(dir, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "mstack" }));
   try {
     assert.equal(isMstackRoot(dir), true);
     const root = findMstackRoot({ cwd: "/nowhere", env: { MOLA_MSTACK_DIR: dir } as NodeJS.ProcessEnv });
@@ -132,7 +132,7 @@ test("skills: the mstack root is found by walking up from the working directory"
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mola-skills-"));
   fs.mkdirSync(path.join(dir, "skills"), { recursive: true });
   fs.mkdirSync(path.join(dir, ".claude-plugin"), { recursive: true });
-  fs.writeFileSync(path.join(dir, ".claude-plugin", "plugin.json"), "{}");
+  fs.writeFileSync(path.join(dir, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "mstack" }));
   const nested = path.join(dir, "cli", "packages");
   fs.mkdirSync(nested, { recursive: true });
   try {
@@ -158,4 +158,14 @@ test("skills: with no env, config or usable cwd, the root is found from where th
   assert.ok(root, "root is null: the walk from the package directory found nothing");
   assert.equal(isMstackRoot(root as string), true);
   assert.ok(fs.existsSync(path.join(root as string, "cli", "packages")));
+});
+
+test("isMstackRoot: another Claude plugin repo (plugin.json named otherwise) is not mstack", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "other-plugin-"));
+  fs.mkdirSync(path.join(dir, ".claude-plugin"));
+  fs.mkdirSync(path.join(dir, "skills", "foo"), { recursive: true });
+  fs.writeFileSync(path.join(dir, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "other" }));
+  assert.equal(isMstackRoot(dir), false);
+  fs.writeFileSync(path.join(dir, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "mstack" }));
+  assert.equal(isMstackRoot(dir), true);
 });

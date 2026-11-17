@@ -82,7 +82,7 @@ test("routingFilePath: MOLA_ROUTING_FILE wins; otherwise the checkout's config f
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "mola-root-"));
   try {
     fs.mkdirSync(path.join(root, ".claude-plugin"), { recursive: true });
-    fs.writeFileSync(path.join(root, ".claude-plugin", "plugin.json"), "{}");
+    fs.writeFileSync(path.join(root, ".claude-plugin", "plugin.json"), JSON.stringify({ name: "mstack" }));
     const deep = path.join(root, "a", "b", "c");
     fs.mkdirSync(deep, { recursive: true });
     assert.equal(routingFilePath({ env: {} as never, startDir: deep }), path.join(root, "config", "model-routing.json"));

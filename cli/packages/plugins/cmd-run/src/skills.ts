@@ -102,10 +102,14 @@ export function skillSpec(command: string): SkillSpec | undefined {
 
 /** True when the directory looks like the mstack repo root. */
 export function isMstackRoot(dir: string): boolean {
-  return (
-    fs.existsSync(path.join(dir, ".claude-plugin", "plugin.json")) &&
-    fs.existsSync(path.join(dir, "skills"))
-  );
+  // any Claude plugin repo has .claude-plugin/plugin.json and skills/: only mstack's own counts
+  if (!fs.existsSync(path.join(dir, "skills"))) return false;
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(dir, ".claude-plugin", "plugin.json"), "utf8")) as { name?: unknown };
+    return manifest.name === "mstack";
+  } catch {
+    return false;
+  }
 }
 
 /**
