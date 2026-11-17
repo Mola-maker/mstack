@@ -33,7 +33,7 @@ import {
   classifyRoute,
   stripMagpiePrefix,
 } from "./whitelist.js";
-import { loadRankTable } from "./routing.js";
+import { loadRankTable, roleGroupGaps } from "./routing.js";
 
 const runners = new WeakMap<PluginContext, MagpieRunner>();
 
@@ -80,6 +80,26 @@ export function routeSource(configPath: string | undefined): string {
 
 export default definePlugin({
   activate(ctx: PluginContext) {
+    // The role groups of config/model-routing.json must exist in magpie. A missing one is a warning, not a failure:
+    // routing falls back to the next pick, but only after the first request fails with an unknown model.
+    ctx.doctor.registerCheck({
+      id: "roles.groups",
+      description: "the magpie routing groups named by the roles in config/model-routing.json",
+      async run() {
+        const table = loadRankTable();
+        if (typeof table === "string") return { ok: true, message: `no routing file to compare (${table})` };
+        if (!table.roles) return { ok: true, message: "the routing file has no roles (v1): nothing to check" };
+        const res = await magpie(ctx).run(["models"]);
+        if (res.unavailable || res.code !== 0) {
+          return { ok: true, warn: true, message: `could not list magpie routes (${res.unavailable ?? res.stderr ?? `exit ${res.code}`}), so the role groups were not checked` };
+        }
+        const gaps = roleGroupGaps(table, parseMagpieRoutes(res.stdout));
+        if (gaps.length === 0) return { ok: true, message: `all ${Object.keys(table.roles).length} role groups exist in magpie` };
+        const lines = gaps.map((g) => `${g.group} (${g.kinds.join(", ") || "no kind"}${g.fallback ? ` → ${g.fallback}` : ""})`);
+        return { ok: true, warn: true, message: `${gaps.length} role group${gaps.length > 1 ? "s" : ""} missing in magpie: ${lines.join("; ")} — create with \`magpie group m-<role>\`; until then each request pays one failed attempt` };
+      },
+    });
+
     ctx.commands.register({
       path: ["model", "show"],
       description: "the model route magpie pins for an agent (thin passthrough)",
@@ -255,7 +275,7 @@ export default definePlugin({
 });
 
 export { classifyRoute, globToRegExp, stripMagpiePrefix } from "./whitelist.js";
-export { loadRankTable, routingFilePath } from "./routing.js";
+export { loadRankTable, roleGroupGaps, routingFilePath, type RoleGroupGap } from "./routing.js";
 export { DEFAULT_ALLOWED_ROUTES, DEFAULT_BANNED_ROUTES } from "./whitelist.js";
 export {
   createMagpieRunner,

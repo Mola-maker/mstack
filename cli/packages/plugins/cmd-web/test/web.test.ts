@@ -349,3 +349,92 @@ test("a re-check answers with what it just wrote, even when an older snapshot is
     assert.equal(JSON.parse((await get(base, "/api/env")).body).doctor.gaps.length, 0);
   });
 });
+
+test("POST /api/launch: validates the task, the directory and the kind, caps runs in flight, 501 without a launcher", async () => {
+  const cwd = tmp();
+  const started: Array<{ cwd: string; task: string; kind?: string }> = [];
+  const gates: Array<() => void> = [];
+  const startRun = (r: { cwd: string; task: string; kind?: string }) => {
+    started.push(r);
+    return { pid: 4242, exited: new Promise<void>((res) => gates.push(res)) };
+  };
+  const json = (o: unknown): string => JSON.stringify(o);
+  await withWeb({ cwds: [cwd] }, async (_w, base) => {
+    assert.equal((await post(base, "/api/launch", json({ task: "x" }))).status, 501);
+  });
+  await withWeb({ cwds: [cwd], startRun }, async (_w, base) => {
+    assert.equal((await post(base, "/api/launch", json({ task: "x" }), "text/plain")).status, 415, "a form post from another site");
+    assert.equal((await post(base, "/api/launch", "{nope")).status, 400);
+    for (const bad of [{}, { task: "   " }, { task: 5 }, { task: "--help" }, { task: "x".repeat(4001) }]) {
+      assert.equal((await post(base, "/api/launch", json(bad))).status, 400, json(bad).slice(0, 40));
+    }
+    assert.equal((await post(base, "/api/launch", json({ task: "x", cwd: "/etc" }))).status, 400, "only a watched directory");
+    assert.equal((await post(base, "/api/launch", json({ task: "x", cwd: "../.." }))).status, 400);
+    assert.equal((await post(base, "/api/launch", json({ task: "x", kind: "Plan; rm -rf /" }))).status, 400);
+    assert.equal(started.length, 0, "nothing started for any bad request");
+
+    const ok = await post(base, "/api/launch", json({ task: "  fix the login bug  ", kind: "debug" }));
+    assert.equal(ok.status, 202);
+    assert.deepEqual(JSON.parse(ok.body), { started: true, cwd: path.resolve(cwd), pid: 4242 });
+    assert.deepEqual(started[0], { cwd: path.resolve(cwd), task: "fix the login bug", kind: "debug" });
+    assert.equal((await post(base, "/api/launch", json({ task: "two", cwd: path.resolve(cwd) }))).status, 202);
+    assert.equal((await post(base, "/api/launch", json({ task: "three" }))).status, 202);
+    const full = await post(base, "/api/launch", json({ task: "four" }));
+    assert.equal(full.status, 429, "three in flight is the limit");
+    assert.equal(started.length, 3);
+    gates[0]!();
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal((await post(base, "/api/launch", json({ task: "five" }))).status, 202, "a slot frees when a run ends");
+  });
+  await withWeb({ cwds: [cwd], startRun: () => { throw new Error("no entry point"); } }, async (_w, base) => {
+    const r = await post(base, "/api/launch", json({ task: "x" }));
+    assert.equal(r.status, 500);
+    assert.match(r.body, /no entry point/);
+  });
+  await withWeb({ cwds: [cwd], startRun, token: "t0ken-t0ken" }, async (_w, base) => {
+    assert.equal((await post(base, "/api/launch", json({ task: "x" }))).status, 401);
+  });
+});
+
+test("launchRun passes the task as one argv entry, never through a shell", async () => {
+  const { launchRun } = await import("@mola/plugin-cmd-web");
+  const dir = tmp();
+  const probe = path.join(dir, "probe.mjs");
+  fs.writeFileSync(probe, 'import fs from "node:fs";fs.writeFileSync("argv.json", JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd() }));');
+  const h = launchRun({ cwd: dir, task: 'a; touch pwned && echo "$(id)"', kind: "debug" }, probe);
+  await h.exited;
+  const got = JSON.parse(fs.readFileSync(path.join(dir, "argv.json"), "utf8")) as { argv: string[]; cwd: string };
+  assert.deepEqual(got.argv, ["run", 'a; touch pwned && echo "$(id)"', "--kind", "debug"]);
+  assert.equal(fs.existsSync(path.join(dir, "pwned")), false);
+  assert.throws(() => launchRun({ cwd: dir, task: "x" }, ""), /entry point/);
+});
+
+test("the page has the launch form and posts to /api/launch; its script still parses", () => {
+  const html = pageHtml();
+  assert.match(html, /id="launch"/);
+  assert.match(html, /\/api\/launch/);
+  const script = /<script>([\s\S]*)<\/script>/.exec(html)![1]!;
+  assert.doesNotThrow(() => new Function(script));
+});
+
+test("without a token, a request addressed to another host name is refused (DNS rebinding)", async () => {
+  const cwd = tmp();
+  run(cwd, "r1");
+  await withWeb({ cwds: [cwd], startRun: () => ({ exited: Promise.resolve() }) }, async (w) => {
+    const ask = (host: string, p: string, method = "GET", body?: string): Promise<number> =>
+      new Promise((resolve, reject) => {
+        const req = http.request({ host: "127.0.0.1", port: w.port, path: p, method, headers: { Host: host, ...(body ? { "Content-Type": "application/json" } : {}) } }, (res) => {
+          res.resume();
+          resolve(res.statusCode ?? 0);
+        });
+        req.on("error", reject);
+        req.end(body);
+      });
+    assert.equal(await ask(`evil.example:${w.port}`, "/api/runs"), 403);
+    assert.equal(await ask(`evil.example:${w.port}`, "/api/launch", "POST", JSON.stringify({ task: "rm everything" })), 403);
+    assert.equal(await ask(`evil.example:${w.port}`, "/"), 403);
+    assert.equal(await ask(`127.0.0.1:${w.port}`, "/api/runs"), 200);
+    assert.equal(await ask(`localhost:${w.port}`, "/api/runs"), 200);
+    assert.equal(await ask(`[::1]:${w.port}`, "/api/runs"), 200);
+  });
+});
