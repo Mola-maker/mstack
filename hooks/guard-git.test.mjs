@@ -440,3 +440,29 @@ t("plugin-hook: outside a git repository, and with garbage on stdin, it stays si
   assert.equal(r.code, 0);
   assert.equal(r.out.trim(), "");
 });
+
+// guardEnabled finds the repo root on disk; it must agree with git about which `.git` counts. Plain fs: runs everywhere.
+import { guardEnabled, isGitDir } from "./guard-git.mjs";
+test("guardEnabled: the nearest valid .git decides; an empty or stray .git does not switch the guard off", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "guard-root-"));
+  fs.mkdirSync(path.join(root, ".git"));
+  fs.writeFileSync(path.join(root, ".git", "HEAD"), "ref: refs/heads/main\n");
+  fs.mkdirSync(path.join(root, ".mstack"));
+  fs.writeFileSync(path.join(root, ".mstack", "guard.json"), "{}");
+  const sub = path.join(root, "a", "b");
+  fs.mkdirSync(sub, { recursive: true });
+  assert.equal(guardEnabled(sub, {}), true);
+  // an empty .git in a subdirectory is not a repository
+  const stray = path.join(root, "emptygit");
+  fs.mkdirSync(path.join(stray, ".git"), { recursive: true });
+  assert.equal(isGitDir(path.join(stray, ".git")), false);
+  assert.equal(guardEnabled(stray, {}), true);
+  // a worktree's .git file is one, and it has no guard.json of its own
+  const wt = path.join(root, "wt");
+  fs.mkdirSync(wt);
+  fs.writeFileSync(path.join(wt, ".git"), "gitdir: ../.git/worktrees/wt\n");
+  assert.equal(isGitDir(path.join(wt, ".git")), true);
+  assert.equal(guardEnabled(wt, {}), false);
+  assert.equal(guardEnabled(wt, { MOLA_GUARD: "1" }), true);
+  fs.rmSync(root, { recursive: true, force: true });
+});
