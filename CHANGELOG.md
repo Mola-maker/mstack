@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- **m-cua, Android**: `mola-cua` (github.com/Mola-maker/agent-desktop, `mola-cua/`) is the Android driver when installed: refs that are re-found before every action, errors that say whether input reached the device, `set-value` that reads the field back. `cua-doctor.mjs` probes it first and falls back to plain `adb`, with a note on how to get it. `references/drivers.md` has a table for each.
 - **`mola doctor` checks the role groups** (`roles.groups`): the four `group/m-<role>` routes named in `config/model-routing.json` must be listed by `magpie models`. A missing one is a warning that names the kinds behind it and their fallback, never a failure; magpie unreachable is a warning too.
 - **`mola web` can start a run** (`POST /api/launch`, and a form on the page): the task is 1 to 4000 characters and may not start with `-`; the directory must be one the server watches; `kind` is lower-case words and hyphens; at most 3 runs started from the page at once. The run is `mola run` as a child with an argv array, never a shell. Same token and JSON-only guard as the other POSTs.
 - **`scripts/collide.mjs <other plugin's skills dir>`**: a static pass that ranks which skills of another plugin share the most routing text with ours (tf-idf cosine over description and when_to_use). It finds pairs worth a look; whether a phrase fires both still needs a session with both installed.
