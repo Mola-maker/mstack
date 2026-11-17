@@ -44,7 +44,9 @@ for (const dir of pkgDirs) {
   const deps = {}
   for (const [k, v] of Object.entries(pkg.dependencies ?? {})) deps[k] = String(v).startsWith('workspace:') ? versions.get(k) : v
   const { devDependencies: _d, scripts: _s, ...rest } = pkg
-  writeFileSync(join(out, 'package.json'), JSON.stringify({ ...rest, dependencies: deps }, null, 2) + '\n')
+  // the CLI reports its own package.json version: give the staged `mola` the release version
+  const own = pkg.name === 'mola' ? { version } : {}
+  writeFileSync(join(out, 'package.json'), JSON.stringify({ ...rest, ...own, dependencies: deps }, null, 2) + '\n')
   bundled.push(pkg.name)
 }
 
@@ -54,7 +56,7 @@ for (const d of ['skills', 'hooks', 'agents', 'commands', '.claude-plugin']) {
 for (const f of ['README.md', 'LICENSE', 'NOTICE.md', 'CHANGELOG.md']) if (existsSync(join(repo, f))) cpSync(join(repo, f), join(stage, f))
 
 mkdirSync(join(stage, 'bin'))
-writeFileSync(join(stage, 'bin', 'mola.js'), '#!/usr/bin/env node\n// the mola CLI bundled in this package; MOLA_MSTACK_DIR points the skill readers at the skills shipped beside it\nimport { fileURLToPath } from "node:url";\nprocess.env.MOLA_MSTACK_DIR ??= fileURLToPath(new URL("..", import.meta.url));\nimport { readFileSync } from "node:fs";\nprocess.env.MOLA_PACKAGE_VERSION ??= JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;\nawait import("../node_modules/mola/dist/bin.js");\n')
+writeFileSync(join(stage, 'bin', 'mola.js'), '#!/usr/bin/env node\n// the mola CLI bundled in this package; it finds the skills shipped beside it by walking up from its own files\nawait import("../node_modules/mola/dist/bin.js");\n')
 
 const dependencies = Object.fromEntries(bundled.map((n) => [n, versions.get(n)]))
 writeFileSync(join(stage, 'package.json'), JSON.stringify({
