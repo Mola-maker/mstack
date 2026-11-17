@@ -80,3 +80,23 @@ orca worktree create --name <name> --no-parent --agent codex --prompt "<task bri
 ## Isolation
 
 - Code-changing subtask → its own `git worktree` (`agent/<task>` branch) or a LayerFS branch; no two subtasks edit the same file.
+
+## LayerFS 2.0 as the workspace (`@layerfs/node@2.0.0-rc.1`, linux x64, glibc ≥ 2.39: WSL on Windows)
+
+One Branch per worker instead of a worktree; git stays the record. Proved on WSL Ubuntu: fork, write, edit, diff, merge, conflict, publish, export. Design: `.mstack/specs/2026-11-17-layerfs2-agent-writes.md`.
+
+```js
+import { client, close } from "@layerfs/node";
+const lfs = client({ home });                                   // close() before exit
+await lfs.project.init("mstack/<repo>", repoFolder);           // once; main = the folder
+await lfs.branch.fork(p, "agent-<task>", "main");               // names: no '/'
+await lfs.file.edit(p, "agent-<task>", "/src/x.ts", { old, new: next, message: "<plan step>" });
+await lfs.branch.diff(p, "main", "agent-<task>", { paths_only: true });   // review input
+await lfs.branch.merge(p, "agent-int-1", "agent-a", "agent-b");  // Conflict → nothing created; report the pair
+await lfs.branch.publish(p, "agent-int-1");                     // main's next Layer
+await lfs.project.export(p, dest);                               // then git switch -c agent/<slug>, commit, PR
+```
+
+- Every call is one attempt: after a lost reply, read (`branch.get`) before writing again.
+- To run tests on a Branch, `project.export(p, tmp, { branch: "agent-<task>" })` and run there; Sandboxes (`workspace.mount/exec/commit`) are not proved on a Linux host yet.
+- A `Conflict` from `merge` means two subtasks touched the same lines: split differently or sequence them; do not hand-merge.
