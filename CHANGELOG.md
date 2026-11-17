@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- **herdr**: `mola web` lists herdr's agents (name, state, folder) beside mstack's runs; a `mola` run inside a herdr pane reports its state to herdr's sidebar; `m-dispatch` can put each worker in a herdr pane (`references/harness-commands.md`). All of it is silent without herdr. `@mola/plugin-sdk`: `herdrAgents`, `reportRunToHerdr`.
+- **`GET /embed`** on `mola web`: a one-line status (verify, gaps, runs that work or wait, herdr agents that wait) for other hosts to frame; the DSH plugin `@mola/dsh-mstack` shows it beside each session title.
 - **TUI in the theme, on the same state as the web console.** `mola tui` paints with the molamaker tones (blue for work in progress, pink for what waits on you, deep pink for failure) and its title bar shows the same verify verdict and doctor gaps as the status line and `mola web`. All three read them through `envParts` / `verifyStatus` / `doctorStatus` in `@mola/plugin-sdk`, so the TUI and the browser can be open together and agree.
 - **TUI colour depth.** `colorDepth()` in the SDK says 24-bit only where the terminal does (`COLORTERM=truecolor|24bit`, Windows Terminal, a `direct`/`truecolor` TERM); `themePalette(color, depth)` and `themedPalette(color, depth)` fall back to the nearest 256-colour index otherwise. The TUI picks the depth itself; the status line is unchanged.
 - **m-cua, Android**: `mola-cua` (github.com/Mola-maker/agent-desktop, `mola-cua/`) is the Android driver when installed: refs that are re-found before every action, errors that say whether input reached the device, `set-value` that reads the field back. `cua-doctor.mjs` probes it first and falls back to plain `adb`, with a note on how to get it. `references/drivers.md` has a table for each.
