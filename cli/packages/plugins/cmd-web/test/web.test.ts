@@ -461,9 +461,12 @@ test("the environment carries herdr's agents, asked at most every 5 s however of
   let asked = 0;
   const herdr = (): HerdrState => (asked++, { state: "running", agents: [{ pane: "w1:p1", workspace: "w1", name: "builder", agent: "Claude Code", status: "blocked", cwd: null, title: null }] });
   await withWeb({ cwds: [cwd], herdr, pollMs: 10 }, async (_w, base) => {
-    const first = JSON.parse((await get(base, "/api/env")).body);
-    assert.equal(first.herdr.state, "running");
-    assert.equal(first.herdr.agents[0].status, "blocked");
+    // the first read starts the ask in the background; the answer is in the next snapshot
+    await get(base, "/api/env");
+    await new Promise((r) => setTimeout(r, 30));
+    const next = JSON.parse((await get(base, "/api/env")).body);
+    assert.equal(next.herdr.state, "running");
+    assert.equal(next.herdr.agents[0].status, "blocked");
     await new Promise((r) => setTimeout(r, 40));
     await get(base, "/api/env");
     assert.equal(asked, 1);
@@ -478,4 +481,20 @@ test("the page has a herdr section that stays hidden until herdr is there", () =
   const html = pageHtml();
   assert.match(html, /<section id="herdr" hidden>/);
   assert.match(html, /hs\.hidden=h\.state==="absent"/);
+});
+
+test("a herdr that never answers does not hold up the console", async () => {
+  const cwd = tmp();
+  let asked = 0;
+  const herdr = (): Promise<HerdrState> => (asked++, new Promise<HerdrState>(() => undefined));
+  await withWeb({ cwds: [cwd], herdr, pollMs: 10 }, async (_w, base) => {
+    for (let i = 0; i < 3; i++) {
+      const t = Date.now();
+      const r = await get(base, "/api/env");
+      assert.equal(r.status, 200);
+      assert.ok(Date.now() - t < 500, "the request waited for herdr");
+      await new Promise((res) => setTimeout(res, 20));
+    }
+    assert.equal(asked, 1, "one ask in flight at a time");
+  });
 });

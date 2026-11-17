@@ -11,7 +11,7 @@
  * silent when herdr is not installed or not running: herdr is optional.
  */
 
-import { spawn, spawnSync } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { RunProgress } from "./progress.js";
@@ -89,17 +89,24 @@ export function parseAgentList(stdout: string): HerdrState {
   return { state: "running", agents };
 }
 
-/** Ask herdr for its agents. Bounded by `timeoutMs`; never throws. */
-export function herdrAgents(env: NodeJS.ProcessEnv = process.env, timeoutMs = 1500): HerdrState {
+/**
+ * Ask herdr for its agents. Asynchronous (a server must not stop for a slow herdr), bounded by `timeoutMs`, and the
+ * child is killed when the time is up. Never rejects.
+ */
+export function herdrAgents(env: NodeJS.ProcessEnv = process.env, timeoutMs = 1500): Promise<HerdrState> {
   const bin = locateHerdr(env);
-  if (!bin) return { state: "absent" };
-  try {
-    const r = spawnSync(bin, ["agent", "list"], { encoding: "utf8", timeout: timeoutMs, windowsHide: true, env, stdio: ["ignore", "pipe", "pipe"] });
-    if (r.error) return { state: "error", message: r.error.message.slice(0, 200) };
-    return parseAgentList(`${r.stdout ?? ""}`.trim() || `${r.stderr ?? ""}`);
-  } catch (err) {
-    return { state: "error", message: err instanceof Error ? err.message.slice(0, 200) : String(err) };
-  }
+  if (!bin) return Promise.resolve({ state: "absent" });
+  return new Promise((resolve) => {
+    try {
+      execFile(bin, ["agent", "list"], { encoding: "utf8", timeout: timeoutMs, windowsHide: true, env, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
+        const out = `${stdout ?? ""}`.trim() || `${stderr ?? ""}`.trim();
+        if (err && !out) return resolve({ state: "error", message: (err.killed ? `herdr did not answer within ${timeoutMs} ms` : err.message).slice(0, 200) });
+        resolve(parseAgentList(out));
+      });
+    } catch (err) {
+      resolve({ state: "error", message: err instanceof Error ? err.message.slice(0, 200) : String(err) });
+    }
+  });
 }
 
 /** herdr's state for a run: working while it runs, blocked while it waits for a person, idle once it is over. */
@@ -115,18 +122,30 @@ export function herdrStateOf(p: Pick<RunProgress, "status">): "working" | "block
 const lastReport = new Map<string, string>();
 let seq = 0;
 
+const detached = (bin: string, args: string[]): void => {
+  try {
+    const child = spawn(bin, args, { stdio: "ignore", detached: true, windowsHide: true });
+    child.on("error", () => undefined);
+    child.unref();
+  } catch {
+    // herdr is optional
+  }
+};
+
+/** When the run ends in this pane, give the pane back so herdr shows whatever runs there next. */
+export function releaseHerdr(env: NodeJS.ProcessEnv = process.env, launch: (bin: string, args: string[]) => void = detached): boolean {
+  if (env.HERDR_ENV !== "1" || !env.HERDR_PANE_ID || !env.HERDR_BIN_PATH) return false;
+  if (!lastReport.has(env.HERDR_PANE_ID)) return false;
+  lastReport.delete(env.HERDR_PANE_ID);
+  seq = Math.max(seq + 1, Date.now());
+  launch(env.HERDR_BIN_PATH, ["pane", "release-agent", env.HERDR_PANE_ID, "--source", "mstack", "--agent", "mola", "--seq", String(seq)]);
+  return true;
+}
+
 export function reportRunToHerdr(
   p: Pick<RunProgress, "status" | "intent" | "stage"> & { blocked?: { reason: string } },
   env: NodeJS.ProcessEnv = process.env,
-  launch: (bin: string, args: string[]) => void = (bin, args) => {
-    try {
-      const child = spawn(bin, args, { stdio: "ignore", detached: true, windowsHide: true });
-      child.on("error", () => undefined);
-      child.unref();
-    } catch {
-      // herdr is optional
-    }
-  },
+  launch: (bin: string, args: string[]) => void = detached,
 ): boolean {
   if (env.HERDR_ENV !== "1" || !env.HERDR_PANE_ID || !env.HERDR_BIN_PATH) return false;
   const state = herdrStateOf(p);

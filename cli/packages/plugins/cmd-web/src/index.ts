@@ -74,8 +74,8 @@ export interface WebOptions {
   runDoctor?: () => Promise<unknown>;
   /** starts `mola run` for the page (`POST /api/launch`); absent → 501 */
   startRun?: (req: LaunchRequest) => LaunchHandle;
-  /** herdr's agent list; default `herdrAgents()` at most every 5 s (tests pass a stand-in) */
-  herdr?: () => HerdrState;
+  /** herdr's agent list; default `herdrAgents()`, asked in the background at most every 5 s (tests pass a stand-in) */
+  herdr?: () => HerdrState | Promise<HerdrState>;
   /** where the doctor result and the routing file are looked up (tests) */
   env?: NodeJS.ProcessEnv;
 }
@@ -204,10 +204,22 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
   // herdr is asked through its CLI (a process), so less often than the files are read
   let herdrAt = 0;
   let herdrState: HerdrState = { state: "absent" };
+  let herdrBusy = false;
+  // Never waits: returns what is known and, when it is old, asks herdr again in the background (one ask at a time).
+  // The next snapshot picks the answer up.
   const herdrNow = (): HerdrState => {
-    if (Date.now() - herdrAt >= Math.max(pollMs, HERDR_EVERY_MS)) {
-      herdrState = (opts.herdr ?? (() => herdrAgents(opts.env ?? process.env)))();
+    if (!herdrBusy && Date.now() - herdrAt >= Math.max(pollMs, HERDR_EVERY_MS)) {
+      herdrBusy = true;
       herdrAt = Date.now();
+      void Promise.resolve((opts.herdr ?? (() => herdrAgents(opts.env ?? process.env)))())
+        .then((h) => {
+          if (JSON.stringify(h) !== JSON.stringify(herdrState)) snapshotAt = 0;
+          herdrState = h;
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          herdrBusy = false;
+        });
     }
     return herdrState;
   };

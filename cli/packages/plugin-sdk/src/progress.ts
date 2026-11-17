@@ -5,7 +5,6 @@
  * <cwd>/.mstack/runs/<id>/progress.json, plus approvals/<approvalId>.json.
  */
 
-import { reportRunToHerdr } from "./herdr.js";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -108,8 +107,6 @@ export function writeProgress(p: RunProgress): void {
   p.updatedAt = new Date().toISOString();
   p.costUsd = round(p.stages.reduce((s, x) => s + (x.costUsd ?? 0), 0));
   writeJsonAtomic(progressPath(p.cwd, p.id), p);
-  // a run inside a herdr pane shows its state in herdr's sidebar; a no-op anywhere else
-  reportRunToHerdr(p);
 }
 
 /** All runs under <cwd>/.mstack/runs that have a progress.json, newest first. */

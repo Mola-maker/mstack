@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { herdrAgents, herdrStateOf, locateHerdr, parseAgentList, reportRunToHerdr } from "@mola/plugin-sdk";
+import { herdrAgents, herdrStateOf, locateHerdr, parseAgentList, releaseHerdr, reportRunToHerdr } from "@mola/plugin-sdk";
 
 // The shape `herdr agent list` prints, from the API schema bundled with herdr 0.9.5 (success_response: agent_list, AgentInfo).
 const LIST = JSON.stringify({
@@ -37,10 +37,10 @@ test("parseAgentList: a stopped server, another error, and output that is not JS
   assert.equal(parseAgentList('{"result":{"type":"pane_list","panes":[]}}').state, "error");
 });
 
-test("herdrAgents: absent when herdr is not installed; runs the CLI it finds", (t) => {
+test("herdrAgents: absent when herdr is not installed; runs the CLI it finds", async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mola-herdr-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
-  assert.deepEqual(herdrAgents({ PATH: dir } as NodeJS.ProcessEnv), { state: "absent" });
+  assert.deepEqual(await herdrAgents({ PATH: dir } as NodeJS.ProcessEnv), { state: "absent" });
   // a stand-in herdr: a node script behind the platform's launcher
   const js = path.join(dir, "fake.js");
   fs.writeFileSync(js, `process.stdout.write(${JSON.stringify(LIST)})`);
@@ -55,7 +55,7 @@ test("herdrAgents: absent when herdr is not installed; runs the CLI it finds", (
   }
   assert.equal(locateHerdr({ PATH: dir } as NodeJS.ProcessEnv), bin);
   if (process.platform !== "win32") {
-    const s = herdrAgents({ PATH: dir } as NodeJS.ProcessEnv);
+    const s = await herdrAgents({ PATH: dir } as NodeJS.ProcessEnv);
     assert.equal(s.state, "running");
   }
 });
@@ -92,4 +92,18 @@ test("reportRunToHerdr: only inside a herdr pane; the report herdr documents", (
   reportRunToHerdr({ status: "running", intent: "fix the bug", stage: "verify" }, env, launch);
   assert.equal(calls.length, 3);
   assert.ok(Number(calls[2][1][10]) > Number(calls[1][1][10]));
+});
+
+test("releaseHerdr: gives the pane back once, only after mstack reported into it", () => {
+  const calls: Array<[string, string[]]> = [];
+  const launch = (bin: string, args: string[]): void => void calls.push([bin, args]);
+  const env = { HERDR_ENV: "1", HERDR_PANE_ID: "w9:p1", HERDR_BIN_PATH: "/opt/herdr" } as NodeJS.ProcessEnv;
+  assert.equal(releaseHerdr(env, launch), false, "nothing reported yet");
+  reportRunToHerdr({ status: "running", intent: "x", stage: "plan" }, env, launch);
+  assert.equal(releaseHerdr(env, launch), true);
+  assert.deepEqual(calls[1][1].slice(0, 7), ["pane", "release-agent", "w9:p1", "--source", "mstack", "--agent", "mola"]);
+  assert.ok(Number(calls[1][1][8]) > Number(calls[0][1][10]));
+  assert.equal(releaseHerdr(env, launch), false, "released once");
+  // after a release, the same state is reported again
+  assert.equal(reportRunToHerdr({ status: "running", intent: "x", stage: "plan" }, env, launch), true);
 });

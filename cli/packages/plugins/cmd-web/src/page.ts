@@ -321,8 +321,8 @@ export const PAGE_HTML = pageHtml();
 
 /**
  * The one-line status `@mola/dsh-mstack` embeds beside a DSH session title (and any other host can): the verify
- * verdict, the environment gaps, and how many runs work or wait for you. Same stream as the full page; the line is
- * a link that opens the full console in a new tab. Text only, so it fits a 26 px frame.
+ * verdict, the environment gaps, and how many runs work or wait for you, read every 5 s; the line is a link that
+ * opens the full console in a new tab. Text only, so it fits a 26 px frame.
  */
 const EMBED_SCRIPT = `
 (function(){
@@ -344,10 +344,16 @@ function draw(){
   if(!out.length){line.appendChild(part("muted","mstack：还没有记录"));return}
   out.forEach(function(s,i){if(i)line.appendChild(part("muted"," · "));line.appendChild(s)});
 }
-var es=new EventSource(q("/api/stream"));
-es.addEventListener("run",function(ev){var r=JSON.parse(ev.data);runs[r.cwd+"|"+r.id]=r;draw()});
-es.addEventListener("env",function(ev){env=JSON.parse(ev.data);draw()});
-es.onerror=function(){line.textContent="";line.appendChild(part("muted","mstack：重新连接中…"))};
+// Polls instead of holding a stream: a host may frame this line in many tabs, and a browser keeps only six
+// connections per server open; the full console keeps the stream.
+function poll(){
+  Promise.all([fetch(q("/api/env"),{cache:"no-store"}),fetch(q("/api/runs"),{cache:"no-store"})])
+    .then(function(rs){if(!rs[0].ok||!rs[1].ok)throw new Error(rs[0].status+"/"+rs[1].status);return Promise.all([rs[0].json(),rs[1].json()])})
+    .then(function(v){env=v[0];runs={};v[1].forEach(function(r){runs[r.cwd+"|"+r.id]=r});draw()})
+    .catch(function(){while(line.firstChild)line.removeChild(line.firstChild);line.appendChild(part("muted","mstack：连不上控制台"))});
+}
+poll();
+setInterval(poll,5000);
 line.href=q("/");
 })();
 `;

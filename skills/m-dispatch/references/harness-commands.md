@@ -34,7 +34,7 @@ codex exec "<task>"
 
 ## herdr (when `herdr` is installed and its server runs)
 
-herdr (github.com/herdrdev/herdr) keeps each worker in a terminal pane that survives a closed client, and marks every pane `working`, `blocked` or `idle`. Use it when the person wants to watch or step into the workers, or when workers are interactive agents (Claude Code, Codex, OpenCode, …) rather than headless runs. `herdr status server` says whether its server runs; without it, use the other executors. Every command prints JSON; take IDs from the answer, never guess them.
+herdr (github.com/herdrdev/herdr) keeps each worker in a terminal pane that survives a closed client, and marks every pane `working`, `blocked` or `idle`. Use it when the person wants to watch or step into the workers, or when workers are interactive agents (Claude Code, Codex, OpenCode, …) rather than headless runs. `herdr status server --json` says whether its server runs; without it, use the other executors. The workspace, pane and agent commands print JSON (`status` needs `--json`); take IDs from the answer, never guess them.
 
 ```sh
 # one workspace for the dispatch, one pane per worker, each in its own worktree
