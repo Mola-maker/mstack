@@ -192,3 +192,20 @@ test("doctor leaves its last result in the mola home for the status line: failin
   assert.deepEqual(cache.gaps.map((g: any) => g.id).sort(), checks.filter((c) => !c.ok || c.warn).map((c) => c.id).sort());
   assert.ok(Math.abs(Date.now() - Date.parse(cache.ts)) < 60_000);
 });
+
+test("skills install refuses a stray word or an unknown flag (exit 64) and installs nothing", () => {
+  const home = tmpHome();
+  for (const argv of [["skills", "install", "dsh", "--dry-run"], ["skills", "install", "--dsh", "--dyr-run"], ["skills", "install", "help"]]) {
+    const r = run(argv, home, undefined, { USERPROFILE: home, HOME: home });
+    assert.equal(r.status, 64, `${argv.join(" ")}: ${r.stdout}${r.stderr}`);
+  }
+  assert.equal(fs.existsSync(path.join(home, ".dsh")), false);
+  assert.equal(fs.existsSync(path.join(home, ".codex")), false);
+});
+
+test("--help after a command never runs it, even with words after it", () => {
+  const home = tmpHome();
+  const r = run(["go", "--help", "fix", "the", "bug"], home, undefined, { USERPROFILE: home, HOME: home });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /^mola go — /);
+});

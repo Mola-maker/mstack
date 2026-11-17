@@ -6,8 +6,8 @@
 
 - **npm**: `npm i -g @molamaker/mstack` installs the `mola` CLI with its packages bundled (`scripts/pack-npm.mjs`), plus the 17 skills, hooks and agents; `mola skills install --dsh|--codex|--claude` takes the skills from the package.
 - **`mola go`, `mola web`, `mola tui`, `mola scout`, `mola statusline` were missing from the CLI**: the plugins were built and tested but not in the built-in list. Fixed.
-- **`--help` never runs a command** (core router): before, `mola skills install --help` installed into every target.
-- **`skills install` refuses unknown flags** (exit 64) instead of installing everywhere.
+- **`--help` never runs a command** (core router; `--help <words>`, `--help=…` and `-h` too; an envelope with `--json`): before, `mola skills install --help` installed into every target.
+- **`skills install` refuses unknown flags and stray words** (exit 64) instead of installing everywhere.
 - **m-cua**: in an app that already holds the user's documents, act only on the tab or window you created. Found in a real DSH run, where the agent began counting the user's Notepad tabs.
 - **DSH plugin `@molamaker/dsh-mstack` 1.1.0**: mstack's state in the dsh-TUI footer, 17 skills, a DSH bundle patch.
 - **README demo** re-rendered for 0.11.0.

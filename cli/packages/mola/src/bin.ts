@@ -19,8 +19,8 @@ process.emitWarning = ((warning: string | Error, ...rest: unknown[]) => {
   return (emitWarning as (...a: unknown[]) => void)(warning, ...rest);
 }) as typeof process.emitWarning;
 
-// the npm package (@molamaker/mstack) passes its own version; a checkout run says the workspace version
-const VERSION = process.env.MOLA_PACKAGE_VERSION || "0.1.0";
+// this package's own version: the npm package stages it with the release version, a checkout says 0.1.0
+const VERSION: string = (createRequire(import.meta.url)("../package.json") as { version: string }).version;
 
 /** Bundled first-party plugins (tier: builtin), resolved through this package's deps. */
 const BUILTIN_PLUGIN_PACKAGES = [

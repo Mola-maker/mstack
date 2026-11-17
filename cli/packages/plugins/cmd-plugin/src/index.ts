@@ -621,6 +621,14 @@ export default definePlugin({
             ExitCode.Usage,
           );
         }
+        // `skills install dsh` (for --dsh) or a stray word: refuse rather than install everywhere
+        if (args.positionals.length > 0) {
+          throw new MolaError(
+            "USAGE_ERROR",
+            `skills install takes no arguments, got ${args.positionals.map((p) => JSON.stringify(p)).join(" ")} (targets are flags: --claude --dsh --codex)`,
+            ExitCode.Usage,
+          );
+        }
         const targets = parseTargets(args.flags);
         const dryRun = args.flags["dry-run"] === true || args.flags.dryRun === true;
         const home = userHome();
