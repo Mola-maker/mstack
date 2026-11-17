@@ -47,6 +47,9 @@ importers:
       '@mola/plugin-cmd-doctor':
         specifier: workspace:*
         version: link:../plugins/cmd-doctor
+      '@mola/plugin-cmd-go':
+        specifier: workspace:*
+        version: link:../plugins/cmd-go
       '@mola/plugin-cmd-model':
         specifier: workspace:*
         version: link:../plugins/cmd-model
@@ -59,9 +62,18 @@ importers:
       '@mola/plugin-cmd-run':
         specifier: workspace:*
         version: link:../plugins/cmd-run
+      '@mola/plugin-cmd-scout':
+        specifier: workspace:*
+        version: link:../plugins/cmd-scout
+      '@mola/plugin-cmd-tui':
+        specifier: workspace:*
+        version: link:../plugins/cmd-tui
       '@mola/plugin-cmd-ultramode':
         specifier: workspace:*
         version: link:../plugins/cmd-ultramode
+      '@mola/plugin-cmd-web':
+        specifier: workspace:*
+        version: link:../plugins/cmd-web
       '@mola/plugin-policy-approval':
         specifier: workspace:*
         version: link:../plugins/policy-approval

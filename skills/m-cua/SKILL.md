@@ -31,7 +31,7 @@ First line you say: `Using m-cua: drive the real UI, keep the script.`
 5. **Write the script.** Put the steps that worked into `.mstack/cua/<slug>.mjs` (or `.sh`): launch, wait for a named element, act, assert on text or state read back from the UI, exit non-zero on any miss. Selectors are roles and names, never screen coordinates or refs from your session. Waits name an element or text, never a fixed sleep.
 6. **Prove the script.** Run it from a cold start: it must pass. Then break the expectation on purpose (assert a wrong text) and run again: it must fail. A script that cannot fail proves nothing.
 7. **Record the level.** L3 if the script launches the artifact and checks that it is up; L4 if it drives a flow and asserts the result. `node "<m-verify dir>/scripts/receipt.mjs" write --level <3|4> --cmd "<the script command>" --exit <code>`.
-8. **Clean up.** Close the app or stop the emulator you started. Leave what was already running alone.
+8. **Clean up.** Close the app or stop the emulator you started; when the app was already open, close only the tab or window you created. Leave what was already running alone.
 
 ## Output
 
@@ -42,6 +42,7 @@ First line you say: `Using m-cua: drive the real UI, keep the script.`
 ## Stop conditions
 
 - The doctor still exits 1 after one fix attempt → report the state and the fix line; do not claim L3.
+- The target app already holds the user's own documents (tabs, windows, unsaved work) → act only on the tab or window you created, found by the text you put in it. Do not list, count, scroll through, read or close anything else; if yours cannot be told apart, stop and ask. A tab count that looks wrong is not yours to investigate.
 - A command returns `POLICY_DENIED`, or the step seems to need `--headed` (real pointer and keyboard) or `--force` → stop and ask the user. Never add either flag to get past a failure: headed input lands in whatever window the user is working in.
 - The same action fails 3 times in a row → stop and report the last error and snapshot (principle 9).
 - A step needs credentials, a payment, or sending a message to a real person → stop and ask.
