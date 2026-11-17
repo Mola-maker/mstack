@@ -80,3 +80,28 @@ orca worktree create --name <name> --no-parent --agent codex --prompt "<task bri
 ## Isolation
 
 - Code-changing subtask → its own `git worktree` (`agent/<task>` branch) or a LayerFS branch; no two subtasks edit the same file.
+
+## LayerFS 2.0 as the workspace (`@layerfs/node@2.0.0-rc.1`, linux x64, glibc ≥ 2.39: WSL on Windows)
+
+One Branch per worker instead of a worktree; git stays the record and does the integration. Proved on a real repo in WSL (`research/layerfs2/accept.mjs`). Design: `.mstack/specs/2026-11-17-layerfs2-agent-writes.md`.
+
+```js
+import { client, close } from "@layerfs/node";
+// GIT_INDEX_FILE=tmp git read-tree $base && GIT_INDEX_FILE=tmp git checkout-index -a --prefix=snap/   (not git archive)
+const lfs = client({ home });                                    // close() before exit
+await lfs.project.init(`mstack/${repo}-${base7}`, snap);         // new base → new project
+await lfs.branch.fork(p, "agent-<task>", "main");                // names: no '/'
+await lfs.file.edit(p, "agent-<task>", "/src/x.ts", { old, new: next, message: "<plan step>" });
+const d = await lfs.branch.diff(p, "main", "agent-<task>", { paths_only: true });  // d.items[].path; page while d.has_more
+await lfs.branch.merge(p, "agent-int-1", "agent-a", "agent-b");   // only after the path checks below
+await lfs.project.export(p, freshTmp, { branch: "agent-int-1" });  // destination must be absent or empty
+// git worktree add -b agent/<slug> wt $base; apply ONLY the diff's paths from freshTmp
+//   (gone → rm, folder → mkdir, symlink → same link text, file → copy + mode); delete freshTmp; git add -A;
+//   every non-folder diff path must be in `git diff --cached --name-only` (a path under a gitlink is dropped silently), else fail; commit; PR
+```
+
+- **Before merging**: refuse a Branch with any path that has a `.git` component (`/pkg/.git/HEAD` too); stop when two Branches share a file path (folder items do not count). `merge` conflicts only on the same lines and folds different lines of one file silently.
+- **Never `branch.publish`**: it overwrites main's newer files (`overwrote_count`) instead of merging.
+- **Never export into the repo folder** (`NotEmpty`): export to a fresh folder, then carry it into a git worktree.
+- **Tests on a Branch**: `project.export(p, tmp, { branch })` and run there. A `native` Sandbox needs root on Linux; Docker or VM Sandboxes are not proved here.
+- Every call is one attempt: after a lost reply, read (`branch.get`) before writing again.
