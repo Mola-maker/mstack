@@ -5,6 +5,7 @@ mstack = 17 workflow skills (`skills/`) + the `mola` CLI (`cli/`). The spec is `
 ## Verify before you claim done
 - Skills: `node scripts/check.mjs` (structure, ≤150 lines, ≤12000 bytes, frontmatter, no upstream names, eval cases). Must print `OK`.
 - Skill helper scripts: `node --test "skills/<name>/scripts/*.test.mjs"` and `node --test "hooks/*.test.mjs"` (glob form: Node 24 rejects a bare directory).
+- Benchmark harness: `node --test bench/bench.test.mjs` (free; the real runs in `bench/README.md` cost money).
 - CLI: `cd cli && pnpm -r build && pnpm -r --no-bail test`. Windows skips POSIX-only cases; CI (Linux) runs them all.
 - Routing evals (cost money, run on purpose, not on every change): `claude plugin eval . --trust-plugin --runs 3 --threshold 0.8 --no-publish --max-cost-usd 2`.
 
