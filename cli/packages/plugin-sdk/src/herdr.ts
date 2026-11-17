@@ -112,6 +112,9 @@ export function herdrStateOf(p: Pick<RunProgress, "status">): "working" | "block
  * set). Fire and forget: herdr's guidance is that a report must never slow the agent, so the child is detached and
  * its failure ignored. `seq` is the time in ms, which only grows, as herdr requires.
  */
+const lastReport = new Map<string, string>();
+let seq = 0;
+
 export function reportRunToHerdr(
   p: Pick<RunProgress, "status" | "intent" | "stage"> & { blocked?: { reason: string } },
   env: NodeJS.ProcessEnv = process.env,
@@ -127,12 +130,18 @@ export function reportRunToHerdr(
 ): boolean {
   if (env.HERDR_ENV !== "1" || !env.HERDR_PANE_ID || !env.HERDR_BIN_PATH) return false;
   const state = herdrStateOf(p);
-  const message = state === "blocked" ? (p.blocked?.reason ?? "waiting for you") : `${p.stage}: ${p.intent}`;
+  const message = (state === "blocked" ? (p.blocked?.reason ?? "waiting for you") : `${p.stage}: ${p.intent}`).replace(CONTROL, " ").slice(0, 200);
+  // Progress is written about once a second while an agent talks; herdr only needs to hear when what it shows changes.
+  const key = `${env.HERDR_PANE_ID}|${state}|${message}`;
+  if (lastReport.get(env.HERDR_PANE_ID) === key) return false;
+  lastReport.set(env.HERDR_PANE_ID, key);
+  // herdr ignores a report whose seq is not above the last one from this source; two in the same millisecond would tie
+  seq = Math.max(seq + 1, Date.now());
   launch(env.HERDR_BIN_PATH, [
     "pane", "report-agent", env.HERDR_PANE_ID,
     "--source", "mstack", "--agent", "mola", "--state", state,
-    "--seq", String(Date.now()),
-    "--message", message.replace(CONTROL, " ").slice(0, 200),
+    "--seq", String(seq),
+    "--message", message,
   ]);
   return true;
 }

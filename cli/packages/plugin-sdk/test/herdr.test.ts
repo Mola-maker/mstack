@@ -84,4 +84,12 @@ test("reportRunToHerdr: only inside a herdr pane; the report herdr documents", (
   reportRunToHerdr({ status: "running", intent: "fix the bug", stage: "implement" }, env, launch);
   assert.deepEqual(calls[1][1].slice(7, 9), ["--state", "working"]);
   assert.equal(calls[1][1][12], "implement: fix the bug");
+
+  // the same state again (progress written while an agent talks) is not reported again
+  assert.equal(reportRunToHerdr({ status: "running", intent: "fix the bug", stage: "implement" }, env, launch), false);
+  assert.equal(calls.length, 2);
+  // a change is, with a larger seq even within the same millisecond
+  reportRunToHerdr({ status: "running", intent: "fix the bug", stage: "verify" }, env, launch);
+  assert.equal(calls.length, 3);
+  assert.ok(Number(calls[2][1][10]) > Number(calls[1][1][10]));
 });
