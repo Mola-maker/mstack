@@ -235,6 +235,15 @@ export class CommandRouter {
     const pathStr = this.key(command.path);
     io.commandPath = pathStr;
     const args: ParsedArgs = parseArgv(rest);
+    // --help never runs the command: one that installs, starts a run or pushes must be safe to ask about.
+    // It prints the command's line and the commands under it (`mola skills install --help`, `mola go --help`).
+    if (args.flags.help === true || args.flags.h === true) {
+      const subs = this.list().filter((c) => c !== command && this.key(c.path).startsWith(pathStr + " "));
+      const lines = [`mola ${pathStr} — ${command.description}`];
+      if (subs.length > 0) lines.push("", ...table({ rows: subs.map((c) => [this.key(c.path), c.description]), indent: "  " }));
+      process.stdout.write(lines.join("\n") + "\n");
+      return ExitCode.Ok;
+    }
 
     this.opts.bus?.emit(MolaEvents.CommandStarted, { traceId: this.opts.traceId, path: pathStr, argv: rest });
     const t0 = Date.now();

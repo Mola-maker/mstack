@@ -141,3 +141,18 @@ test("human mode does not repeat data when the handler already wrote", async () 
   assert.equal(res.code, 0);
   assert.equal(res.stdout, "hello\n");
 });
+
+test("--help and -h describe a command and never run it", async () => {
+  const r = makeRouter();
+  let ran = 0;
+  r.register({ path: ["skills", "install"], description: "install the skills", handler: async () => (ran++, 0) }, "a");
+  r.register({ path: ["go"], description: "start a run", handler: async () => (ran++, 0) }, "a");
+  r.register({ path: ["go", "stop"], description: "stop a run", handler: async () => (ran++, 0) }, "a");
+  const a = await capture(() => r.dispatch(["skills", "install", "--help"], quietIo()));
+  assert.equal(a.code, 0);
+  assert.match(a.stdout, /mola skills install — install the skills/);
+  const b = await capture(() => r.dispatch(["go", "-h"], quietIo()));
+  assert.match(b.stdout, /mola go — start a run/);
+  assert.match(b.stdout, /go stop\s+stop a run/);
+  assert.equal(ran, 0);
+});

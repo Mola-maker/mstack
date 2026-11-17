@@ -1,6 +1,17 @@
 # Changelog
 
 ## Unreleased
+
+## 0.11.0
+
+- **npm**: `npm i -g @molamaker/mstack` installs the `mola` CLI with its packages bundled (`scripts/pack-npm.mjs`), plus the 17 skills, hooks and agents; `mola skills install --dsh|--codex|--claude` takes the skills from the package.
+- **`mola go`, `mola web`, `mola tui`, `mola scout`, `mola statusline` were missing from the CLI**: the plugins were built and tested but not in the built-in list. Fixed.
+- **`--help` never runs a command** (core router): before, `mola skills install --help` installed into every target.
+- **`skills install` refuses unknown flags** (exit 64) instead of installing everywhere.
+- **m-cua**: in an app that already holds the user's documents, act only on the tab or window you created. Found in a real DSH run, where the agent began counting the user's Notepad tabs.
+- **DSH plugin `@molamaker/dsh-mstack` 1.1.0**: mstack's state in the dsh-TUI footer, 17 skills, a DSH bundle patch.
+- **README demo** re-rendered for 0.11.0.
+
 - **herdr**: `mola web` lists herdr's agents (name, state, folder) beside mstack's runs; a `mola` run inside a herdr pane reports its state to herdr's sidebar; `m-dispatch` can put each worker in a herdr pane (`references/harness-commands.md`). All of it is silent without herdr. `@mola/plugin-sdk`: `herdrAgents`, `reportRunToHerdr`.
 - **`GET /embed`** on `mola web`: a one-line status (verify, gaps, runs that work or wait, herdr agents that wait) for other hosts to frame; the DSH plugin `@mola/dsh-mstack` shows it beside each session title.
 - **TUI in the theme, on the same state as the web console.** `mola tui` paints with the molamaker tones (blue for work in progress, pink for what waits on you, deep pink for failure) and its title bar shows the same verify verdict and doctor gaps as the status line and `mola web`. All three read them through `envParts` / `verifyStatus` / `doctorStatus` in `@mola/plugin-sdk`, so the TUI and the browser can be open together and agree.
