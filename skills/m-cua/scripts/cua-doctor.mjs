@@ -5,6 +5,7 @@
 // A driver is one of: ready | not-on-path (installed and working, but only by the full path printed) | no-device | missing | broken.
 // ready and not-on-path are both usable.
 import { existsSync, statSync } from "node:fs";
+const isFile = (p) => { try { return statSync(p).isFile(); } catch { return false; } };
 import { spawnSync } from "node:child_process";
 import { join, delimiter, dirname, basename } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -66,8 +67,8 @@ const MOLA_CUA_BUILD = "git clone https://github.com/Mola-maker/agent-desktop &&
 export function probeAndroid(env = process.env) {
   // MOLA_CUA_BIN names the binary outright (a build output that is not installed). It must exist: a stale
   // path is reported as that, with the variable named, not as "Android unusable".
-  if (env.MOLA_CUA_BIN && !existsSync(env.MOLA_CUA_BIN)) {
-    return { driver: "android", tool: "mola-cua", state: "broken", bin: env.MOLA_CUA_BIN, fix: `MOLA_CUA_BIN points at a missing file: ${env.MOLA_CUA_BIN}; fix it, or unset it to use mola-cua from PATH or plain adb` };
+  if (env.MOLA_CUA_BIN && !isFile(env.MOLA_CUA_BIN)) {
+    return { driver: "android", tool: "mola-cua", state: "broken", bin: env.MOLA_CUA_BIN, fix: `MOLA_CUA_BIN is not a file (a missing path, or a directory): ${env.MOLA_CUA_BIN}; fix it, or unset it to use mola-cua from PATH or plain adb` };
   }
   const cargoBins = [env.CARGO_HOME && join(env.CARGO_HOME, "bin"), env.HOME && join(env.HOME, ".cargo", "bin"), env.USERPROFILE && join(env.USERPROFILE, ".cargo", "bin")];
   const hit = env.MOLA_CUA_BIN ? { bin: env.MOLA_CUA_BIN, onPath: false } : locate("mola-cua", cargoBins, env);

@@ -233,7 +233,12 @@ test("MOLA_CUA_BIN pointing at a missing file is broken and names the variable",
   assert.equal(r.code, 1);
   const a = drivers(r).android;
   assert.equal(a.state, "broken");
-  assert.match(a.fix, /MOLA_CUA_BIN points at a missing file/);
+  assert.match(a.fix, /MOLA_CUA_BIN is not a file/);
+  // a directory (the build folder instead of the binary) is not run; the variable is named
+  fake(join(d, "release"), "mola-cua", [MOLA_STATUS([])]);
+  const dirResult = drivers(main(["--need", "android", "--json"], env([d], { MOLA_CUA_BIN: join(d, "release") }), d)).android;
+  assert.equal(dirResult.state, "broken");
+  assert.match(dirResult.fix, /MOLA_CUA_BIN is not a file/);
 });
 
 test("mola-cua in cargo's bin directory but not on PATH is found and reported not-on-path", (t) => {
