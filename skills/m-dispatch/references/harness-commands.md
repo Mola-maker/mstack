@@ -83,20 +83,23 @@ orca worktree create --name <name> --no-parent --agent codex --prompt "<task bri
 
 ## LayerFS 2.0 as the workspace (`@layerfs/node@2.0.0-rc.1`, linux x64, glibc ≥ 2.39: WSL on Windows)
 
-One Branch per worker instead of a worktree; git stays the record. Proved on WSL Ubuntu: fork, write, edit, diff, merge, conflict, publish, export. Design: `.mstack/specs/2026-11-17-layerfs2-agent-writes.md`.
+One Branch per worker instead of a worktree; git stays the record and does the integration. Proved on a real repo in WSL (`research/layerfs2/accept.mjs`). Design: `.mstack/specs/2026-11-17-layerfs2-agent-writes.md`.
 
 ```js
 import { client, close } from "@layerfs/node";
-const lfs = client({ home });                                   // close() before exit
-await lfs.project.init("mstack/<repo>", repoFolder);           // once; main = the folder
-await lfs.branch.fork(p, "agent-<task>", "main");               // names: no '/'
+// git archive $base | tar -x -C snap   → tracked files only, no .git
+const lfs = client({ home });                                    // close() before exit
+await lfs.project.init(`mstack/${repo}-${base7}`, snap);         // new base → new project
+await lfs.branch.fork(p, "agent-<task>", "main");                // names: no '/'
 await lfs.file.edit(p, "agent-<task>", "/src/x.ts", { old, new: next, message: "<plan step>" });
-await lfs.branch.diff(p, "main", "agent-<task>", { paths_only: true });   // review input
-await lfs.branch.merge(p, "agent-int-1", "agent-a", "agent-b");  // Conflict → nothing created; report the pair
-await lfs.branch.publish(p, "agent-int-1");                     // main's next Layer
-await lfs.project.export(p, dest);                               // then git switch -c agent/<slug>, commit, PR
+const d = await lfs.branch.diff(p, "main", "agent-<task>", { paths_only: true });  // d.items[].path; page while d.has_more
+await lfs.branch.merge(p, "agent-int-1", "agent-a", "agent-b");   // only after the path checks below
+await lfs.project.export(p, freshTmp, { branch: "agent-int-1" });  // destination must be absent or empty
+// git worktree add -b agent/<slug> wt $base; rm its tracked files; copy freshTmp in; git add -A; commit; PR
 ```
 
+- **Before merging**: refuse a Branch whose diff touches `/.git`; stop when two Branches share a path. `merge` conflicts only on the same lines and folds different lines of one file silently.
+- **Never `branch.publish`**: it overwrites main's newer files (`overwrote_count`) instead of merging.
+- **Never export into the repo folder** (`NotEmpty`): export to a fresh folder, then carry it into a git worktree.
+- **Tests on a Branch**: `project.export(p, tmp, { branch })` and run there. A `native` Sandbox needs root on Linux; Docker or VM Sandboxes are not proved here.
 - Every call is one attempt: after a lost reply, read (`branch.get`) before writing again.
-- To run tests on a Branch, `project.export(p, tmp, { branch: "agent-<task>" })` and run there; Sandboxes (`workspace.mount/exec/commit`) are not proved on a Linux host yet.
-- A `Conflict` from `merge` means two subtasks touched the same lines: split differently or sequence them; do not hand-merge.

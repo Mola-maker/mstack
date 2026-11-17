@@ -1,6 +1,6 @@
 # mstack agent writes on LayerFS 2.0
 
-Date: 2026-11-17. Status: design, with the file path proved on a real install; the Sandbox path not yet run.
+Date: 2026-11-17. Status: design; the file path and the git accept path proved on a real install (WSL); per-worker scope and Sandboxes not yet run.
 
 ## Why change
 
@@ -26,43 +26,53 @@ Probe: `research/layerfs2/probe.mjs` (run with `research/layerfs2/run.sh` inside
 | review input | `branch.diff(p, "main", "agent-a", {paths_only})` | the changed paths |
 | integrate two workers | `branch.merge(p, "agent-ab", "agent-a", "agent-b")` | `Merged`, not fast-forward |
 | two workers changed the same line | `branch.merge(p, "agent-ac", "agent-a", "agent-c")` | `Conflict`, "nothing was created" |
-| accept | `branch.publish(p, "agent-ab")` | `Added`: main's next Layer |
-| back to a git folder | `project.export(p, dest)` | all four files, with the edit |
+| (not used: overwrites) | `branch.publish(p, "agent-ab")` | `Added`: main's next Layer |
+| export to a fresh folder | `project.export(p, dest)` | all four files, with the edit |
 
 **Branch names cannot contain `/`.** `agent/a` is refused with `InvalidInput`. LayerFS branches are therefore named `agent-<task>`; the git branch made at the end keeps `agent/<task>`.
 
 ## Limits that shape the design
 
 - The addon ships for **linux x64 with glibc ≥ 2.39** only. On Windows this means WSL, where the DSH workers already run. Windows-native and macOS are not supported in this version.
-- **Sandboxes and Workspaces** (`workspace.mount/exec/commit`) let a worker run commands on its Branch. They need a machine (`native`, Docker, VM). The 2.0 manual lists the Linux host as *not verified*. Until it is run here, a worker that must run tests uses the file path for edits and a plain checkout for running them (below).
-- Every call is one attempt, with no retries. A lost reply means: read the state again (`branch.get`), never repeat the write blindly.
+- **Sandboxes and Workspaces** (`workspace.mount/exec/commit`) let a worker run commands on its Branch, but they need a machine. A `native` Sandbox on Linux needs root for FUSE ("Not built" for a non-root user in limitations.md), WSL workers run as a user, and the manual lists the Linux host as not verified. Until a Docker or VM machine is proved here, a worker runs tests on an export of its Branch (step 3).
+- **`branch.merge` conflicts only on the same lines.** Two Branches that change different lines of one file merge silently. The rule "no two subtasks edit the same file" is checked on the paths, before merging (step 5).
+- **`branch.publish` overwrites; it does not merge.** A Branch based on an older main replaces main's newer files and reports `overwrote_count`, without a Conflict. This flow never publishes. Git does the integration with the rest of the world.
+- **`project.export` needs an absent or empty destination** (`NotEmpty` otherwise). Results go to a fresh folder, never into the repo.
+- **`project.init` imports whatever the folder holds, `.git` included.** Init from a `git archive` of the base commit: tracked files only, no `.git`. A worker can still create `/.git/...` in its Branch, so any diff touching `/.git` is refused.
+- `branch.diff` answers `{items: [{path, kind, type, …}], has_more, next_page_pos}`: read every page.
+- Every call is one attempt, with no retries. After a lost reply, read the state again (`branch.get`); never repeat the write blindly.
 - One store is held open per process: call `close()` before exit.
 
 ## The flow (m-dispatch step 4, Isolate, and step 6, Merge)
 
+Proved end to end on a real git repo: `research/layerfs2/accept.mjs` (`run.sh accept` in WSL). The output includes `refused: writes .git ["agent-evil"]`, `same file a & b ["/src.txt"]`, `merge a+c Merged`, `export has .git false`, `git diff --stat 2 files changed`, `main untouched true`.
+
 1. **Once per dispatch**:
-   - `project.init(<store>/<repo>, <repo folder>)` if the project does not exist yet; otherwise `branch.get(p, "main")`.
-   - When main is behind the folder's HEAD, init a fresh project for this dispatch rather than sync. Re-basing main is not in 2.0.
+   - Record the base commit: `base=$(git rev-parse HEAD)`.
+   - `git archive $base | tar -x -C <snap>` gives the tracked files without `.git`.
+   - `project.init(<store>/<repo>-<base short>, <snap>)`. A new base means a new project; there is no sync of main.
 2. **Per worker**:
-   - `branch.fork(p, "agent-<task>", "main")`.
-   - The worker gets the project and Branch names and writes only through `file.write` / `file.edit` / `file.apply`. `apply` takes a list of changes as one Commit, all or none.
-   - The commit message is the step from the plan.
-   - The worker never sees the folder, so it cannot write outside its Branch.
-3. **Worker needs to run something** (tests, build). Until Sandboxes are proved:
-   - `project.export(p, <tmp>, {branch: "agent-<task>"})` to a scratch folder;
+   - `branch.fork(p, "agent-<task>", "main")`. Names cannot contain `/`.
+   - The worker gets the project and Branch names and writes only through `file.write` / `file.edit` / `file.apply` (`apply` = a list of changes as one Commit, all or none). The commit message is the step from the plan.
+   - Next step, not proved yet: give each worker a client scoped to its Branch (`client({scope: {project, folder: "/", branch: "agent-<task>"}})`, calls.md "Folder scope"), so that it cannot write another worker's Branch. A scope still allows merge and publish; the orchestrator alone calls those.
+3. **Worker needs to run something** (tests, build):
+   - `project.export(p, <fresh tmp>, {branch: "agent-<task>"})`;
    - run the command there;
    - report the output.
-   - Edits still go through `file.*`. Once a Sandbox run is proved, this becomes `sandbox.create` + `workspace.mount(sbx, "agent-<task>")` + `workspace.exec` + `workspace.commit`.
-4. **Review**: the reviewer reads `branch.diff(p, "main", "agent-<task>")` and `file.read` at the Branch. That is the same evidence as a git diff, without a checkout.
-5. **Integrate**:
-   - Fold the worker Branches pairwise with `branch.merge` into `agent-int-<n>`.
-   - A `Conflict` stops that pair. Report the two tasks and the file; m-dispatch's "no two subtasks edit the same file" rule is now enforced, not just asked for.
-   - The final Branch is verified (step 3 on it) and reviewed (step 4).
-6. **Accept**:
-   - `branch.publish(p, "agent-int-<n>")`, then `project.export(p, <repo folder or a worktree>)`.
-   - Then an ordinary `git switch -c agent/<slug>`, commit, PR.
-   - Git stays the system of record; LayerFS is the workspace.
-7. **Hand-off between machines** (envs-collab B5): the unit to move is the store (`store push` / `store pull`), not a folder copy. Not part of this change.
+   - Edits still go through `file.*`.
+4. **Review**: the reviewer reads the diff items and `file.read` at the Branch. That is the same evidence as a git diff, without a checkout.
+5. **Checks before integrating**, for each Branch:
+   - read every page of `branch.diff(p, "main", b, {paths_only: true})`;
+   - **refuse** the Branch if any path is `/.git` or under it;
+   - **stop** when two Branches share a path. Report the tasks and the file, then split or sequence them. Merge would fold different lines of one file without a word.
+6. **Integrate**: fold the Branches that passed with `branch.merge(p, "agent-int-<n>", a, b)`. A `Conflict` (same lines) creates nothing: report it. Verify (step 3) and review (step 4) the result.
+7. **Accept, through git only**:
+   - `project.export(p, <fresh tmp>, {branch: "agent-int-<n>"})`;
+   - `git worktree add -b agent/<slug> <wt> $base`;
+   - remove the worktree's tracked files (`git ls-files -z`), copy the export in (deletions are carried this way), `git add -A`, commit.
+   - Then the usual review, PR and merge.
+   - LayerFS `main` is never published; it stays the base snapshot. Git is the system of record; LayerFS is the workspace.
+8. **Hand-off between machines** (envs-collab B5): the unit to move is the store (`store push` / `store pull`), not a folder copy. Not part of this change.
 
 ## What changes in mstack
 
