@@ -610,6 +610,25 @@ export default definePlugin({
             ExitCode.NoInput,
           );
         }
+        // This command replaces folders in other tools' homes: a flag it does not know (a typo) must not fall
+        // through to "install everywhere".
+        const known = new Set<string>([...SKILL_TARGETS, "copy", "dry-run", "dryRun"]);
+        const unknown = Object.keys(args.flags).filter((k) => !known.has(k));
+        if (unknown.length > 0) {
+          throw new MolaError(
+            "USAGE_ERROR",
+            `skills install: unknown flag ${unknown.map((k) => `--${k}`).join(", ")} (known: --claude --dsh --codex --copy --dry-run)`,
+            ExitCode.Usage,
+          );
+        }
+        // `skills install dsh` (for --dsh) or a stray word: refuse rather than install everywhere
+        if (args.positionals.length > 0) {
+          throw new MolaError(
+            "USAGE_ERROR",
+            `skills install takes no arguments, got ${args.positionals.map((p) => JSON.stringify(p)).join(" ")} (targets are flags: --claude --dsh --codex)`,
+            ExitCode.Usage,
+          );
+        }
         const targets = parseTargets(args.flags);
         const dryRun = args.flags["dry-run"] === true || args.flags.dryRun === true;
         const home = userHome();

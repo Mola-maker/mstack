@@ -234,6 +234,23 @@ export class CommandRouter {
     const { command, rest } = hit;
     const pathStr = this.key(command.path);
     io.commandPath = pathStr;
+    // --help never runs the command: one that installs, starts a run or pushes must be safe to ask about.
+    // Read from the raw tokens (before `--`), not the parsed flags: `--help fix the bug` parses as help="fix".
+    // It prints the command's line and the commands under it (`mola skills install --help`, `mola go --help`).
+    const end = rest.indexOf("--");
+    const asksHelp = (end < 0 ? rest : rest.slice(0, end)).some((t) => t === "--help" || t === "-h" || t.startsWith("--help="));
+    if (asksHelp) {
+      const subs = this.list().filter((c) => c !== command && this.key(c.path).startsWith(pathStr + " "));
+      if (io.json) {
+        io.data({ command: pathStr, description: command.description, subcommands: subs.map((c) => ({ command: this.key(c.path), description: c.description })) });
+        io.finish();
+        return ExitCode.Ok;
+      }
+      const lines = [`mola ${pathStr} — ${command.description}`];
+      if (subs.length > 0) lines.push("", ...table({ rows: subs.map((c) => [this.key(c.path), c.description]), indent: "  " }));
+      process.stdout.write(lines.join("\n") + "\n");
+      return ExitCode.Ok;
+    }
     const args: ParsedArgs = parseArgv(rest);
 
     this.opts.bus?.emit(MolaEvents.CommandStarted, { traceId: this.opts.traceId, path: pathStr, argv: rest });

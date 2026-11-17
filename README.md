@@ -53,6 +53,27 @@ mstack 是 Mola-maker 的个人 agent 工作流技能栈：把 superpowers、gst
 
 ## 安装
 
+### 一条命令（npm，含 `mola` CLI 和全部 skill）
+
+```sh
+npm i -g @molamaker/mstack          # Node ≥ 22
+mola doctor                          # 查环境：node、magpie、agent、工具
+mola skills install --claude         # 或 --dsh / --codex：把包里的 17 个 skill 装到对应 agent
+mola go "<一句话>"                   # 无人值守跑完整流程
+mola web                             # 浏览器控制台（总控）：http://127.0.0.1:7333
+mola tui                             # 终端控制台，和网页读同一份状态
+```
+
+### DeepSeek Harness（DSH）插件：skill + 状态栏
+
+[`@molamaker/dsh-mstack`](https://github.com/Mola-maker/dsh-mstack) 把 17 个 skill 注册进 DSH；在 [dsh-TUI](https://www.npmjs.com/package/@deepseek-harness-tui/dsh-tui) 的底栏显示 mstack 状态（`mstack ✗L1/L3 等你1 跑1`：验收结论、等你批准的任务、在跑的任务，悬停看原因）；在 DSH 网页端每个会话标题旁显示一行状态、多一个 `mstack` 标签页（嵌入 `mola web`）。
+
+```sh
+dsh plugin --profile dsh-tui add @deepseek-harness-tui/dsh-tui   # 终端界面（需要 dsh ≥ 0.2.2-rc.3）
+dsh plugin --profile dsh-tui add @molamaker/dsh-mstack
+dsh --profile dsh-tui
+```
+
 ### Claude Code
 
 方式一（GitHub marketplace）：

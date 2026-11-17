@@ -1,37 +1,51 @@
 import React from "react";
 import { AbsoluteFill, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 
-const BG = "#0d1117";
-const FG = "#e6edf3";
-const DIM = "#7d8590";
-const ACCENT = "#58a6ff";
-const MONO = "'Cascadia Code', 'JetBrains Mono', Consolas, monospace";
-const SANS = "'Inter', 'Segoe UI', 'Microsoft YaHei', sans-serif";
+// Tokens mirror cli/packages/plugin-sdk/src/theme.ts (THEME / SEMANTIC) so the animation matches the real console.
+const T = {
+  blue: { 50: "#f7fbff", 100: "#eaf3ff", 300: "#b7d4ff", 500: "#5d93dc", 600: "#3f72bd", 700: "#2b5597" },
+  pink: { 100: "#fde8f1", 300: "#f2a5c4", 500: "#dd668d" },
+  ink: { 900: "#1f2c44", 600: "#4a5b78", 500: "#586884", 400: "#8496b3" },
+  night: { 900: "#0f1726", 800: "#172238", 700: "#22314e" },
+  lift2: "inset 0 1px 0 rgba(255,255,255,.85), 0 10px 29px rgba(52,101,170,.14)",
+  lift3: "inset 0 1px 0 rgba(255,255,255,.85), 0 15px 35px rgba(52,101,170,.19)",
+};
+const BG = T.night[900];
+const FG = "#e8f0ff";
+const DIM = "#8ea1c4";
+const LINE = "#33466b";
+const MONO = "'JetBrains Mono', 'Cascadia Code', Consolas, 'Microsoft YaHei UI', monospace";
+const SANS = "'Zen Maru Gothic', 'Yu Gothic UI', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif";
 
-const SCENES = { title: 90, merge: 150, skills: 150, route: 160, team: 140, built: 110 };
+const SCENES = { title: 60, route: 150, web: 240, tui: 120, cua: 120, end: 90 };
 export const DURATION = Object.values(SCENES).reduce((a, b) => a + b, 0);
+
+const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
+const ramp = (f: number, a: number, b: number) => interpolate(f, [a, b], [0, 1], clamp);
 
 // Fade in at the start of a scene and out at its end.
 const useFade = (len: number) => {
   const f = useCurrentFrame();
-  return interpolate(f, [0, 12, len - 12, len], [0, 1, 1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  return interpolate(f, [0, 12, len - 12, len], [0, 1, 1, 0], clamp);
 };
 
-const Caption: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div style={{ position: "absolute", bottom: 56, width: "100%", textAlign: "center", color: DIM, fontFamily: SANS, fontSize: 24 }}>
+const Caption: React.FC<{ children: React.ReactNode; dark?: boolean }> = ({ children, dark }) => (
+  <div style={{ position: "absolute", bottom: 40, width: "100%", textAlign: "center", color: dark ? T.ink[500] : DIM, fontFamily: SANS, fontSize: 26 }}>
     {children}
   </div>
 );
 
-const Chip: React.FC<{ label: string; on?: boolean; style?: React.CSSProperties }> = ({ label, on, style }) => (
+type PillState = "done" | "now" | "todo";
+const Pill: React.FC<{ label: string; state: PillState }> = ({ label, state }) => (
   <div
     style={{
-      fontFamily: MONO, fontSize: 22, padding: "10px 18px", borderRadius: 8,
-      border: `1px solid ${on ? ACCENT : "#30363d"}`, color: on ? ACCENT : FG,
-      background: on ? "rgba(88,166,255,0.08)" : "#161b22", whiteSpace: "nowrap", ...style,
+      fontFamily: MONO, fontSize: 20, padding: "6px 16px", borderRadius: 999, whiteSpace: "nowrap",
+      border: `1px solid ${state === "todo" ? T.blue[300] : T.blue[600]}`,
+      background: state === "now" ? T.blue[600] : state === "done" ? T.blue[100] : "#fff",
+      color: state === "now" ? "#fff" : state === "done" ? T.blue[700] : T.ink[400],
     }}
   >
-    {label}
+    {state === "done" ? "✓ " : state === "now" ? "▸ " : "○ "}{label}
   </div>
 );
 
@@ -42,132 +56,216 @@ const Title = () => {
   return (
     <AbsoluteFill style={{ justifyContent: "center", alignItems: "center", opacity: useFade(SCENES.title) }}>
       <div style={{ fontFamily: MONO, fontSize: 120, color: FG, transform: `translateY(${(1 - s) * 20}px)` }}>mstack</div>
-      <div style={{ fontFamily: SANS, fontSize: 30, color: DIM, marginTop: 12, opacity: s }}>
-        one de-duplicated skill stack for coding agents
+      <div style={{ fontFamily: SANS, fontSize: 32, color: DIM, marginTop: 12, opacity: s }}>
+        一句话交给 agent，自己只管点头
       </div>
     </AbsoluteFill>
   );
 };
 
-const SOURCES = [
-  { name: "superpowers", n: 15 },
-  { name: "gstack", n: 23 },
-  { name: "pstack", n: 30 },
-  { name: "oh-my-claudecode", n: 18 },
-];
+const STAGES = ["think", "plan", "implement", "verify", "review", "ship"];
 
-const Merge = () => {
-  const f = useCurrentFrame();
-  const t = interpolate(f, [30, 95], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-  const ease = 1 - Math.pow(1 - t, 3);
-  return (
-    <AbsoluteFill style={{ opacity: useFade(SCENES.merge) }}>
-      {SOURCES.map((src, i) => {
-        const y0 = 170 + i * 90;
-        const fade = interpolate(t, [0.45, 0.9], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-        return (
-          <div key={src.name} style={{ position: "absolute", left: 140 + ease * 160, top: y0, opacity: fade }}>
-            <Chip label={`${src.name} · ${src.n}`} />
-          </div>
-        );
-      })}
-      <div style={{ position: "absolute", left: 760, top: 290, opacity: ease }}>
-        <Chip on label="16 m-skills" style={{ fontSize: 34, padding: "18px 28px" }} />
-      </div>
-      <Caption>86 source skills from 4 stacks → merged, de-duplicated, rewritten</Caption>
-    </AbsoluteFill>
-  );
-};
-
-const SKILLS = ["m-start", "m-think", "m-plan", "m-goal", "m-team", "m-dispatch", "m-verify", "m-debug",
-  "m-review", "m-ship", "m-qa", "m-research", "m-handoff", "m-learn", "m-deslop", "m-guard"];
-
-const Skills = () => {
-  const f = useCurrentFrame();
-  return (
-    <AbsoluteFill style={{ opacity: useFade(SCENES.skills) }}>
-      <div style={{ position: "absolute", top: 150, left: 140, right: 140, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 22 }}>
-        {SKILLS.map((s, i) => {
-          const o = interpolate(f, [8 + i * 4, 20 + i * 4], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
-          return <div key={s} style={{ opacity: o }}><Chip label={s} on={s === "m-start"} style={{ textAlign: "center" }} /></div>;
-        })}
-      </div>
-      <Caption>each SKILL.md ≤ 150 lines · one job per skill · Claude Code, DSH and Codex</Caption>
-    </AbsoluteFill>
-  );
-};
-
-const STAGES = ["m-start", "m-think", "m-plan", "m-goal", "m-dispatch", "m-verify", "m-ship"];
-
+// 1. /go <一句话> -> the six stages light up one by one
 const Route = () => {
   const f = useCurrentFrame();
-  const typed = "继续".slice(0, Math.floor(interpolate(f, [5, 25], [0, 2], { extrapolateRight: "clamp" })));
-  const active = Math.floor(interpolate(f, [40, 140], [0, STAGES.length - 0.01], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }));
+  const full = "/go 给首页英雄区加上滚动视差";
+  const typed = full.slice(0, Math.floor(interpolate(f, [6, 46], [0, full.length], clamp)));
+  const active = Math.floor(interpolate(f, [56, 138], [0, STAGES.length - 0.01], clamp));
   return (
     <AbsoluteFill style={{ opacity: useFade(SCENES.route) }}>
-      <div style={{ position: "absolute", top: 150, left: 140, fontFamily: MONO, fontSize: 30, color: FG }}>
-        <span style={{ color: DIM }}>&gt; </span>{typed}<span style={{ opacity: f % 30 < 15 ? 1 : 0 }}>▍</span>
+      <div style={{ position: "absolute", top: 150, left: 140, fontFamily: MONO, fontSize: 38, color: FG }}>
+        <span style={{ color: T.pink[300] }}>&gt; </span>{typed}<span style={{ opacity: f % 30 < 15 ? 1 : 0 }}>▍</span>
       </div>
-      <div style={{ position: "absolute", top: 310, left: 70, right: 70, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-        {STAGES.map((s, i) => (
-          <React.Fragment key={s}>
-            <Chip label={s} on={f >= 40 && i === active} style={{ fontSize: 19, padding: "8px 12px", opacity: f >= 40 && i <= active ? 1 : 0.45 }} />
-            {i < STAGES.length - 1 && <span style={{ color: DIM, fontFamily: MONO, fontSize: 20 }}>→</span>}
-          </React.Fragment>
-        ))}
+      <div style={{ position: "absolute", top: 330, left: 60, right: 60, display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
+        {STAGES.map((s, i) => {
+          const on = f >= 56 && i === active;
+          const done = f >= 56 && i < active;
+          return (
+            <React.Fragment key={s}>
+              <div style={{
+                fontFamily: MONO, fontSize: 25, padding: "12px 20px", borderRadius: 16,
+                border: `1px solid ${on || done ? T.blue[500] : T.night[700]}`,
+                color: on ? "#fff" : done ? T.blue[300] : DIM,
+                background: on ? T.blue[600] : T.night[800],
+                boxShadow: on ? "0 10px 29px rgba(63,114,189,.45)" : "none",
+                transform: `translateY(${on ? -6 : 0}px)`,
+              }}>{done ? "✓ " : ""}{s}</div>
+              {i < STAGES.length - 1 && <span style={{ color: DIM, fontFamily: MONO, fontSize: 24 }}>→</span>}
+            </React.Fragment>
+          );
+        })}
       </div>
-      <Caption>a two-character prompt is enough: m-start reads .mstack/ state and resumes the right stage</Caption>
+      <Caption>mola go：从想法到上线，六个阶段自己往下走</Caption>
     </AbsoluteFill>
   );
 };
 
-const LOOP = ["round v{n}", "measure + gates", "supervisor reflects", "redesign roles"];
+// 2. mola web: run cards + approval + side panel (day theme)
+const Card: React.FC<{ style?: React.CSSProperties; children: React.ReactNode }> = ({ style, children }) => (
+  <div style={{ background: "#fff", borderRadius: 24, boxShadow: T.lift2, padding: "22px 28px", ...style }}>{children}</div>
+);
 
-const Team = () => {
+const LADDER: [string, string, "ok" | "gap" | "need"][] = [
+  ["L5", "性能与体积", "gap"], ["L4", "走通行为", "gap"], ["L3", "装上并启动（要求）", "need"], ["L2", "单元测试", "gap"], ["L1", "能编译", "ok"],
+];
+const RUN_STAGES = ["plan", "implement", "verify", "review", "ship"];
+
+const Web = () => {
   const f = useCurrentFrame();
-  const angle = interpolate(f, [10, 130], [0, Math.PI * 2]);
-  const cx = 640, cy = 330, r = 165;
-  const round = 1 + Math.floor(interpolate(f, [10, 130], [0, 3], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }));
+  const { fps } = useVideoConfig();
+  const pop = (d: number): React.CSSProperties => {
+    const s = spring({ frame: f - d, fps, config: { damping: 200 } });
+    return { opacity: s, transform: `translateY(${(1 - s) * 24}px)` };
+  };
+  const press = ramp(f, 150, 160) - ramp(f, 185, 200);
+  const approved = f >= 158;
   return (
-    <AbsoluteFill style={{ opacity: useFade(SCENES.team) }}>
-      <svg width={1280} height={720} style={{ position: "absolute" }}>
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#30363d" strokeWidth={2} />
-        <circle cx={cx + r * Math.cos(angle - Math.PI / 2)} cy={cy + r * Math.sin(angle - Math.PI / 2)} r={7} fill={ACCENT} />
-      </svg>
-      {LOOP.map((label, i) => {
-        const a = (i / LOOP.length) * Math.PI * 2 - Math.PI / 2;
-        return (
-          <div key={label} style={{ position: "absolute", left: cx + (r + 8) * Math.cos(a), top: cy + (r + 8) * Math.sin(a), transform: "translate(-50%,-50%)" }}>
-            <Chip label={label.replace("{n}", String(round))} style={{ fontSize: 18, padding: "6px 12px" }} />
+    <AbsoluteFill style={{ opacity: useFade(SCENES.web), background: T.blue[50] }}>
+      <div style={{ position: "absolute", top: 34, left: 60, fontFamily: SANS, fontSize: 34, fontWeight: 700, color: T.ink[900] }}>
+        mola 控制台 <span style={{ fontSize: 20, fontWeight: 400, color: T.blue[600], marginLeft: 14 }}>已连接</span>
+      </div>
+      <div style={{ position: "absolute", top: 100, left: 60, width: 700 }}>
+        <div style={pop(10)}>
+          <Card style={{ boxShadow: T.lift3, borderBottom: `8px solid ${T.pink[300]}` }}>
+            <div style={{ fontFamily: SANS, fontSize: 25, fontWeight: 700, color: T.ink[900] }}>给首页的英雄区加上滚动视差</div>
+            <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+              {RUN_STAGES.map((s, i) => <Pill key={s} label={s} state={i < 4 ? "done" : "now"} />)}
+            </div>
+            <div style={{ fontFamily: SANS, fontSize: 20, color: T.ink[500], marginTop: 12 }}>
+              {approved ? "已批准 · 正在推送" : "等你 · ship · 已用 3 分钟"}
+            </div>
+            <div style={{ marginTop: 14, borderRadius: 16, background: T.pink[100], padding: "16px 20px", ...pop(55) }}>
+              <div style={{ fontFamily: SANS, fontSize: 23, color: T.ink[900] }}>要你点头：git push … 并开 PR</div>
+              <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+                <div style={{
+                  fontFamily: SANS, fontSize: 22, padding: "8px 28px", borderRadius: 999, color: "#fff",
+                  background: T.blue[600], boxShadow: `0 ${6 - 4 * press}px 14px rgba(63,114,189,.35)`, transform: `translateY(${press * 3}px)`,
+                }}>{approved ? "已批准" : "批准"}</div>
+                <div style={{ fontFamily: SANS, fontSize: 22, padding: "8px 28px", borderRadius: 999, background: "#fff", color: T.pink[500], border: `1px solid ${T.pink[300]}` }}>拒绝</div>
+              </div>
+            </div>
+          </Card>
+        </div>
+        <div style={{ marginTop: 26, ...pop(30) }}>
+          <Card style={{ padding: "18px 28px" }}>
+            <div style={{ fontFamily: SANS, fontSize: 23, fontWeight: 700, color: T.ink[900] }}>给 CAD2GIS 的图层匹配补单元测试</div>
+            <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+              {RUN_STAGES.map((s, i) => <Pill key={s} label={s} state={i === 0 ? "done" : i === 1 ? "now" : "todo"} />)}
+            </div>
+          </Card>
+        </div>
+      </div>
+      <div style={{ position: "absolute", top: 100, left: 810, width: 410 }}>
+        <div style={pop(80)}>
+          <Card style={{ padding: "20px 26px" }}>
+            <div style={{ fontFamily: SANS, fontSize: 25, fontWeight: 700, color: T.ink[900] }}>只验到 L1，要求 L3</div>
+            <div style={{ marginTop: 14 }}>
+              {LADDER.map(([lv, label, st]) => (
+                <div key={lv} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8, fontFamily: SANS, fontSize: 20, color: st === "need" ? T.ink[900] : T.ink[500] }}>
+                  <div style={{
+                    width: 54, height: 26, borderRadius: 10, flexShrink: 0, boxSizing: "border-box",
+                    background: st === "ok" ? T.blue[500] : st === "need" ? "#fff" : T.blue[100],
+                    border: st === "need" ? `2px dashed ${T.pink[500]}` : "none",
+                  }} />
+                  {lv} {label}
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+        <div style={{ marginTop: 22, ...pop(115) }}>
+          <Card style={{ padding: "18px 26px" }}>
+            <div style={{ fontFamily: SANS, fontSize: 23, fontWeight: 700, color: T.ink[900], marginBottom: 12 }}>herdr 里的 agent</div>
+            {[["agent-1", "在干活", T.blue[500]], ["agent-2", "等你", T.pink[300]]].map(([n, st, c]) => (
+              <div key={n} style={{ display: "flex", alignItems: "center", gap: 12, fontFamily: SANS, fontSize: 21, color: T.ink[600], marginBottom: 8 }}>
+                <span style={{ width: 14, height: 14, borderRadius: 7, background: c }} />{n}
+                <span style={{ marginLeft: "auto", color: T.ink[900] }}>{st}</span>
+              </div>
+            ))}
+          </Card>
+        </div>
+      </div>
+      <Caption dark>mola web：所有 run 一屏看完，危险动作等你点头</Caption>
+    </AbsoluteFill>
+  );
+};
+
+// 3. DSH terminal: footer status line + web embed line
+const Tui = () => {
+  const f = useCurrentFrame();
+  const on = ramp(f, 30, 45);
+  const emb = ramp(f, 62, 78);
+  return (
+    <AbsoluteFill style={{ opacity: useFade(SCENES.tui), justifyContent: "center", alignItems: "center" }}>
+      <div style={{ width: 1120, height: 440, borderRadius: 20, background: T.night[800], border: `1px solid ${LINE}`, boxShadow: "0 20px 50px rgba(0,0,0,.45)", overflow: "hidden" }}>
+        <div style={{ height: 44, background: T.night[700], display: "flex", alignItems: "center", gap: 10, paddingLeft: 20 }}>
+          {[T.pink[300], T.blue[300], T.blue[500]].map((c) => <span key={c} style={{ width: 14, height: 14, borderRadius: 7, background: c }} />)}
+          <span style={{ fontFamily: MONO, fontSize: 18, color: DIM, marginLeft: 12 }}>dsh · tui-demo</span>
+        </div>
+        <div style={{ padding: "26px 34px", fontFamily: MONO, fontSize: 24, color: FG, lineHeight: 1.7 }}>
+          <div><span style={{ color: T.blue[300] }}>Read</span> .mstack/PLAN.md <span style={{ color: DIM }}>· 0s</span></div>
+          <div><span style={{ color: T.blue[300] }}>Pwsh</span>(npm test) <span style={{ color: DIM }}>· 6s</span></div>
+          <div style={{ color: DIM }}>● 换条路 · 20s · 工具x14</div>
+          <div style={{ marginTop: 24, border: `1px solid ${LINE}`, borderRadius: 12, padding: "8px 16px", color: DIM }}>❯ <span style={{ opacity: f % 30 < 15 ? 1 : 0 }}>▍</span></div>
+          <div style={{ marginTop: 18, fontSize: 22, color: DIM, whiteSpace: "nowrap" }}>
+            group/group-3 · ● 1 · high · 缓存 90.7% ·{" "}
+            <span style={{
+              color: T.pink[500], padding: "2px 8px", borderRadius: 8,
+              background: `rgba(221,102,141,${0.22 * on})`, outline: `2px solid rgba(221,102,141,${on})`,
+            }}>mstack ✗L1/L3 等你1 跑1</span>
           </div>
-        );
-      })}
-      <div style={{ position: "absolute", left: cx, top: cy, transform: "translate(-50%,-50%)", fontFamily: MONO, fontSize: 18, color: DIM, textAlign: "center", lineHeight: 1.6 }}>
-        LEARNINGS.md<br />SYNTHESIS.md<br />history.md
+          <div style={{ marginTop: 14, fontSize: 21, color: T.pink[300], opacity: emb, transform: `translateY(${(1 - emb) * 10}px)`, whiteSpace: "nowrap" }}>
+            verify ✗ L1 / L3 · 缺口 3 · 等你 1 · 在跑 1 · herdr 等你 1
+          </div>
+        </div>
       </div>
-      <Caption>m-team: the team itself evolves each round (after arXiv 2610.36848)</Caption>
+      <Caption>终端状态栏同样盯着：验证缺口、等你的、在跑的</Caption>
     </AbsoluteFill>
   );
 };
 
-const Built = () => {
+// 4. m-cua beat
+const CUA_STEPS: [number, string, string][] = [
+  [8, "mola-cua snapshot", "→ @e1 窗口  @e2 文本框  @e3 按钮「保存」"],
+  [38, "mola-cua click @e3", "→ ok"],
+  [66, "mola-cua get text @e2", "→ 已保存  (期望: 已保存)"],
+];
+
+const Cua = () => {
   const f = useCurrentFrame();
-  const lines = [
-    "framework  → FRAMEWORK.md (Claude)",
-    "build      → DSH headless workers via magpie routes",
-    "review     → independent DSH reviewer, findings fixed",
-    "check      → scripts/check.mjs + CI",
-  ];
+  const rec = ramp(f, 90, 102);
   return (
-    <AbsoluteFill style={{ opacity: useFade(SCENES.built), justifyContent: "center", paddingLeft: 180 }}>
-      {lines.map((l, i) => (
-        <div key={l} style={{ fontFamily: MONO, fontSize: 26, color: FG, marginBottom: 18, opacity: interpolate(f, [6 + i * 10, 16 + i * 10], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) }}>
-          {l}
+    <AbsoluteFill style={{ opacity: useFade(SCENES.cua), justifyContent: "center", alignItems: "center" }}>
+      <div style={{ width: 1000, background: T.night[800], border: `1px solid ${LINE}`, borderRadius: 20, padding: "34px 44px", fontFamily: MONO, fontSize: 28, boxShadow: "0 20px 50px rgba(0,0,0,.45)" }}>
+        {CUA_STEPS.map(([at, cmd, out]) => (
+          <div key={cmd} style={{ opacity: ramp(f, at, at + 10), marginBottom: 20 }}>
+            <div style={{ color: FG }}><span style={{ color: T.pink[300] }}>$ </span>{cmd}</div>
+            <div style={{ color: DIM, fontSize: 24, marginTop: 4 }}>{out}</div>
+          </div>
+        ))}
+        <div style={{
+          marginTop: 28, display: "inline-block", opacity: rec, transform: `scale(${0.92 + 0.08 * rec})`,
+          padding: "12px 26px", borderRadius: 999, background: "rgba(74,222,128,.14)", border: "2px solid #4ade80", color: "#4ade80", fontSize: 30,
+        }}>L4 ✓ receipt</div>
+      </div>
+      <Caption>m-cua：真去点一下桌面应用，拿到 L4 回执</Caption>
+    </AbsoluteFill>
+  );
+};
+
+const End = () => {
+  const f = useCurrentFrame();
+  return (
+    <AbsoluteFill style={{ opacity: useFade(SCENES.end), justifyContent: "center", alignItems: "center", gap: 30 }}>
+      {["npm i -g @molamaker/mstack", 'mola go "给首页英雄区加上滚动视差"'].map((l, i) => (
+        <div key={l} style={{
+          opacity: ramp(f, 8 + i * 14, 20 + i * 14), fontFamily: MONO, fontSize: i ? 34 : 38, color: FG,
+          background: T.night[800], border: `1px solid ${LINE}`, borderRadius: 16, padding: "18px 36px",
+        }}>
+          <span style={{ color: T.pink[300] }}>$ </span>{l}
         </div>
       ))}
-      <div style={{ fontFamily: MONO, fontSize: 24, color: ACCENT, marginTop: 36, opacity: interpolate(f, [50, 62], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) }}>
-        github.com/Mola-maker/mstack
-      </div>
+      <div style={{ fontFamily: MONO, fontSize: 24, color: T.blue[300], opacity: ramp(f, 46, 58) }}>github.com/Mola-maker/mstack</div>
     </AbsoluteFill>
   );
 };
@@ -182,11 +280,11 @@ export const Demo = () => {
   return (
     <AbsoluteFill style={{ background: BG }}>
       {seq(SCENES.title, <Title />)}
-      {seq(SCENES.merge, <Merge />)}
-      {seq(SCENES.skills, <Skills />)}
       {seq(SCENES.route, <Route />)}
-      {seq(SCENES.team, <Team />)}
-      {seq(SCENES.built, <Built />)}
+      {seq(SCENES.web, <Web />)}
+      {seq(SCENES.tui, <Tui />)}
+      {seq(SCENES.cua, <Cua />)}
+      {seq(SCENES.end, <End />)}
     </AbsoluteFill>
   );
 };

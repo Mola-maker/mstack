@@ -19,7 +19,8 @@ process.emitWarning = ((warning: string | Error, ...rest: unknown[]) => {
   return (emitWarning as (...a: unknown[]) => void)(warning, ...rest);
 }) as typeof process.emitWarning;
 
-const VERSION = "0.1.0";
+// this package's own version: the npm package stages it with the release version, a checkout says 0.1.0
+const VERSION: string = (createRequire(import.meta.url)("../package.json") as { version: string }).version;
 
 /** Bundled first-party plugins (tier: builtin), resolved through this package's deps. */
 const BUILTIN_PLUGIN_PACKAGES = [
@@ -41,6 +42,11 @@ const BUILTIN_PLUGIN_PACKAGES = [
   "@mola/plugin-tool-superagent",
   "@mola/plugin-cmd-dash",
   "@mola/plugin-cmd-ultramode",
+  // mstack 1.0: unattended runs and the status line, the web console, the terminal console, the scout
+  "@mola/plugin-cmd-go",
+  "@mola/plugin-cmd-web",
+  "@mola/plugin-cmd-tui",
+  "@mola/plugin-cmd-scout",
 ];
 
 function parseGlobalFlags(argv: string[]): { flags: GlobalFlags; rest: string[] } {

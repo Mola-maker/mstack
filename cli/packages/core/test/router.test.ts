@@ -141,3 +141,24 @@ test("human mode does not repeat data when the handler already wrote", async () 
   assert.equal(res.code, 0);
   assert.equal(res.stdout, "hello\n");
 });
+
+test("--help and -h describe a command and never run it", async () => {
+  const r = makeRouter();
+  let ran = 0;
+  r.register({ path: ["skills", "install"], description: "install the skills", handler: async () => (ran++, 0) }, "a");
+  r.register({ path: ["go"], description: "start a run", handler: async () => (ran++, 0) }, "a");
+  r.register({ path: ["go", "stop"], description: "stop a run", handler: async () => (ran++, 0) }, "a");
+  const a = await capture(() => r.dispatch(["skills", "install", "--help"], new IoImpl(false, false, "t-test", process.cwd(), true)));
+  assert.equal(a.code, 0);
+  assert.match(a.stdout, /mola skills install — install the skills/);
+  const b = await capture(() => r.dispatch(["go", "-h"], new IoImpl(false, false, "t-test", process.cwd(), true)));
+  assert.match(b.stdout, /mola go — start a run/);
+  assert.match(b.stdout, /go stop\s+stop a run/);
+  // a value after --help, and --help=…, still never run it
+  await capture(() => r.dispatch(["go", "--help", "fix", "the", "bug"], quietIo()));
+  await capture(() => r.dispatch(["skills", "install", "--help=true"], quietIo()));
+  // json mode answers an envelope
+  const j = await capture(() => r.dispatch(["go", "--help"], quietIo()));
+  assert.equal(JSON.parse(j.stdout).data.command, "go");
+  assert.equal(ran, 0);
+});

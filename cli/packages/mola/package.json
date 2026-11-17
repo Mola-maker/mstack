@@ -1,7 +1,7 @@
 {
   "name": "mola",
   "version": "0.1.0",
-  "description": "mola \u2014 plugin-based agent orchestration CLI (B1 skeleton)",
+  "description": "mola — plugin-based agent orchestration CLI (B1 skeleton)",
   "type": "module",
   "bin": {
     "mola": "./dist/bin.js"
@@ -40,6 +40,10 @@
     "@mola/plugin-cmd-run": "workspace:*",
     "@mola/plugin-tool-superagent": "workspace:*",
     "@mola/plugin-cmd-dash": "workspace:*",
-    "@mola/plugin-cmd-ultramode": "workspace:*"
+    "@mola/plugin-cmd-ultramode": "workspace:*",
+    "@mola/plugin-cmd-go": "workspace:*",
+    "@mola/plugin-cmd-web": "workspace:*",
+    "@mola/plugin-cmd-tui": "workspace:*",
+    "@mola/plugin-cmd-scout": "workspace:*"
   }
 }

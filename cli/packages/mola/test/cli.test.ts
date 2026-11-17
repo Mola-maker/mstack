@@ -47,7 +47,7 @@ test("plugin list --json: envelope with the builtin plugins, exit 0", () => {
   assert.equal(env.command, "plugin list");
   assert.ok(typeof env.traceId === "string" && env.traceId.length > 0);
   const ids = env.data.map((p: any) => p.id).sort();
-  assert.deepEqual([...ids].sort(), ["mola-agent-dsh", "mola-cmd-config", "mola-cmd-dispatch", "mola-cmd-doctor", "mola-cmd-model", "mola-cmd-plugin", "mola-cmd-rtk", "mola-policy-approval", "mola-tool-git", "mola-tool-magpie", "mola-tool-rtk", "mola-agent-claude", "mola-agent-codex", "mola-rec-runs", "mola-cmd-run", "mola-tool-superagent", "mola-cmd-dash", "mola-cmd-ultramode"].sort());
+  assert.deepEqual([...ids].sort(), ["mola-agent-dsh", "mola-cmd-config", "mola-cmd-dispatch", "mola-cmd-doctor", "mola-cmd-model", "mola-cmd-plugin", "mola-cmd-rtk", "mola-policy-approval", "mola-tool-git", "mola-tool-magpie", "mola-tool-rtk", "mola-agent-claude", "mola-agent-codex", "mola-rec-runs", "mola-cmd-run", "mola-tool-superagent", "mola-cmd-dash", "mola-cmd-ultramode", "mola-cmd-go", "mola-cmd-web", "mola-cmd-tui", "mola-cmd-scout"].sort());
   for (const p of env.data) {
     assert.equal(p.tier, "builtin");
     assert.equal(p.state, "active");
@@ -191,4 +191,21 @@ test("doctor leaves its last result in the mola home for the status line: failin
   assert.equal(cache.total, checks.length);
   assert.deepEqual(cache.gaps.map((g: any) => g.id).sort(), checks.filter((c) => !c.ok || c.warn).map((c) => c.id).sort());
   assert.ok(Math.abs(Date.now() - Date.parse(cache.ts)) < 60_000);
+});
+
+test("skills install refuses a stray word or an unknown flag (exit 64) and installs nothing", () => {
+  const home = tmpHome();
+  for (const argv of [["skills", "install", "dsh", "--dry-run"], ["skills", "install", "--dsh", "--dyr-run"], ["skills", "install", "help"]]) {
+    const r = run(argv, home, undefined, { USERPROFILE: home, HOME: home });
+    assert.equal(r.status, 64, `${argv.join(" ")}: ${r.stdout}${r.stderr}`);
+  }
+  assert.equal(fs.existsSync(path.join(home, ".dsh")), false);
+  assert.equal(fs.existsSync(path.join(home, ".codex")), false);
+});
+
+test("--help after a command never runs it, even with words after it", () => {
+  const home = tmpHome();
+  const r = run(["go", "--help", "fix", "the", "bug"], home, undefined, { USERPROFILE: home, HOME: home });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /^mola go — /);
 });
