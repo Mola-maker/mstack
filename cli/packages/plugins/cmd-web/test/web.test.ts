@@ -10,6 +10,7 @@ import {
   runDir,
   writeApproval,
   writeProgress,
+  type HerdrState,
   type RunProgress,
 } from "@mola/plugin-sdk";
 import { startWeb, type WebServer } from "@mola/plugin-cmd-web";
@@ -437,4 +438,44 @@ test("without a token, a request addressed to another host name is refused (DNS 
     assert.equal(await ask(`localhost:${w.port}`, "/api/runs"), 200);
     assert.equal(await ask(`[::1]:${w.port}`, "/api/runs"), 200);
   });
+});
+
+// ---------------------------------------------------------------- embed page, herdr
+
+import { embedHtml } from "@mola/plugin-cmd-web";
+
+test("GET /embed serves the one-line status page; it is self-contained and its script parses", async () => {
+  const cwd = tmp();
+  await withWeb({ cwds: [cwd] }, async (_w, base) => {
+    const page = await get(base, "/embed");
+    assert.equal(page.status, 200);
+    assert.match(page.body, /id="line"/);
+  });
+  const html = embedHtml();
+  assert.doesNotMatch(html, /(src|href)="(https?:)?\/\//);
+  assert.doesNotThrow(() => new Function(/<script>([\s\S]*)<\/script>/.exec(html)![1]));
+});
+
+test("the environment carries herdr's agents, asked at most every 5 s however often the page reads", async () => {
+  const cwd = tmp();
+  let asked = 0;
+  const herdr = (): HerdrState => (asked++, { state: "running", agents: [{ pane: "w1:p1", workspace: "w1", name: "builder", agent: "Claude Code", status: "blocked", cwd: null, title: null }] });
+  await withWeb({ cwds: [cwd], herdr, pollMs: 10 }, async (_w, base) => {
+    const first = JSON.parse((await get(base, "/api/env")).body);
+    assert.equal(first.herdr.state, "running");
+    assert.equal(first.herdr.agents[0].status, "blocked");
+    await new Promise((r) => setTimeout(r, 40));
+    await get(base, "/api/env");
+    assert.equal(asked, 1);
+  });
+  // without a stand-in and without herdr on the machine's PATH given to it, the console says nothing about herdr
+  await withWeb({ cwds: [cwd], env: { MOLA_HOME: tmp() } as NodeJS.ProcessEnv }, async (_w, base) => {
+    assert.deepEqual(JSON.parse((await get(base, "/api/env")).body).herdr, { state: "absent" });
+  });
+});
+
+test("the page has a herdr section that stays hidden until herdr is there", () => {
+  const html = pageHtml();
+  assert.match(html, /<section id="herdr" hidden>/);
+  assert.match(html, /hs\.hidden=h\.state==="absent"/);
 });
