@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { ExecOptions, ExecResult } from "@mola/plugin-sdk";
-import plugin from "@mola/plugin-cmd-model";
+import plugin, { roleGroupGaps } from "@mola/plugin-cmd-model";
 import { commandOf, fakeCtx, fakeIo, type FakeCtx } from "./helpers.js";
 import { MAGPIE_DSH, MAGPIE_LS, MAGPIE_MODELS, MAGPIE_STDERR_NOISE } from "./fixtures.js";
 
@@ -204,6 +204,54 @@ test("model routes lists magpie's route ids with whitelist verdicts", async () =
   const banned = data.routes.find((r) => r.id === "deepseek/deepseek-v4-pro[1M]")!;
   assert.equal(banned.allowed, false);
   assert.equal(banned.reason, "banned");
+});
+
+const ROLE_TABLE = {
+  file: "x",
+  roles: { think: { group: "group/m-think" }, bulk: { group: "group/m-bulk" } },
+  tasks: {
+    plan: { role: "think", picks: ["group/m-think", "auto/claude-opus-5-5"] },
+    review: { role: "think", picks: ["group/m-think", "auto/gemini"] },
+    test: { role: "bulk", picks: ["group/m-bulk"] },
+    odd: { picks: ["auto/x"] },
+  },
+  families: {},
+};
+
+test("roleGroupGaps names the missing groups, the kinds behind them and the fallback", () => {
+  assert.deepEqual(roleGroupGaps(ROLE_TABLE as never, ["group/m-think", "auto/x"]), [{ role: "bulk", group: "group/m-bulk", kinds: ["test"] }]);
+  assert.deepEqual(roleGroupGaps(ROLE_TABLE as never, []), [
+    { role: "think", group: "group/m-think", kinds: ["plan", "review"], fallback: "auto/claude-opus-5-5" },
+    { role: "bulk", group: "group/m-bulk", kinds: ["test"] },
+  ]);
+  assert.deepEqual(roleGroupGaps(ROLE_TABLE as never, ["group/m-think", "group/m-bulk"]), []);
+  assert.deepEqual(roleGroupGaps({ ...ROLE_TABLE, roles: undefined } as never, []), []);
+});
+
+test("doctor: roles.groups warns when magpie lacks the role groups, and is quiet when it has them", async () => {
+  const { ctx } = activatedCtx();
+  const check = ctx.doctor.checks.find((c) => c.id === "roles.groups")!;
+  assert.ok(check, "registered");
+  const missing = await check.run();
+  assert.equal(missing.ok, true, "a missing group never fails the doctor");
+  assert.equal(missing.warn, true);
+  assert.match(missing.message ?? "", /4 role groups missing in magpie: group\/m-think/);
+  assert.match(missing.message ?? "", /→ auto\/claude-opus-5-5/, "names the fallback");
+
+  const groups = ["think", "build", "operate", "bulk"].map((r) => `  group/m-${r}   a role\n`).join("");
+  const full = activatedCtx({ exec: async () => ({ code: 0, stdout: MAGPIE_MODELS + groups, stderr: "" }) });
+  const ok = await full.ctx.doctor.checks.find((c) => c.id === "roles.groups")!.run();
+  assert.equal(ok.ok, true);
+  assert.equal(ok.warn, undefined);
+  assert.match(ok.message ?? "", /all 4 role groups exist/);
+});
+
+test("doctor: roles.groups says it could not check when magpie is unreachable, and does not fail", async () => {
+  const { ctx } = activatedCtx({ exec: async () => { throw new Error("spawn magpie ENOENT"); } });
+  const r = await ctx.doctor.checks.find((c) => c.id === "roles.groups")!.run();
+  assert.equal(r.ok, true);
+  assert.equal(r.warn, true);
+  assert.match(r.message ?? "", /were not checked/);
 });
 
 test("model commands exit 69 when magpie is unreachable", async () => {

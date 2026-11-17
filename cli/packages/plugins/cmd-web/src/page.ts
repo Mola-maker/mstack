@@ -63,6 +63,8 @@ mola-run .ask p:last-child{margin-bottom:0}
 .ask .acts{margin-top:0}
 .btn{border:1px solid var(--m-line);background:var(--m-surface);color:var(--m-ink);border-radius:var(--m-radius-pill);padding:6px 18px;cursor:pointer;min-height:36px;
   box-shadow:0 2px 0 var(--m-line);transition:transform var(--m-t-press) var(--m-ease),box-shadow var(--m-t-press) var(--m-ease)}
+.launch textarea{width:100%;min-height:76px;resize:vertical;font:inherit;color:inherit;background:var(--m-surface);border:1px solid var(--m-line);border-radius:var(--m-radius-md);padding:10px 12px}
+.launch .small{margin:6px 0 0}
 .btn:hover{transform:translateY(-1px);box-shadow:0 3px 0 var(--m-line)}
 .btn:active{transform:translateY(2px);box-shadow:0 0 0 var(--m-line)}
 .btn:disabled{opacity:.5;cursor:default;transform:none}
@@ -237,6 +239,20 @@ function onEnv(e){
     return"<tr><th>"+esc(ROLE[r.role]||r.role)+(r.unverified?'<span class="tag">未实测</span>':"")+"</th><td>"+esc(r.kinds.join("、"))+'<span class="grp">'+esc(r.group)+"</span></td></tr>";
   }).join("")||'<tr><td class="small">没找到路由表。</td></tr>';
 }
+var launchBtn=document.getElementById("launch");
+if(launchBtn)launchBtn.addEventListener("click",function(){
+  var box=document.getElementById("task"),msg=document.getElementById("launchmsg"),text=box.value.trim();
+  if(!text){msg.textContent="先写下要做的事。";return}
+  launchBtn.disabled=true;msg.textContent="启动中…";
+  fetch(q("/api/launch"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task:text})})
+    .then(function(r){
+      if(r.status===202){box.value="";msg.textContent="已启动，稍等它出现在左边。"}
+      else if(r.status===501)msg.textContent="这个控制台不能启动任务，请在终端运行 mola run。";
+      else if(r.status===429)msg.textContent="从这里启动的任务已有 3 个在跑，等一个结束再来。";
+      else r.json().then(function(j){msg.textContent="没启动成功："+(j.error||r.status)},function(){msg.textContent="没启动成功（"+r.status+"）"});
+    })
+    .catch(function(){msg.textContent="连不上控制台服务"}).then(function(){launchBtn.disabled=false});
+});
 document.getElementById("recheck").addEventListener("click",function(){
   var b=this;b.disabled=true;b.textContent="体检中…";
   fetch(q("/api/doctor"),{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"})
@@ -269,9 +285,10 @@ export function pageHtml(): string {
     '<header class="top"><h1>mola 控制台</h1><span class="conn" id="conn">连接中…</span><button class="mode" id="mode" type="button">换成夜间</button></header>',
     '<main class="desk"><div>',
     "<h2>正在干活的 agent</h2>",
-    '<div class="empty" id="none">现在没有任务在跑。在终端里运行 <code>mola go "要做的事"</code> 开一个，它会出现在这里。</div>',
+    '<div class="empty" id="none">现在没有任务在跑。在右边写下要做的事，或在终端运行 <code>mola go "要做的事"</code>，它会出现在这里。</div>',
     '<div class="runs" id="runs"></div></div>',
     '<aside class="side">',
+    '<section class="launch"><h2>开一个任务</h2><textarea id="task" maxlength="4000" placeholder="要做的事，一句话说清楚结果" aria-label="任务"></textarea><div class="acts"><button class="btn" id="launch" type="button">开始</button></div><p class="small" id="launchmsg" role="status"></p></section>',
     '<section><h2>这份代码</h2><div id="code"><p class="small">读取中…</p></div></section>',
     '<section><h2>环境缺口</h2><p class="small" id="gapwhen"></p><ul class="gaps" id="gaps"></ul><div class="acts"><button class="btn" id="recheck" type="button">重新体检</button></div></section>',
     '<section><h2>角色分工</h2><table class="roles"><tbody id="roles"></tbody></table></section>',

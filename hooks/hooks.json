@@ -1,5 +1,5 @@
 {
-  "description": "mstack handoff safety net: snapshot state before compaction, remind after it",
+  "description": "mstack hooks: snapshot state before compaction and remind after it, an opt-in verify gate on Stop, an opt-in branch guard on Bash",
   "hooks": {
     "PreCompact": [
       {
@@ -34,6 +34,19 @@
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-verify.mjs\"",
             "timeout": 10,
+            "async": false
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\" plugin-hook",
+            "timeout": 5,
             "async": false
           }
         ]

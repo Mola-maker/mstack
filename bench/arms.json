@@ -1,0 +1,76 @@
+{
+  "_comment": "argv entries may use {prompt}, {repo} (the mstack checkout), {work} (the task's scratch repo). Each run is a headless agent in the scratch repo. Check an arm with a canary before trusting it: a bare arm that still loads a plugin from your user settings is not a baseline.",
+  "arms": [
+    {
+      "name": "bare",
+      "format": "claude-json",
+      "argv": [
+        "claude",
+        "-p",
+        "{prompt}",
+        "--output-format",
+        "json",
+        "--permission-mode",
+        "acceptEdits",
+        "--max-budget-usd",
+        "1",
+        "--no-session-persistence",
+        "--setting-sources",
+        "project",
+        "--disable-slash-commands"
+      ]
+    },
+    {
+      "name": "mstack",
+      "format": "claude-json",
+      "argv": [
+        "claude",
+        "-p",
+        "{prompt}",
+        "--output-format",
+        "json",
+        "--permission-mode",
+        "acceptEdits",
+        "--max-budget-usd",
+        "1",
+        "--no-session-persistence",
+        "--setting-sources",
+        "project",
+        "--plugin-dir",
+        "{repo}"
+      ]
+    },
+    {
+      "name": "omc",
+      "enabled": false,
+      "format": "claude-json",
+      "argv": [
+        "claude",
+        "-p",
+        "{prompt}",
+        "--output-format",
+        "json",
+        "--permission-mode",
+        "acceptEdits",
+        "--max-budget-usd",
+        "1",
+        "--no-session-persistence",
+        "--setting-sources",
+        "project",
+        "--plugin-dir",
+        "<path to the oh-my-claudecode plugin directory>"
+      ]
+    },
+    {
+      "name": "codex-bare",
+      "enabled": false,
+      "format": "text",
+      "_comment": "the same tasks on another harness: `codex exec` prints the final message as text, so cost and turns are not recorded. Check the flags on your install first; this entry was not run.",
+      "argv": [
+        "codex",
+        "exec",
+        "{prompt}"
+      ]
+    }
+  ]
+}

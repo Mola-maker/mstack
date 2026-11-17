@@ -363,12 +363,14 @@ t("hooks: pre-push refuses protected destinations and force, allows agent/x", ()
   const repo = mkRepo("agent/x");
   const bare = mkRemote();
   git(repo, "remote", "add", "origin", bare);
+  // the local `main` has to exist before the hooks are installed: reference-transaction refuses creating it afterwards,
+  // and then `push --all` only pushes agent/x ("Everything up-to-date") and proves nothing
+  assert.equal(git(repo, "branch", "-q", "main").code, 0);
   installHooks(repo);
   assert.equal(git(repo, "push", "origin", "agent/x").code, 0, "allowed push of agent/x");
   const toMain = git(repo, "push", "origin", "agent/x:main");
   assert.notEqual(toMain.code, 0);
   assert.match(toMain.err, /protected ref 'main'/);
-  git(repo, "branch", "-q", "main");
   const all = git(repo, "push", "--all", "origin");
   assert.notEqual(all.code, 0);
   assert.match(all.err, /protected ref/);
@@ -393,4 +395,74 @@ t("everything together: the shim in front of hooks still lets a normal agent flo
   assert.equal(gitShim(shim, repo, ["push", "-u", "origin", "agent/x"]).code, 0);
   assert.equal(gitShim(shim, repo, ["checkout", "-q", "main"]).code, 0);
   assert.equal(gitShim(shim, repo, ["merge", "agent/x"]).code, 1);
+});
+
+// ------------------------------------------------------------------ plugin-hook: the opt-in form wired in hooks.json
+
+function pluginHook(command, cwd, env = {}) {
+  const input = JSON.stringify({ tool_name: "Bash", tool_input: { command }, cwd });
+  const r = sh(process.execPath, [GUARD, "plugin-hook"], { input, env });
+  return { ...r, json: r.out.trim() ? JSON.parse(r.out) : null };
+}
+
+t("plugin-hook: a project that did not opt in is not touched, even on main", () => {
+  const repo = mkRepo("main");
+  const r = pluginHook("git commit -m x", repo, { MOLA_GUARD: "" });
+  assert.equal(r.code, 0);
+  assert.equal(r.json, null);
+});
+
+t("plugin-hook: .mstack/guard.json at the repo root opts the project in", () => {
+  const repo = mkRepo("main");
+  fs.mkdirSync(path.join(repo, ".mstack"), { recursive: true });
+  fs.writeFileSync(path.join(repo, ".mstack", "guard.json"), "{}\n");
+  assert.ok(denied(pluginHook("git commit -m x", repo)));
+  const sub = path.join(repo, "sub");
+  fs.mkdirSync(sub);
+  assert.ok(denied(pluginHook("git commit -m x", sub)), "from a subdirectory");
+  assert.equal(pluginHook("git status", repo).json, null, "reads are not refused");
+});
+
+t("plugin-hook: MOLA_GUARD=1 opts in without a file", () => {
+  const repo = mkRepo("main");
+  assert.ok(denied(pluginHook("git commit -m x", repo, { MOLA_GUARD: "1" })));
+});
+
+t("plugin-hook: an opted-in project on a free branch can commit", () => {
+  const repo = mkRepo("agent/x");
+  assert.equal(pluginHook("git commit -m x", repo, { MOLA_GUARD: "1" }).json, null);
+});
+
+t("plugin-hook: outside a git repository, and with garbage on stdin, it stays silent", () => {
+  const dir = tmp("nogit");
+  assert.equal(pluginHook("git commit -m x", dir).json, null);
+  const r = sh(process.execPath, [GUARD, "plugin-hook"], { input: "not json" });
+  assert.equal(r.code, 0);
+  assert.equal(r.out.trim(), "");
+});
+
+// guardEnabled finds the repo root on disk; it must agree with git about which `.git` counts. Plain fs: runs everywhere.
+import { guardEnabled, isGitDir } from "./guard-git.mjs";
+test("guardEnabled: the nearest valid .git decides; an empty or stray .git does not switch the guard off", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "guard-root-"));
+  fs.mkdirSync(path.join(root, ".git"));
+  fs.writeFileSync(path.join(root, ".git", "HEAD"), "ref: refs/heads/main\n");
+  fs.mkdirSync(path.join(root, ".mstack"));
+  fs.writeFileSync(path.join(root, ".mstack", "guard.json"), "{}");
+  const sub = path.join(root, "a", "b");
+  fs.mkdirSync(sub, { recursive: true });
+  assert.equal(guardEnabled(sub, {}), true);
+  // an empty .git in a subdirectory is not a repository
+  const stray = path.join(root, "emptygit");
+  fs.mkdirSync(path.join(stray, ".git"), { recursive: true });
+  assert.equal(isGitDir(path.join(stray, ".git")), false);
+  assert.equal(guardEnabled(stray, {}), true);
+  // a worktree's .git file is one, and it has no guard.json of its own
+  const wt = path.join(root, "wt");
+  fs.mkdirSync(wt);
+  fs.writeFileSync(path.join(wt, ".git"), "gitdir: ../.git/worktrees/wt\n");
+  assert.equal(isGitDir(path.join(wt, ".git")), true);
+  assert.equal(guardEnabled(wt, {}), false);
+  assert.equal(guardEnabled(wt, { MOLA_GUARD: "1" }), true);
+  fs.rmSync(root, { recursive: true, force: true });
 });

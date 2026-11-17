@@ -3,6 +3,9 @@
 //
 // Modes (first argv):
 //   claude-hook             Claude Code PreToolUse hook: hook JSON on stdin, deny JSON on stdout.
+//   plugin-hook             the same, for hooks.json: acts only in a project that opted in (a .mstack/guard.json at the
+//                           repo root) or when MOLA_GUARD=1; elsewhere it is silent, so installing the plugin does not
+//                           start refusing a person's own commits on main.
 //   shim <git args...>      the `git` wrapper for agent workers (PATH shim); refuses or execs the real git.
 //   pre-commit              git hook.
 //   pre-push <remote> <url> git hook; ref lines on stdin.
@@ -603,10 +606,42 @@ function readStdin() {
   try { return fs.readFileSync(0, "utf8"); } catch { return ""; }
 }
 
-function claudeHook() {
+/** A `.git` git itself would accept: a directory holding HEAD, or the file a worktree or submodule has (`gitdir: …`).
+ *  An empty or stray `.git` is skipped, as `git rev-parse` skips it, so it cannot switch the guard off. */
+export function isGitDir(p) {
+  try {
+    const st = fs.statSync(p);
+    if (st.isDirectory()) return fs.existsSync(path.join(p, "HEAD"));
+    return st.isFile() && fs.readFileSync(p, "utf8").startsWith("gitdir:");
+  } catch {
+    return false;
+  }
+}
+
+/** Has this project opted in to the guard? `.mstack/guard.json` at the repo root, or MOLA_GUARD=1 in the environment. */
+export function guardEnabled(cwd, env = process.env) {
+  if (env.MOLA_GUARD === "1") return true;
+  // This runs before every Bash call in every project with the plugin installed, so it reads the disk instead of
+  // starting git: the nearest directory holding `.git` (a directory, or the file a worktree has) is the repo root.
+  try {
+    let dir = path.resolve(cwd);
+    for (let i = 0; i < 64; i++) {
+      if (isGitDir(path.join(dir, ".git"))) return fs.existsSync(path.join(dir, ".mstack", "guard.json"));
+      const parent = path.dirname(dir);
+      if (parent === dir) return false;
+      dir = parent;
+    }
+  } catch {
+    // unreadable directory: not opted in
+  }
+  return false;
+}
+
+function claudeHook(raw = readStdin(), { optIn = false } = {}) {
   // Fail open: layer (a) git hooks and layer (c) GitHub branch protection back this up.
   try {
-    const j = JSON.parse(readStdin() || "{}");
+    const j = JSON.parse(raw || "{}");
+    if (optIn && !guardEnabled(j.cwd || process.cwd(), process.env)) return;
     if (j.tool_name !== "Bash") return;
     const command = j.tool_input?.command;
     if (typeof command !== "string" || !command) return;
@@ -656,12 +691,13 @@ export function main(argv) {
   const [mode, ...rest] = argv;
   switch (mode) {
     case "claude-hook": claudeHook(); return 0;
+    case "plugin-hook": claudeHook(readStdin(), { optIn: true }); return 0;
     case "shim": return runShim(rest);
     case "pre-commit": return gitHook(() => hookPreCommit());
     case "pre-push": return gitHook(() => hookPrePush(readStdin().split("\n").filter(Boolean)));
     case "reference-transaction": return gitHook(() => hookReferenceTransaction(rest[0], rest[0] === "prepared" ? readStdin().split("\n").filter(Boolean) : []));
     default:
-      process.stderr.write("usage: guard-git.mjs claude-hook | shim <git args> | pre-commit | pre-push | reference-transaction <state>\n");
+      process.stderr.write("usage: guard-git.mjs claude-hook | plugin-hook | shim <git args> | pre-commit | pre-push | reference-transaction <state>\n");
       return 2;
   }
 }

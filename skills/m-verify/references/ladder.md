@@ -42,4 +42,4 @@ Cost: hashing adds every changed and untracked file to the temporary index, so i
 
 ## Known limitation
 
-Docs-only changes are not exempted this round: with a gate that requires L3, a README edit also needs a new receipt, which can mean booting an emulator. The way out is to turn the Stop reminder off (delete `.mstack/verify/gate`), not to weaken the required level.
+Docs-only changes are not exempted this round: with a gate that requires L3, a README edit also needs a new receipt, which can mean booting an emulator. The way out is to turn the Stop reminder off (delete `.mstack/verify/gate`), not to weaken the required level. The gate can also be strict: put `block` in the gate file and a stop below the required level is refused once per turn (details in `m-guard/references/hooks.md`).
