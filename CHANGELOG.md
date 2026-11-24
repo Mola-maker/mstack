@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **m-verify / m-plan**: a test claim and a baseline need more than 0 tests run; "0 passed" or no result line (feature-gated target, failed build) is not a pass. Found when a LayerFS baseline came back empty after a build failure and a feature-gated suite compiled to 0 tests.
+- **m-dispatch**: parallel workers on one heavy build share one build cache instead of N cold builds.
+- **m-start**: when the code is out of the file tools' reach (WSL root, remote host), `.mstack/` lives in one readable folder whose `handoff.md` names the code's path; `m-handoff`'s template gains a `Code:` line so a save keeps it.
+- **m-cua**: find your own window by diffing `list-windows` around `launch`; read edit boxes with `--property value` (the 2026-11-17 Notepad lesson).
+- **m-guard**: known trap — `$VAR` in `bash -lc` from Git Bash to `wsl` arrives empty; use a script file.
+- **`scripts/check.mjs`** fails on a literal `\n` or `\"` in skill Markdown outside frontmatter, code fences and code spans: an edit script that writes the escape instead of the character joins bullets and shows backslashes. It slipped into three files of this change before review caught it.
+
 ## 0.11.0
 
 - **npm**: `npm i -g @molamaker/mstack` installs the `mola` CLI with its packages bundled (`scripts/pack-npm.mjs`), plus the 17 skills, hooks and agents; `mola skills install --dsh|--codex|--claude` takes the skills from the package.

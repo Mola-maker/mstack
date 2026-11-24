@@ -31,7 +31,7 @@ No exceptions: a terse prompt is not a reason to guess the phase; "I remember wh
 
 Red flags — stop and route: you edited a file before naming a skill; you cite a goal's status without having opened its state file; you ran `rm` or edited on stale state; your routing line names two skills.
 
-1. Read `.mstack/handoff.md` first (if present) and any `.mstack/goals/<slug>.md` or `.mstack/plans/*-<slug>.md` (plans carry a `<YYYY-MM-DD>-` prefix) that names the current task.
+1. Read `.mstack/handoff.md` first (if present) and any `.mstack/goals/<slug>.md` or `.mstack/plans/*-<slug>.md` (plans carry a `<YYYY-MM-DD>-` prefix) that names the current task. When the code lives where your file tools cannot read it (a WSL root checkout, a remote host), keep `.mstack/` in one readable folder and record the code's path in its `handoff.md` (the `Code:` line of `m-handoff`'s template).
 2. Flag stale state, advisory only — report it, never auto-resume, clean up, or close it. Judge staleness from the state file, not from headings (a goal's `## Closeout` heading exists from creation, so its presence means nothing):
    - A goal (`.mstack/goals/<slug>.md`) is stale when its `<slug>.state.json` has `"status": "active"` and the state file's mtime is older than 2 hours. Its resume hint is the goal file path plus the last row of its checkpoint table — an unfinished goal has no resume-hint of its own.
    - A goal file whose `## Closeout` contains no `status:` line, while its `state.json` is missing, counts as abnormally interrupted (the loop died before writing either). A `## Closeout` that holds only the placeholder text from creation is not a closeout.

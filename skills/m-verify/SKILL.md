@@ -39,7 +39,7 @@ Closed loopholes: an earlier run, a green single file, a lint pass, a worktree a
 
    | Claim | Evidence required | Evidence that is NOT enough |
    |---|---|---|
-   | Tests pass | full-suite command, 0 failures, exit 0 | an earlier run; one file only; run before the final commit |
+   | Tests pass | full-suite command, more than 0 tests run, 0 failures, exit 0 | an earlier run; one file only; run before the final commit; "0 passed" or no result line (a feature-gated or filtered target, a build that failed first) |
    | Build succeeds | build command, exit 0 | lint clean; the log looks fine |
    | Bug fixed | the original repro now passes | code changed; "should be fixed" |
    | New check works | red on the broken version, green on the fix | one green run |

@@ -125,6 +125,18 @@ for (const f of walk(join(root, "skills"))) {
   for (const bad of ["superpowers:", "oh-my-claudecode:", "omc:"]) if (t.includes(bad)) err(`${f}: references "${bad}"`);
   // scripts ship inside the skill: a repo-relative path does not exist once mstack is installed as a plugin
   if (t.includes("node skills/m-") && f.endsWith(".md")) err(`${f}: repo-relative script path "node skills/m-…" (use the skill dir)`);
+  // an edit script that wrote an escape instead of the character: a literal \n joins two bullets, a \" shows its
+  // backslash (frontmatter, code fences and `code spans` may hold escapes on purpose)
+  if (f.endsWith(".md")) {
+    let fence = false;
+    const body = t.replace(/^---\r?\n[\s\S]*?\r?\n---/, (fm) => fm.replace(/[^\n]/g, ""));
+    body.split("\n").forEach((l, i) => {
+      if (/^\s*(```|~~~)/.test(l)) fence = !fence;
+      if (fence) return;
+      const prose = l.replace(/`[^`]*`/g, "");
+      if (/\\n|\\"/.test(prose)) err(`${f}:${i + 1} has a literal \\n or \\" outside code (an escape written instead of the character)`);
+    });
+  }
 }
 
 for (const f of ["README.md", "docs/source-map.md", "docs/migration.md", "NOTICE.md", ".claude-plugin/plugin.json"])

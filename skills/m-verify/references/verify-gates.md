@@ -21,6 +21,7 @@ Rules:
 - If a baseline failure disappears, note it (your change probably fixed it) and remove the line so the baseline does not rot.
 - A changing baseline (new entries appearing while you work) means you are breaking other things — treat every new entry as a blocker regardless of cause.
 - If the first run is green, skip the file. No baseline file present later = every failure is new.
+- A run counts as a baseline only when every suite printed a result line with more than 0 tests run. No result line (the build failed first) or "0 passed" (a feature-gated or filtered target) means the run did not happen: fix the command, then take the baseline. Say the per-suite counts in the report, since a green run leaves no file to show them.
 
 ## Anti-cheat gate
 

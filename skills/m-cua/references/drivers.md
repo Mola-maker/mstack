@@ -19,13 +19,14 @@ agent-desktop <command> --help
 | Two windows | `AMBIGUOUS_TARGET` lists window ids in `error.details`; pass one with `--window-id` |
 | Act | `agent-desktop click '<ref>'`, `set-value '<ref>' <text>`, `press <key>` |
 | Wait | `agent-desktop wait --app <app> --text "<text>"`, or `--wait-for role:text` on a snapshot or action |
-| Assert | `agent-desktop find` / `get` / `is`, then compare the JSON in the script |
+| Assert | `agent-desktop find` / `get` / `is`, then compare the JSON in the script; read an edit box with `get --property value` (on an empty document `text` falls back to the control's name) |
 | Replay | in the script, look the element up again each run: `agent-desktop find --app <app> --role button --name "<name>" --first` returns `data.match.ref_id`; pass that ref to `click` or `get`. Do not use `batch` for replay: it takes fixed refs, and a ref dies with its snapshot |
 
 Rules that save retries:
 
 - Default delivery is headless: it does not move the pointer or take focus. Stay headless. On Windows `type`, `right-click`, `double-click` and pointer input return `POLICY_DENIED` headless; use `set-value` instead of `type`, and a ref `click` instead of pointer input.
 - `--headed` moves the real pointer and sends real keys into the user's desktop. Use it only after the user said yes for this task, never to recover from a headless failure. The same goes for `press --force`, which bypasses the dangerous-shortcut block.
+- Your window is the one `launch` added. An app that restores its session (Notepad, editors, browsers) can reopen the user's documents on launch, and one already running opens a new window instead of attaching. Run `list-windows` before and after `launch`; the new window id is yours; pass `--window-id` to every later command. Before answering a save prompt with "Don't save", check that its title and text name the text you typed.
 - Retry a failed command only when `error.disposition.retry` is `safe`. On `STALE_REF`, snapshot again.
 - Dense apps: `snapshot --skeleton` first, then `snapshot --root '<ref>'` for one region.
 - Measured on Windows 11 through the npm launcher (2026-11-12, v1.3.0): `list-apps` about 0.25 s, a window snapshot about 0.5 s. Install size 31 MB.

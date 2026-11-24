@@ -10,6 +10,7 @@ Read this when m-handoff's Save step writes the handoff. The file is overwritten
 ## Task frame          (stable: changes only when the goal itself changes)
 - Goal: <one sentence; link .mstack/goals/<slug>.md, and its ## Closeout if written>
 - Constraints: <hard requirements, deadlines, "do not touch X">
+- Code: <where the code lives, when it is not beside this .mstack/ (a WSL root checkout, a remote host); omit otherwise>
 
 ## Progress            (condensed: rewritten from scratch on every save)
 - Decisions: <decision — why, alternatives rejected>

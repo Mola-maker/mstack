@@ -6,6 +6,7 @@ Each entry is a trap that has already cost real work, with what actually happens
 
 - **Never `pkill -f <text>` in WSL.** It matches the invoking shell (killed it twice), and `pkill -f "dsh --profile mola"` also matched the default tmux server's argv and took the superagents (3082/3083) down. Kill by exact PID, or use `scripts/mola.sh stop|restart` (the `mola` profile has its own tmux socket `-L mola`).
 - **Git Bash → `wsl` path mangling.** From Git Bash, `wsl -e bash /mnt/e/x.sh` gets rewritten to `C:/Program Files/Git/mnt/e/x.sh`. Prefix with `MSYS_NO_PATHCONV=1`.
+- **Git Bash → `wsl ... bash -lc '<cmd with $VAR>'` loses the variables.** They reach WSL empty, so a loop or a path silently becomes something else. Write the commands to a script file under `/mnt/e/...` and run `MSYS_NO_PATHCONV=1 wsl -d Ubuntu -u root -- bash -l /mnt/e/.../x.sh` (`-l` for cargo's PATH).
 - **`Wsl/Service/0x8007274c`** (connection timeout) after starting several long `wsl` jobs at once: already-running jobs keep going; new `wsl` calls fail for a while. Read their output from the Windows side (`E:\…`) instead of opening more `wsl` sessions.
 - **WSL reaches magpie (:3425) only with `networkingMode=mirrored`** in `%USERPROFILE%\.wslconfig`.
 
