@@ -38,8 +38,11 @@ Probe: `research/layerfs2/probe.mjs` (run with `research/layerfs2/run.sh` inside
 - **`branch.merge` conflicts only on the same lines.** Two Branches that change different lines of one file merge silently. The rule "no two subtasks edit the same file" is checked on the paths, before merging (step 5).
 - **`branch.publish` overwrites; it does not merge.** A Branch based on an older main replaces main's newer files and reports `overwrote_count`, without a Conflict. This flow never publishes. Git does the integration with the rest of the world.
 - **`project.export` needs an absent or empty destination** (`NotEmpty` otherwise). Results go to a fresh folder, never into the repo.
-- **`project.init` imports whatever the folder holds, `.git` included.** Init from a `git checkout-index` of the base commit: tracked files as a checkout has them, with no `.git` and no gitlinks. Not `git archive`: it honours `export-ignore` and `export-subst`, and the accept step would then commit their deletion or expansion. A worker can still create `.git` folders in its Branch, so any diff path with a `.git` component (`/(^|\/)\.git(\/|$)/`, nested ones included) refuses the Branch.
-- `branch.diff` answers `{items: [{path, kind, type, …}], has_more, next_page_pos}`: read every page.
+- **`project.init` imports whatever the folder holds, `.git` included.** Init from a `git checkout-index` of the base commit: tracked files as a checkout has them, with no `.git` and no gitlinks. Not `git archive`: it honours `export-ignore` and `export-subst`, and the accept step would then commit their deletion or expansion. A worker can still create `.git` folders in its Branch, so any diff path with a `.git` component refuses the Branch: `/(^|\/)(\.git|git~\d+)(\/|$)/i`, nested ones included, any case (on DrvFs under `/mnt/c`, `.GIT` is `.git`; `git~1` is its NTFS short name), and any `.`, `..` or empty component.
+- `branch.diff` answers `{items: [{path, kind, type, before, after, …}], has_more, next_page_pos}`: read every page. `kind` is `Added`, `Modified` or `Removed`; `type` is `file`, `dir` or `symlink`, the old type for a `Removed` item. A folder item comes before its children, but do not rely on the order.
+- **`branch.diff` lists paths whose content did not change.** An edit and its revert leave `/src.txt` as `Modified` (`metadata: true`, `content: false`). The accept step compares each path with `<base>` itself.
+- **`branch.diff` fails on a Branch that replaced a symlink with a folder** (`Failed: invalid record: portable metadata`, rc.1). The accept step then stops before it writes anything; report the Branch. Writes through a symlink are refused (`NotDirectory`), so a worker cannot reach the link's target.
+- **`branch.merge` does catch structural clashes**: a deleted folder against an edit inside it, and a file against a folder at one path, are a `Conflict`.
 - Every call is one attempt, with no retries. After a lost reply, read the state again (`branch.get`); never repeat the write blindly.
 - One store is held open per process: call `close()` before exit.
 
@@ -49,9 +52,13 @@ Proved end to end on a real git repo that has `export-ignore` and `export-subst`
 
 - a Branch where nobody wrote stages `(nothing)`;
 - the refused Branches are `["agent-evil","agent-nested"]`, one with a top-level `.git` and one with `/pkg/.git`;
-- for the shared-path check, `same file a & b ["/src.txt"]`;
+- `.GIT` in any case is refused too (`agent-case`);
+- for the shared-path check, `shared a & b ["/src.txt"]`, and deleting `/tree` against editing `/tree/a.ts` is reported (`/tree ~ /tree/a.ts`);
+- an edit and its revert stage `(nothing)`; a file that becomes a folder stages `D f | A f/y`, a folder that becomes a file `A d | D d/x`;
+- a failed accept removes its worktree and `agent/<slug>` branch, so a retry runs;
+- a write under a tracked link to a folder is refused before anything is written, and the link's target is untouched;
 - the integration stages `M other.txt | M src.txt | D ver.txt`;
-- two workers adding files under one new folder do not collide (`same file e & f (one new dir) []`);
+- two workers adding files under one new folder do not collide (`shared e & f (one new dir) []`);
 - a write under the gitlink path fails the accept (`NotCarried: not carried into git: /dep/x.txt`);
 - the link stays relative (`run.sh`), the executable bit stays, the gitlink stays `160000`, and `main` is untouched.
 
@@ -71,20 +78,23 @@ Proved end to end on a real git repo that has `export-ignore` and `export-subst`
 4. **Review**: the reviewer reads the diff items and `file.read` at the Branch. That is the same evidence as a git diff, without a checkout.
 5. **Checks before integrating**, for each Branch:
    - read every page of `branch.diff(p, "main", b, {paths_only: true})`;
-   - **refuse** the Branch if any path has a `.git` component (`/.git`, `/pkg/.git/HEAD`);
-   - **stop** when two Branches share a file path (items whose `type` is not a folder: two workers adding files under one new folder do not collide). Report the tasks and the file, then split or sequence them. Merge would fold different lines of one file without a word.
+   - **refuse** the Branch if any path has a `.git` component in any case (`/.git`, `/pkg/.git/HEAD`, `/pkg/.GIT/HEAD`);
+   - **stop** when two Branches touch the same path, or one changed a path under a path the other changed. Two folders that both still exist do not count, so two workers adding files under one new folder do not collide; a folder one worker deleted or turned into a file does. Report the tasks and the paths, then split or sequence them. Merge would fold different lines of one file without a word.
 6. **Integrate**: fold the Branches that passed with `branch.merge(p, "agent-int-<n>", a, b)`. A `Conflict` (same lines) creates nothing: report it. Verify (step 3) and review (step 4) the result.
 7. **Accept, through git only, carrying exactly the changed paths**:
+   - Read the integration Branch's diff (all pages) and run the `.git` refusal again: it is not one of the Branches step 5 checked.
    - `project.export(p, <fresh tmp>, {branch: "agent-int-<n>"})`;
    - `git worktree add -b agent/<slug> <wt> $base`;
-   - for every path in the integration Branch's diff (all pages), and nothing else:
-     - gone from the export → remove it in the worktree;
-     - a folder → `mkdir -p`;
+   - list the paths that must reach git: non-folder diff paths whose exported mode and blob (`git hash-object`; link text for a symlink) differ from `git ls-tree $base -- <path>`;
+   - for every path in the diff, and nothing else, deletions first (deepest first), then the rest (parents first):
+     - refuse when an existing parent in the worktree is a symlink or a file (it would write outside the path);
+     - gone from the export → remove it in the worktree (skip it if a parent is not a real folder; an `ENOTDIR` means it is already gone);
+     - a folder → remove what is there if it is not a real folder (a file, or a link to a folder), then `mkdir -p`;
      - a symlink → recreate it with the same link text (`readlink`), never followed or rewritten;
-     - a file → copy it and its mode.
+     - a file → replace what is there, copy it and its mode.
    - Delete the export, then `git add -A`.
-   - **Check that every changed file reached git**: each non-folder diff path must appear in `git diff --cached --name-only` (deletions included). A path under a submodule gitlink, or one `.gitignore` hides, is dropped by `git add -A` without an error; fail the accept and report it instead of committing a PR that silently lost a worker's edit.
-   - Commit.
+   - **Check that every changed file reached git**: each path from the list above must appear in `git diff --cached --name-only` (deletions included). A path under a submodule gitlink, or one `.gitignore` hides, is dropped by `git add -A` without an error; fail the accept and report it instead of committing a PR that silently lost a worker's edit.
+   - Commit. If any step fails, delete the export, `git worktree remove --force <wt>` and `git branch -D agent/<slug>`, so the retry can create them again.
    - Files the workers did not touch are never rewritten, so attributes, symlinks, gitlinks and untracked files stay as they were. A Branch with no changes commits nothing.
    - Then the usual review, PR and merge.
    - LayerFS `main` is never published; it stays the base snapshot. Git is the system of record; LayerFS is the workspace.
