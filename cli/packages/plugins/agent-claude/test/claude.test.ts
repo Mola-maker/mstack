@@ -12,7 +12,7 @@ import { makeFakeCtx } from "./fake.js";
 import type { RunRequest } from "@mola/plugin-sdk";
 
 // these tests exercise a magpie-routed Claude Code (the adapter reads ANTHROPIC_BASE_URL at creation)
-process.env.ANTHROPIC_BASE_URL ??= "http://127.0.0.1:3425";
+process.env.ANTHROPIC_BASE_URL = "http://127.0.0.1:3425";
 
 const linuxTest = process.platform === "win32" ? test.skip : test;
 
