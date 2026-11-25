@@ -3,7 +3,7 @@
 ## Unreleased
 
 - **m-verify / m-plan**: a test claim and a baseline need more than 0 tests run; "0 passed" or no result line (feature-gated target, failed build) is not a pass. Found when a LayerFS baseline came back empty after a build failure and a feature-gated suite compiled to 0 tests.
-- **m-dispatch**: parallel workers on one heavy build share one build cache instead of N cold builds.
+- **m-dispatch**: never point two worktrees at one build output dir: workspace crates share artifact names, so a worker's test can link another worker's code (seen twice in a LayerFS run with one shared `CARGO_TARGET_DIR`). Cap build jobs or build in turn; verify the merged tree in its own dir.
 - **m-start**: when the code is out of the file tools' reach (WSL root, remote host), `.mstack/` lives in one readable folder whose `handoff.md` names the code's path; `m-handoff`'s template gains a `Code:` line so a save keeps it.
 - **m-cua**: find your own window by diffing `list-windows` around `launch`; read edit boxes with `--property value` (the 2026-11-17 Notepad lesson).
 - **m-guard**: known trap — `$VAR` in `bash -lc` from Git Bash to `wsl` arrives empty; use a script file.
