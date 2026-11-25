@@ -14,9 +14,13 @@ import {
   MolaError,
   MolaEvents,
   STAGES,
+  isGitRepo,
+  listProgress,
   readApproval,
   readProgress,
   runDir,
+  saveCheckpoint,
+  takeNotes,
   writeApproval,
   writeProgress,
   type RunProgress,
@@ -54,6 +58,10 @@ export interface GoOptions {
   auto: boolean;
   dryRun: boolean;
   resume?: string;
+  /** idempotency key: starting again with the same key returns the same run */
+  key?: string;
+  /** progress.origin, e.g. "trigger" */
+  origin?: string;
 }
 
 export interface GoEnv {
@@ -304,7 +312,19 @@ async function runStage(env: GoEnv, rc: RunContext, p: RunProgress, stage: Stage
       .filter((n) => n !== stage && stageOf(p, n).status === "done")
       .map((n) => STAGE_ARTIFACT[n])
       .filter((a) => fs.existsSync(path.join(dir, a)));
-    const prompt = buildStagePrompt({ stage, intent: p.intent, dir: relDir, previous, ...(opts.retryFrom ? { retryFrom: opts.retryFrom } : {}) });
+    const notes = takeNotes(cwd, p.id).map((n) => n.text);
+    if (notes.length > 0) {
+      p.notesDelivered = (p.notesDelivered ?? 0) + notes.length;
+      env.io.note(`mola go: ${notes.length} note${notes.length === 1 ? "" : "s"} from the owner go to ${stage}`);
+    }
+    const prompt = buildStagePrompt({
+      stage,
+      intent: p.intent,
+      dir: relDir,
+      previous,
+      ...(opts.retryFrom ? { retryFrom: opts.retryFrom } : {}),
+      ...(notes.length > 0 ? { notes } : {}),
+    });
     const implementModel = stageOf(p, "implement").model;
     const prepared = await prepareStage(env, rc, stage, prompt, opts.agent, implementModel);
     const { decision, policy, routing } = prepared;
@@ -414,6 +434,7 @@ async function runStage(env: GoEnv, rc: RunContext, p: RunProgress, stage: Stage
   worker.status = outcome.status === "done" ? "done" : outcome.status === "blocked" ? "blocked" : "failed";
   worker.costUsd = Math.round(cost * 10000) / 10000;
   worker.updatedAt = iso();
+  checkpoint(p, stage);
   setNext(p);
   save(env, p);
   emit(env, "stage", p, stage, st.status);
@@ -445,6 +466,17 @@ function interpret(result: RunResult, stage: StageName, dir: string): StageOutco
     return { status: "failed", summary: oneLine(`agent exit ${result.exitCode}${summary ? `: ${summary}` : ""}`) };
   }
   return { status: parsed.status, summary: oneLine(summary || (parsed.found ? parsed.status : "no STATUS line")) };
+}
+
+/** Save the working tree under a hidden ref; a run outside git, or a git error, just has no checkpoint. */
+export function checkpoint(p: RunProgress, name: string): void {
+  try {
+    if (!isGitRepo(p.cwd)) return;
+    const c = saveCheckpoint(p.cwd, p.id, name);
+    if (c) (p.checkpoints ??= []).push({ name: c.name, ref: c.ref, commit: c.commit, at: c.at });
+  } catch {
+    // checkpoints are best effort: they never fail a run
+  }
 }
 
 // --------------------------------------------------------------------- driver
@@ -548,16 +580,33 @@ export async function drive(env: GoEnv, rc: RunContext, p: RunProgress, opts: { 
 export interface StartResult {
   code: ExitCode;
   progress: RunProgress;
+  /** true when an idempotency key matched an earlier run and nothing new started */
+  existing?: boolean;
+}
+
+/** The run started with this idempotency key, if any. */
+export function findByKey(cwd: string, key: string): RunProgress | undefined {
+  return listProgress(cwd).find((r) => r.key === key);
 }
 
 /** `mola go "<intent>"` — mint the run, write intent.md + progress.json, drive. */
 export async function startRun(env: GoEnv, opts: GoOptions): Promise<StartResult> {
   const cwd = env.io.cwd;
+  if (opts.key) {
+    const prior = findByKey(cwd, opts.key);
+    if (prior) {
+      env.io.note(`mola go: key "${opts.key}" already names ${prior.id} (${prior.status}) — not starting another run`);
+      return { code: prior.status === "done" ? ExitCode.Ok : prior.status === "running" || prior.status === "blocked" ? ExitCode.Ok : ExitCode.Error, progress: prior, existing: true };
+    }
+  }
   const rc = loadRunContext(env);
   const id = mintRunId();
   const p = initProgress(id, opts.intent, cwd, selectStages(opts.intent, opts.until));
+  if (opts.key) p.key = opts.key;
+  if (opts.origin) p.origin = opts.origin;
   fs.mkdirSync(runDir(cwd, id), { recursive: true });
   fs.writeFileSync(path.join(runDir(cwd, id), "intent.md"), `# Intent\n\n${opts.intent}\n`, "utf8");
+  checkpoint(p, "base");
   setNext(p);
   save(env, p);
   emit(env, "started", p, p.stage, "running");
@@ -581,6 +630,7 @@ export async function resumeRun(env: GoEnv, id: string, opts: { auto: boolean; a
   for (const w of p.workers) if (w.status === "working") w.status = "failed";
   p.status = "running";
   delete p.blocked;
+  delete p.resumeAt;
   setNext(p);
   save(env, p);
   emit(env, "started", p, p.stage, "running");

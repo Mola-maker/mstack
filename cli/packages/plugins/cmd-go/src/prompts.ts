@@ -15,6 +15,8 @@ export interface StagePromptInput {
   previous: string[];
   /** set when implement runs again because verify failed */
   retryFrom?: string;
+  /** notes the owner sent while the run was going, oldest first */
+  notes?: string[];
 }
 
 const TASK: Record<StageName, string> = {
@@ -49,6 +51,10 @@ export function buildStagePrompt(i: StagePromptInput): string {
       "",
       `Verification failed. Read ${i.dir}/${i.retryFrom}, fix what it reports, and do not repeat the same fix twice.`,
     );
+  }
+  if (i.notes && i.notes.length > 0) {
+    lines.push("", "Notes from the owner, sent while this run was going (they override the plan where they conflict):");
+    for (const n of i.notes) lines.push(`- ${n.replace(/\s+/g, " ").trim()}`);
   }
   lines.push(
     "",

@@ -4,7 +4,9 @@
  *   mola go "<intent>" [--until <stage>] [--agent claude|dsh] [--auto] [--dry-run] [--json]
  *   mola go status [id] | list | approve|deny <runId> [approvalId] | stop <runId>
  *   mola go --resume <runId>
- *   mola statusline [--wrap "<cmd>"]   mola statusline install [--yes]
+ *   mola go say|checkpoints|diff|rewind|later <runId> …   (extras.ts)
+ *   mola go "<intent>" --key <k>   (same key, same run)
+ *   mola statusline [--wrap "<cmd>"]   mola statusline install|uninstall [--yes]
  *   mola notify "<text>" [--title t]
  */
 
@@ -15,8 +17,9 @@ import { describeEnd, loadRunContext, resumeRun, startRun, type GoEnv } from "./
 import { releaseHerdr, reportRunToHerdr } from "@mola/plugin-sdk";
 import { cmdDecide, cmdList, cmdStatus, cmdStop } from "./manage.js";
 import { sendNotify } from "./notify.js";
-import { applyInstall, fastBase, planInstall, readStdin, renderStatusline, settingsPath } from "./statusline.js";
+import { applyInstall, applyUninstall, fastBase, planInstall, planUninstall, readStdin, renderStatusline, settingsPath } from "./statusline.js";
 import { isStageName } from "./stages.js";
+import { cmdCheckpoints, cmdDiff, cmdLater, cmdRewind, cmdSay } from "./extras.js";
 
 const GO_USAGE =
   'usage: mola go "<intent>" [--until think|plan|implement|verify|review|ship] [--agent claude|dsh] [--auto] [--dry-run] [--json] | mola go --resume <runId>';
@@ -86,6 +89,8 @@ export default definePlugin({
           ...(agent ? { agent } : {}),
           auto,
           dryRun: flags["dry-run"] === true,
+          ...(str(flags.key) ? { key: str(flags.key)! } : {}),
+          ...(str(flags.origin) ? { origin: str(flags.origin)! } : {}),
         };
 
         if (opts.dryRun) {
@@ -97,9 +102,45 @@ export default definePlugin({
         }
 
         const res = await startRun(makeEnv(io), opts);
-        io.data(res.progress);
+        io.data(res.existing ? { ...res.progress, existing: true } : res.progress);
         if (!io.json) io.out(describeEnd(res.progress));
         return res.code;
+      },
+    });
+
+    ctx.commands.register({
+      path: ["go", "say"],
+      description: "queue a note for a run; the next stage reads it",
+      async handler(args, io) {
+        return cmdSay(io, args.positionals[0], args.positionals.slice(1).join(" "));
+      },
+    });
+    ctx.commands.register({
+      path: ["go", "checkpoints"],
+      description: "list a run's working-tree checkpoints (hidden git refs)",
+      async handler(args, io) {
+        return cmdCheckpoints(io, args.positionals[0]);
+      },
+    });
+    ctx.commands.register({
+      path: ["go", "diff"],
+      description: "a stage's own changes from its checkpoints (default: base → last) [--stat]",
+      async handler(args, io) {
+        return cmdDiff(io, args.positionals[0], args.positionals[1], args.flags.stat === true);
+      },
+    });
+    ctx.commands.register({
+      path: ["go", "rewind"],
+      description: "put the working tree back to a run checkpoint (undoable: saves pre-rewind) [--yes]",
+      async handler(args, io) {
+        return cmdRewind(io, args.positionals[0], args.positionals[1], args.flags.yes === true);
+      },
+    });
+    ctx.commands.register({
+      path: ["go", "later"],
+      description: "resume a stopped/blocked run at a time (--at +2h | ISO), or --clear; mola serve runs it",
+      async handler(args, io) {
+        return cmdLater(io, args.positionals[0], str(args.flags.at), args.flags.clear === true);
       },
     });
 
@@ -178,6 +219,32 @@ export default definePlugin({
         const { backup } = applyInstall(plan);
         io.data({ file, before: plan.before, after: plan.after, already: false, written: true, ...(backup ? { backup } : {}) });
         io.out(`written${backup ? `; backup: ${backup}` : ""}`);
+        return ExitCode.Ok;
+      },
+    });
+
+    ctx.commands.register({
+      path: ["statusline", "uninstall"],
+      description: "show (and with --yes write) settings.json with the wrapped statusLine put back",
+      async handler(args, io) {
+        const file = str(args.flags.settings) ?? settingsPath();
+        const plan = planUninstall(file);
+        io.out(`settings: ${file}`);
+        io.out(`before: ${JSON.stringify(plan.before)}`);
+        io.out(`after : ${plan.after === null ? "(no statusLine)" : JSON.stringify(plan.after)}`);
+        if (!plan.installed) {
+          io.data({ file, installed: false, written: false });
+          io.out("not installed — nothing to change");
+          return ExitCode.Ok;
+        }
+        if (!(io.yes || args.flags.yes === true)) {
+          io.data({ file, before: plan.before, after: plan.after, written: false });
+          io.out("not written. Re-run with --yes to apply (the old file is saved as settings.json.bak-mola first).");
+          return ExitCode.Ok;
+        }
+        const { backup } = applyUninstall(plan);
+        io.data({ file, before: plan.before, after: plan.after, written: true, backup });
+        io.out(`written; backup: ${backup}`);
         return ExitCode.Ok;
       },
     });
