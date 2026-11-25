@@ -1,5 +1,9 @@
 # m-ship — fixing CI and answering PR comments
 
+## Waiting without polling
+
+`mola watch pr <n> [--repo o/r] --run <go run id>` (needs `mola serve`, or `mola service install`): every 2 minutes it reads the PR once and, only when something changed, notifies the owner and queues a note for the run, then resumes it. It wakes on a newly failing check, all checks passing, the branch starting to conflict, a comment or review from someone else (your own never wake you), and once on merge or close. The first read is the baseline: handle comments that were already there yourself. It ends after 10 comment-only wakes in a row or 8 failed reads. Do not call it again on a wake; it stays on. Without `mola serve`, use the loop below.
+
 ## Fixing CI
 
 1. Resolve the active PR: `gh pr checks --json name,bucket,state,workflow,link`.

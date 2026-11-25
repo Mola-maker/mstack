@@ -24,7 +24,7 @@ try {
     continue: true,
     hookSpecificOutput: {
       hookEventName: "SessionStart",
-      additionalContext: `mstack: .mstack/handoff.md exists — read it before doing anything else (m-handoff).`,
+      additionalContext: `mstack: .mstack/handoff.md exists — read it before doing anything else (m-handoff).${existsSync(join(cwd, ".mstack", "handoff-excerpt.md")) ? " .mstack/handoff-excerpt.md has the original request and the latest turns verbatim; trust it over the compaction summary where they differ." : ""}`,
     },
   }));
 } catch {

@@ -41,6 +41,7 @@ Closed loopholes: "looks risky", a finding about a line the diff did not add, a 
 6. **Refute high-risk survivors.** Critical, security, auth, crypto, destructive, or data-loss findings go to a refuter whose only job is to disprove them. Promote only survivors. Record how many were killed. Prompt in the template.
 7. **Compare in both orders.** When two patches are compared, run A-then-B and B-then-A. Keep a preference only if both orders agree. Hide author identity and any hint that one side is correct. Put every surviving candidate in the same prompt. Bind the verdict to the repro, not to which writeup is longer.
 8. **Merge and persist.** Dedupe by location and root cause. Keep each axis's verdict separate. Write `.mstack/reviews/<date>-<slug>.md`. End that file, and the user-facing summary, with the verdict in Output.
+9. **Optional axes, on request or for a PR a person will read.** Test signal: new tests that add no protection (fold, delete, keep one layer; ask only for fewer or smaller tests). Review guide: a reading-order tour for the human. Both in `references/guide-and-test-signal.md`; neither blocks the verdict.
 
 ## Output
 

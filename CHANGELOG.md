@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+Borrowed from T3 Code (FRAMEWORK §14). Five new builtins, run controls, and the discipline to keep surfaces reachable.
+
+- **`mola land` and `mola guard receipt|check`** (`policy-guard`): the command the branch guard has been naming. It was an empty placeholder and not a builtin, so a refused agent was sent to a command that did not exist.
+- **Unattended** (`cmd-auto`): `mola schedule`, `mola hook` (webhooks with signature, filters, dedupe, coalescing, rate limit, untrusted wrapping), `mola watch pr`, `mola serve`, `mola service install|status|uninstall`. Every trigger starts `mola go` with an idempotency key.
+- **`mola go`**: `--key` (same key, same run); checkpoints as hidden git refs after `base` and every stage; `go diff`, `go checkpoints`, `go rewind` (undoable, refused while another run works there); `go say` (queued notes the next stage reads once); `go later --at` (resumed by `mola serve`).
+- **`mola usage`** (`cmd-usage`): tokens, cache hit share and API-equivalent cost from Claude Code and Codex transcripts, kept in a 92-day ledger.
+- **`mola mcp`** (`cmd-mcp`): mstack as a stdio MCP server; read only by default, `--operate`, `--allow-auto`.
+- **`mola worktree new|gc`** (`cmd-worktree`): `.mstack/worktree.json` setup with rollback; safe cleanup.
+- **`mola web`**: 插话 and 看改动 on each run; token in the URL fragment and an Authorization header, one-use tickets for the stream; launch text loses invisible characters.
+- **`mola statusline uninstall`**.
+- **Hooks**: PreCompact writes `.mstack/handoff-excerpt.md` (first request verbatim, newest turns and command outcomes, 16 KB); the post-compact reminder points at it.
+- **Skills**: m-verify `scripts/prove.mjs` (red on base, green now); m-review optional axes (review guide, test signal); m-ship hands CI waiting to `mola watch pr`; m-dispatch uses `mola worktree new`; m-handoff reads the excerpt.
+- **check.mjs / CI**: every plugin is a builtin and a dependency of the bin, no empty placeholders, a refusal's command exists; CI fails on a quarantined builtin and smoke-starts `mola mcp`. AGENTS.md: "hit every surface" and "reverse states".
+
 ## 0.11.0
 
 - **npm**: `npm i -g @molamaker/mstack` installs the `mola` CLI with its packages bundled (`scripts/pack-npm.mjs`), plus the 17 skills, hooks and agents; `mola skills install --dsh|--codex|--claude` takes the skills from the package.

@@ -51,5 +51,8 @@ jobs:
         run: pnpm -r --no-bail test
       - name: Smoke
         run: |
-          node packages/mola/dist/bin.js plugin list --json > /dev/null
+          node packages/mola/dist/bin.js plugin list --json > plugins.json
+          # every builtin loads: a quarantined plugin's commands are stubs that exit 70
+          node -e 'const d=JSON.parse(require("fs").readFileSync("plugins.json","utf8")).data;const list=Array.isArray(d)?d:d.plugins;const bad=list.filter(p=>p.state!=="active");if(bad.length){console.error(JSON.stringify(bad,null,1));process.exit(1)}'
+          node packages/mola/dist/bin.js mcp < /dev/null
           rc=0; node packages/mola/dist/bin.js agents show nope --json || rc=$?; test "$rc" -eq 66

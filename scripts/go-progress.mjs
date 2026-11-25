@@ -125,8 +125,21 @@ try {
       break;
     }
     case "show": console.log(JSON.stringify(load(a[0]), null, 2)); break;
+    case "notes": {
+      // owner notes queued with `mola go say` or the web console: print the unread ones once (same files as @mola/plugin-sdk inbox)
+      load(a[0]);
+      const inbox = join(runDir(a[0]), "inbox.jsonl");
+      const cursor = join(runDir(a[0]), "inbox.read.json");
+      const all = existsSync(inbox) ? readFileSync(inbox, "utf8").split("\n").flatMap((l) => { try { return l.trim() ? [JSON.parse(l)] : []; } catch { return []; } }) : [];
+      let read = 0;
+      try { read = Number(JSON.parse(readFileSync(cursor, "utf8")).read) || 0; } catch { read = 0; }
+      const fresh = all.slice(read);
+      if (fresh.length) writeFileSync(cursor, JSON.stringify({ read: all.length }) + "\n");
+      for (const n of fresh) console.log(`NOTE (${n.by}, ${n.at}): ${n.text}`);
+      break;
+    }
     default:
-      console.error("usage: go-progress.mjs start|stage|worker|block|check|decide|next|done|show …");
+      console.error("usage: go-progress.mjs start|stage|worker|block|check|decide|next|done|show|notes …");
       process.exit(64);
   }
 } catch (e) {
