@@ -160,5 +160,34 @@ if (existsSync(join(root, ".sources"))) {
   }
 }
 
+// Every surface: each CLI plugin package is a builtin of the `mola` bin (and a dependency of it), or the commands
+// it registers exist only in its tests. 0.11.0 shipped go/web/tui/scout/statusline built and tested but unreachable,
+// and the branch guard pointed agents at `mola land` from a placeholder that was never loaded.
+{
+  const pluginsDir = join(root, "cli", "packages", "plugins");
+  const binFile = join(root, "cli", "packages", "mola", "src", "bin.ts");
+  if (existsSync(pluginsDir) && existsSync(binFile)) {
+    const bin = readFileSync(binFile, "utf8");
+    const molaPkg = JSON.parse(readFileSync(join(root, "cli", "packages", "mola", "package.json"), "utf8"));
+    for (const d of readdirSync(pluginsDir)) {
+      const pkgFile = join(pluginsDir, d, "package.json");
+      if (!existsSync(pkgFile)) continue;
+      const name = JSON.parse(readFileSync(pkgFile, "utf8")).name;
+      if (!bin.includes(`"${name}"`)) err(`cli: ${name} is not in BUILTIN_PLUGIN_PACKAGES (cli/packages/mola/src/bin.ts); its commands are unreachable`);
+      if (!molaPkg.dependencies?.[name]) err(`cli: ${name} is not a dependency of cli/packages/mola/package.json`);
+      const src = existsSync(join(pluginsDir, d, "src", "index.ts")) ? readFileSync(join(pluginsDir, d, "src", "index.ts"), "utf8") : "";
+      if (/activate\(\)\s*\{\s*\}/.test(src)) err(`cli: ${name} is an empty placeholder (activate() {}) but ships as a plugin`);
+    }
+  }
+  // a refusal that names a command must name one that exists
+  const guard = existsSync(join(root, "hooks", "guard-git.mjs")) ? readFileSync(join(root, "hooks", "guard-git.mjs"), "utf8") : "";
+  const pluginSrc = existsSync(join(root, "cli", "packages", "plugins"))
+    ? readdirSync(join(root, "cli", "packages", "plugins")).flatMap((d) => (existsSync(join(root, "cli", "packages", "plugins", d, "src")) ? walk(join(root, "cli", "packages", "plugins", d, "src")) : []))
+    : [];
+  if (guard.includes("mola land") && !pluginSrc.some((f) => f.endsWith(".ts") && readFileSync(f, "utf8").includes('path: ["land"]'))) {
+    err("hooks/guard-git.mjs sends agents to `mola land`, but no plugin registers it");
+  }
+}
+
 if (errors.length) { console.log(errors.map((e) => "FAIL " + e).join("\n")); process.exit(1); }
 console.log(`OK: ${expected.length} skills pass all checks`);

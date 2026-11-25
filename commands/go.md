@@ -22,7 +22,7 @@ If the intent is empty, read `.mstack/runs/*/progress.json` for a run with statu
 
 ## 1. Stages
 
-For each stage: `stage <id> <name> running --model <model>` → do it → `stage <id> <name> done|failed --summary "<one line>" --artifact <file>`. For every subagent you spawn, call `worker <id> <agent-name>-<n> <stage> working --model <model>` before it starts and `... done|failed` when it returns. Write each stage artifact into `.mstack/runs/<id>/`.
+For each stage: `stage <id> <name> running --model <model>` → do it → `stage <id> <name> done|failed --summary "<one line>" --artifact <file>`. For every subagent you spawn, call `worker <id> <agent-name>-<n> <stage> working --model <model>` before it starts and `... done|failed` when it returns. Write each stage artifact into `.mstack/runs/<id>/`. When a stage starts, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/go-progress.mjs" notes <id>`: each `NOTE` line is the owner talking to this run (sent with `mola go say` or 插话 in `mola web`); follow it in this stage, over the plan where they conflict.
 
 | Stage | Who does it | Artifact | Done when |
 |---|---|---|---|

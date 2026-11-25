@@ -14,6 +14,10 @@ import * as path from "node:path";
 import { spawn } from "node:child_process";
 import type { PluginContext } from "@mola/plugin-sdk";
 import {
+  addNote,
+  diffCheckpoints,
+  pendingNotes,
+  stripInvisible,
   decideApproval,
   definePlugin,
   doctorStatus,
@@ -232,12 +236,21 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
   };
   const isJson = (req: http.IncomingMessage): boolean => (req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase() === "application/json";
 
+  // one-use tickets for the event stream (EventSource cannot send a header), a minute each
+  const tickets = new Map<string, number>();
   const authorized = (req: http.IncomingMessage, url: URL): boolean => {
     if (!token) return true;
     const header = req.headers.authorization;
     const bearer = header?.startsWith("Bearer ") ? header.slice(7) : undefined;
-    const given = bearer ?? url.searchParams.get("token") ?? "";
-    return tokenEquals(given, token);
+    if (bearer !== undefined) return tokenEquals(bearer, token);
+    const t = url.searchParams.get("ticket");
+    if (t && url.pathname === "/api/stream") {
+      const exp = tickets.get(t);
+      tickets.delete(t);
+      return exp !== undefined && exp > Date.now();
+    }
+    // old links and other hosts' frames still pass ?token=; the page itself no longer does
+    return tokenEquals(url.searchParams.get("token") ?? "", token);
   };
 
   const server = http.createServer((req, res) => {
@@ -270,6 +283,15 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
     if (segs[0] !== "api") return send(res, 404, { error: "not found" });
     if (!authorized(req, url)) return send(res, 401, { error: "unauthorized" });
 
+    if (method === "POST" && segs.length === 2 && segs[1] === "ticket") {
+      if (!isJson(req)) return send(res, 415, { error: "content-type must be application/json" });
+      const now = Date.now();
+      for (const [k, exp] of tickets) if (exp <= now) tickets.delete(k);
+      if (tickets.size > 200) return send(res, 429, { error: "too many open tickets" });
+      const t = crypto.randomBytes(18).toString("base64url");
+      tickets.set(t, now + 60000);
+      return send(res, 200, { ticket: t, expiresIn: 60 });
+    }
     if (method === "GET" && segs.length === 2 && segs[1] === "runs") return send(res, 200, allRuns(cwds));
     if (method === "GET" && segs.length === 2 && segs[1] === "env") return send(res, 200, JSON.parse(snapshot()));
     if (method === "POST" && segs.length === 2 && segs[1] === "doctor") {
@@ -295,7 +317,8 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
       } catch {
         return send(res, 400, { error: "invalid JSON body" });
       }
-      const task = typeof body.task === "string" ? body.task.trim() : "";
+      // hidden characters can carry instructions a person never sees
+      const task = typeof body.task === "string" ? stripInvisible(body.task).text.trim() : "";
       // a leading "-" would be read by the CLI as a flag
       if (!task || task.length > MAX_TASK || task.startsWith("-")) return send(res, 400, { error: `task must be 1 to ${MAX_TASK} characters and must not start with "-"` });
       // only a directory this server watches; no path from the page is ever used as given
@@ -377,6 +400,19 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
       return send(res, 200, { progress: tag(hit.cwd, hit.progress), artifacts, ...(events ? { events } : {}) });
     }
 
+    if (method === "GET" && segs.length === 4 && segs[3] === "diff") {
+      const hit = findRun(cwds, id, url.searchParams.get("cwd"));
+      if (!hit) return send(res, 404, { error: "run not found" });
+      const cp = url.searchParams.get("checkpoint") ?? undefined;
+      if (cp !== undefined && !ID_RE.test(cp)) return send(res, 400, { error: "bad checkpoint" });
+      try {
+        const diff = diffCheckpoints(hit.cwd, id, cp);
+        return send(res, 200, { diff: diff.length > 2_000_000 ? diff.slice(0, 2_000_000) + "\n… (cut)" : diff });
+      } catch (err) {
+        return send(res, 404, { error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+
     if (method === "POST") {
       if (!isJson(req)) return send(res, 415, { error: "content-type must be application/json" });
       let body: unknown;
@@ -389,6 +425,17 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
       const hit = findRun(cwds, id, url.searchParams.get("cwd"));
       if (!hit) return send(res, 404, { error: "run not found" });
 
+      if (segs.length === 4 && segs[3] === "say") {
+        const text = (body as { text?: unknown } | null)?.text;
+        if (typeof text !== "string") return send(res, 400, { error: "text is required" });
+        if (hit.progress.status === "done") return send(res, 409, { error: "the run is done" });
+        try {
+          const r = addNote(hit.cwd, id, text, "web");
+          return send(res, 200, { ok: true, queued: pendingNotes(hit.cwd, id).length, removedInvisible: r.removed });
+        } catch (err) {
+          return send(res, 400, { error: err instanceof Error ? err.message : String(err) });
+        }
+      }
       if (segs.length === 4 && segs[3] === "stop") {
         const dir = runDir(hit.cwd, id);
         fs.mkdirSync(dir, { recursive: true });
@@ -419,7 +466,8 @@ export async function startWeb(opts: WebOptions = {}): Promise<WebServer> {
   });
   const addr = server.address() as net.AddressInfo;
   const shown = host.includes(":") ? `[${host}]` : host;
-  const url = `http://${shown}:${addr.port}/${token ? `?token=${token}` : ""}`;
+  // the token goes in the fragment: browsers never send it to a server, so no log or Referer carries it
+  const url = `http://${shown}:${addr.port}/${token ? `#token=${token}` : ""}`;
   return {
     server,
     host,
@@ -496,7 +544,7 @@ export default definePlugin({
         io.out(`mola web listening on ${web.url}`);
         if (!isLoopback(host)) {
           const ts = tailscaleHint();
-          io.out(`Tailscale: open http://${ts ?? "<your 100.x address>"}:${web.port}/${token ? `?token=${token}` : ""} on your phone`);
+          io.out(`Tailscale: open http://${ts ?? "<your 100.x address>"}:${web.port}/${token ? `#token=${token}` : ""} on your phone`);
         }
         io.data({ url: web.url, host, port: web.port });
         await new Promise<void>((resolve) => {

@@ -170,3 +170,46 @@ export function applyInstall(plan: InstallPlan): { backup?: string } {
   writeJsonAtomic(plan.file, { ...plan.settings, statusLine: plan.after });
   return backup ? { backup } : {};
 }
+
+// -------------------------------------------------------------- uninstall
+
+export interface UninstallPlan {
+  file: string;
+  installed: boolean;
+  before: StatusLineSetting | null;
+  /** null: remove the statusLine key (there was none before mola) */
+  after: StatusLineSetting | null;
+  settings: Record<string, unknown>;
+}
+
+/** Undo `buildCommand`: `<base> --wrap "<escaped>"` gives the escaped command back. */
+export function unwrapCommand(command: string): string | null {
+  const m = /--wrap\s+"((?:[^"\\]|\\.)*)"\s*$/.exec(command);
+  return m ? m[1].replace(/\\(["\\])/g, "$1") : null;
+}
+
+export function planUninstall(file: string): UninstallPlan {
+  let settings: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(fs.readFileSync(file, "utf8")) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) settings = parsed as Record<string, unknown>;
+  } catch {
+    return { file, installed: false, before: null, after: null, settings };
+  }
+  const before = (settings.statusLine as StatusLineSetting | undefined) ?? null;
+  const installed = typeof before?.command === "string" && /\bmola\b.*\bstatusline\b|statusline-bin/.test(before.command);
+  if (!installed) return { file, installed: false, before, after: before, settings };
+  const inner = unwrapCommand(before!.command as string);
+  const after = inner ? { ...before!, command: inner } : null;
+  return { file, installed: true, before, after, settings };
+}
+
+export function applyUninstall(plan: UninstallPlan): { backup: string } {
+  const backup = `${plan.file}.bak-mola`;
+  fs.copyFileSync(plan.file, backup);
+  const next = { ...plan.settings };
+  if (plan.after) next.statusLine = plan.after;
+  else delete next.statusLine;
+  writeJsonAtomic(plan.file, next);
+  return { backup };
+}

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "mola-cmd-mcp",
+  "version": "0.1.0",
+  "kind": "command",
+  "displayName": "cmd-mcp",
+  "mola": ">=0.1.0 <1.0.0",
+  "engine": {
+    "node": ">=22"
+  },
+  "entry": {
+    "ts": "./dist/index.js"
+  },
+  "provides": [
+    "cmd:mcp"
+  ],
+  "requires": [],
+  "capabilities": [
+    "command.mcp",
+    "mcp.server"
+  ],
+  "permissions": {
+    "process.exec": [
+      "node"
+    ],
+    "fs.read": [
+      "**/.mstack/**"
+    ],
+    "fs.write": [],
+    "mola": [
+      "commands"
+    ]
+  },
+  "hooks": {
+    "emit": [],
+    "listen": []
+  }
+}

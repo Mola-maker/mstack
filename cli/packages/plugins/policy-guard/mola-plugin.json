@@ -22,14 +22,20 @@
     "guard.git"
   ],
   "permissions": {
+    "process.exec": [
+      "git",
+      "gh"
+    ],
     "fs.read": [
       "**/.mstack/**"
     ],
     "fs.write": [
-      "**/.mstack/**"
+      "**/.mstack/**",
+      "**/.git/mola-land-token"
     ],
     "mola": [
       "commands",
+      "events",
       "config.read"
     ]
   },

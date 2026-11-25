@@ -128,3 +128,28 @@ test("both scripts exit 0 on garbage stdin and a missing cwd", () => {
     if (r.code !== 0) throw new Error(`${script} exit ${r.code}`);
   }
 });
+
+test("precompact writes a verbatim excerpt: first request kept, recent turns and command outcomes, omissions counted", () => {
+  const dir = mkdtempSync(join(tmpdir(), "mstack-excerpt-"));
+  mkdirSync(join(dir, ".mstack"));
+  const t = join(dir, "t.jsonl");
+  const rows = [
+    { type: "user", message: { content: "ORIGINAL: make the login page support passkeys" } },
+    ...Array.from({ length: 40 }, (_, i) => ({ type: "assistant", message: { content: [{ type: "text", text: `step ${i} ` + "x".repeat(600) }] } })),
+    { type: "assistant", message: { content: [{ type: "tool_use", id: "tu1", name: "Bash", input: { command: "pnpm test" } }] } },
+    { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "tu1", is_error: true, content: "1 failed" }] } },
+    { type: "user", isMeta: true, message: { content: "meta noise" } },
+    { type: "user", message: { content: "LATEST: keep the old login working too" } },
+  ];
+  writeFileSync(t, rows.map((r) => JSON.stringify(r)).join("\n") + "\nnot json\n");
+  const r = run("precompact.mjs", { cwd: dir, stdin: JSON.stringify({ cwd: dir, transcript_path: t }) });
+  if (r.code !== 0) throw new Error(r.out);
+  const ex = readFileSync(join(dir, ".mstack", "handoff-excerpt.md"), "utf8");
+  if (!ex.includes("ORIGINAL: make the login page support passkeys")) throw new Error("first request lost");
+  if (!ex.includes("LATEST: keep the old login working too")) throw new Error("latest turn lost");
+  if (!ex.includes("$ pnpm test → FAILED")) throw new Error("command outcome lost");
+  if (ex.includes("meta noise")) throw new Error("meta row leaked");
+  if (!/\d+ item\(s\) left out/.test(ex) || ex.includes("step 0 ")) throw new Error("budget not applied");
+  if (Buffer.byteLength(ex) > 20000) throw new Error(`excerpt too big: ${Buffer.byteLength(ex)}`);
+  if (!readFileSync(join(dir, ".mstack", "handoff.md"), "utf8").includes("excerpt: .mstack/handoff-excerpt.md")) throw new Error("snapshot does not point at the excerpt");
+});

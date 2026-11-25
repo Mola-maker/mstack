@@ -74,6 +74,14 @@ export interface RunProgress {
   next?: string;
   /** where this run came from: "cli" (mola go), "claude-code" (/go), "trigger" */
   origin?: string;
+  /** idempotency key it was started with: the same key always names this run */
+  key?: string;
+  /** hidden-ref checkpoints of the working tree, oldest first (`base`, then one per stage) */
+  checkpoints?: { name: string; ref: string; commit: string; at: string }[];
+  /** owner notes handed to stages so far */
+  notesDelivered?: number;
+  /** set when a quota stop has a known reset time: the scheduler resumes the run then */
+  resumeAt?: string;
 }
 
 export const runsRoot = (cwd: string): string => path.join(cwd, ".mstack", "runs");

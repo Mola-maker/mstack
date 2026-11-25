@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -70,4 +70,15 @@ test("rejects unknown stages, bad ids and unknown commands", () => {
   assert.equal(fail("stage", id, "bogus", "running").status, 1);
   assert.equal(fail("stage", "../etc", "plan", "running").status, 1);
   assert.equal(fail("nope").status, 64);
+});
+
+test("notes prints queued owner notes once", () => {
+  const { cwd, run } = setup();
+  const id = run("start", "fix it", "--stages", "plan,implement");
+  const inbox = join(cwd, ".mstack", "runs", id, "inbox.jsonl");
+  writeFileSync(inbox, JSON.stringify({ at: "t1", by: "web", text: "use pnpm" }) + "\n");
+  assert.equal(run("notes", id), "NOTE (web, t1): use pnpm");
+  assert.equal(run("notes", id), "");
+  writeFileSync(inbox, JSON.stringify({ at: "t1", by: "web", text: "use pnpm" }) + "\n" + JSON.stringify({ at: "t2", by: "cli", text: "keep the API" }) + "\n");
+  assert.equal(run("notes", id), "NOTE (cli, t2): keep the API");
 });

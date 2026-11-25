@@ -389,3 +389,34 @@ Plugin `cmd-scout` adds `mola scout "<need>"`. It is also the first working stag
   - Panes: runs list | stage pipeline | workers (status, model, cost, elapsed) | live log tail of the selected run.
   - Keys: ↑↓/jk select, enter details, a approve, d deny, s stop, g new `mola go` prompt, r refresh, q quit.
   - It falls back to a plain frame when stdout is not a TTY.
+
+## 14. Borrowed from T3 Code (2026-11-25)
+
+T3 Code (pingdotgg/t3code, read at commit 90e6e3e6) is a control plane over the same agents mstack drives. It has no workflow discipline of its own (no cross-family review, acceptance ladder, receipts, scout); what it has is the machinery around a run. §13.3 "unattended" asked for exactly that, so this round takes its semantics, not its engine (Effect, event sourcing, Electron and the mobile apps stay out). Each line: what we took → where it lives.
+
+### 14.1 Unattended (§13.3)
+- **Triggers start keyed runs.** Schedules (`every` / `daily` with a 10-minute grace, then skipped / `once`), webhooks, PR watches → `mola go … --key <trigger>:<id>:<slot>`; the same key always names the same run, so a restart or a double delivery never starts two. `cmd-auto`.
+- **Webhook hygiene.** Secret in the path; optional GitHub HMAC; filters; a duplicate key ignored for 7 days; a coalescing window (latest payload wins); 60 a minute; 1 MiB. Every value enters the prompt as untrusted data with invisible characters stripped and `$skill` / `@file` / `/command` broken. `cmd-auto/src/hooks.ts`, `plugin-sdk/src/sanitize.ts`.
+- **PR watch instead of polling.** Wake on a newly failing check, all checks passed, a new conflict, a comment or review from someone else, merge or close; the first read is a baseline; end after 10 comment-only wakes or 8 failed reads; a rate limit pauses. A wake notifies, queues a note for its run and resumes it. A wake is news, not a merge decision. `cmd-auto/src/prwatch.ts`, m-ship.
+- **Resident process.** `mola serve` ticks (schedules → `resumeAt` runs → webhook windows → watches) and answers `/hooks/*`; `mola service install|status|uninstall` keeps it up (systemd --user with a linger check, launchd, Task Scheduler), `service.env` literal and kept.
+- **Resume later.** `mola go later <run> --at +2h` (t3's "resume at reset"); `mola serve` resumes it.
+
+### 14.2 Inside a run
+- **Checkpoints as hidden refs.** `refs/mstack/runs/<id>/<n>-<stage>` after `base` and every stage; a temporary index, never the user's branch or index; `.mstack/` excluded. `mola go diff` shows one stage's own changes; `mola go rewind` saves `pre-rewind` first (undoable) and refuses while another run works in the same directory. `plugin-sdk/src/checkpoint.ts`.
+- **Queue, not steer.** `mola go say` / the web console's 插话 queue a note; the next stage reads every unread note once. Steering a running stage needs harness support and stays out.
+- **Usage that outlives the transcripts.** `mola usage` reads Claude Code and Codex transcripts into a 92-day ledger (Claude deletes its own after 30); cost is an API-equivalent estimate from a price file, unpriced models still count tokens.
+- **Mechanical handoff.** The PreCompact hook also writes `.mstack/handoff-excerpt.md`: the first request verbatim, then the newest turns and command outcomes inside 16 KB, omissions counted with the transcript path. A budgeted selection, not a summary; it wins over a compaction summary.
+
+### 14.3 Doors and ceilings
+- **`mola land` exists.** The branch guard named it since §13.4; `policy-guard` was an empty placeholder. Receipts bound to the commit's tree, refused for the author's family, open blocking findings or REQUEST CHANGES; `--local` uses the one-shot land token; every ref-moving or outward step passes `mola.tool.before`.
+- **`mola mcp`.** Any MCP agent reads runs; `--operate` lets it start, note, decide, stop and resume; `--allow-auto` lets its runs skip the plan approval. Ceilings are set by the human who adds the server, each tool declares its level and the call path checks it again; no tool takes a path.
+- **Web token out of URLs.** The token travels in the fragment and the Authorization header; the event stream takes one-use, one-minute tickets. `?token=` still works for old links and frames.
+
+### 14.4 Discipline
+- **Every surface / reverse states** (AGENTS.md): `check.mjs` fails when a plugin is not a builtin, when a plugin is an empty placeholder, and when the guard names a command no plugin registers. CI fails when a builtin is quarantined. `statusline uninstall` added.
+- **Red→green proven.** `m-verify/scripts/prove.mjs`: base worktree + the new test files; exit 0 only when red on base and green now.
+- **Review guide and test signal** (m-review, optional axes): a reading-order tour that covers every changed file with `Look closely` only where a person must decide; flag tests that protect nothing, ask only for fewer.
+- **Worktree lifecycle.** `mola worktree new` runs `.mstack/worktree.json` setup and rolls back on failure; `mola worktree gc` removes merged or inactive `agent/*` worktrees, keeps dirty, locked and busy ones, never deletes folders git does not know.
+
+### 14.5 Not taken
+Mobile apps, Live Activities, device panel, screen capture, voice, guest links, managed policy, multi-forge support, i18n, themes: product-scale GUI work; ntfy and `mola web` cover a personal stack. On the multi-machine plan (§7–8, ADR-0005): T3 Code runs one server per machine that owns execution, clients attach, and its relay only sets up a tunnel. That is the attach-first design our own cowork spec preferred in its first premise attack; NATS + Yjs stay parked until a concrete need appears.

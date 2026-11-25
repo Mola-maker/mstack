@@ -24,8 +24,14 @@ mstack 是 Mola-maker 的个人 agent 工作流技能栈：把 superpowers、gst
 | 写之前先找能复用的代码 | `mola scout "<需求>"`（`/go` 自动做） |
 | 看每个 agent 在干什么、花了多少 | 终端全屏 `mola tui`；状态栏 `mola statusline install`；手机 `mola web --host <tailscale IP>` |
 | 完成或卡在审批时推到手机 | `mola config set notify.ntfy https://ntfy.sh/<你的 topic>` |
+| 运行中插话、看某阶段改了什么、回滚 | `mola go say <run> "…"`；`mola go diff <run> implement`；`mola go rewind <run> base --yes`（可撤销）|
+| 定时 / webhook / 盯 PR，无人值守 | `mola schedule add "…" --daily 09:30`；`mola hook add "Review {{body.pull_request.html_url}}"`；`mola watch pr 42 --run <run>`；常驻：`mola service install --yes` |
+| 看这几天 token 和成本 | `mola usage --days 7 --by model`（读 Claude Code / Codex 的会话记录，留 92 天）|
+| 让别的 agent 驱动 mstack | `claude mcp add mstack -- mola mcp --cwd <repo> [--operate]` |
+| agent worktree：建好就装依赖，用完清理 | `mola worktree new <名字>`（按 `.mstack/worktree.json` 跑 setup）；`mola worktree gc --yes` |
+| 审查过的分支合进 main | `mola guard receipt …` 后 `mola land <branch>`（默认推分支开 PR，`--local` 本地快进）|
 
-只有 push、PR、发布、删除、花钱、给别人发消息这类不可逆或对外的动作会停下来问你（可以在手机网页或 TUI 里批准）；其余可逆的选择直接用默认值并说明。agent 只在 `agent/<id>` 分支上干活，进 main 只能走 `mola land`（要有异族模型的审查凭证）。
+只有 push、PR、发布、删除、花钱、给别人发消息这类不可逆或对外的动作会停下来问你（可以在手机网页或 TUI 里批准）；其余可逆的选择直接用默认值并说明。agent 只在 `agent/<id>` 分支上干活，进 main 只能走 `mola land`（要有异族模型的审查凭证）。运行、触发器、审查凭证这一层的很多设计借鉴自 T3 Code，见 [FRAMEWORK.md §14](FRAMEWORK.md)。
 
 设计约束（详见 [FRAMEWORK.md](FRAMEWORK.md)）：短 prompt 也能接得上（`m-start` 总入口读 `.mstack/` 状态续干）、每个 SKILL.md ≤150 行、长跑任务必须写 closeout、同一个错误连错 3 次就停。
 
