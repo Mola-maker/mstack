@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "mola-cmd-worktree",
+  "version": "0.1.0",
+  "kind": "command",
+  "displayName": "cmd-worktree",
+  "mola": ">=0.1.0 <1.0.0",
+  "engine": {
+    "node": ">=22"
+  },
+  "entry": {
+    "ts": "./dist/index.js"
+  },
+  "provides": [
+    "cmd:worktree"
+  ],
+  "requires": [],
+  "capabilities": [
+    "command.worktree",
+    "worktree.setup",
+    "worktree.gc"
+  ],
+  "permissions": {
+    "process.exec": [
+      "git",
+      "sh",
+      "cmd"
+    ],
+    "fs.read": [
+      "**/.mstack/worktree.json"
+    ],
+    "fs.write": [],
+    "mola": [
+      "commands"
+    ]
+  },
+  "hooks": {
+    "emit": [],
+    "listen": []
+  }
+}

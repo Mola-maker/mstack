@@ -47,6 +47,12 @@ const BUILTIN_PLUGIN_PACKAGES = [
   "@mola/plugin-cmd-web",
   "@mola/plugin-cmd-tui",
   "@mola/plugin-cmd-scout",
+  // borrowed from T3 Code: the land gate, unattended triggers, usage history, the MCP door, worktree lifecycle
+  "@mola/plugin-policy-guard",
+  "@mola/plugin-cmd-auto",
+  "@mola/plugin-cmd-usage",
+  "@mola/plugin-cmd-mcp",
+  "@mola/plugin-cmd-worktree",
 ];
 
 function parseGlobalFlags(argv: string[]): { flags: GlobalFlags; rest: string[] } {

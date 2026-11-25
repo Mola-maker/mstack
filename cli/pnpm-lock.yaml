@@ -35,6 +35,9 @@ importers:
       '@mola/plugin-agent-dsh':
         specifier: workspace:*
         version: link:../plugins/agent-dsh
+      '@mola/plugin-cmd-auto':
+        specifier: workspace:*
+        version: link:../plugins/cmd-auto
       '@mola/plugin-cmd-config':
         specifier: workspace:*
         version: link:../plugins/cmd-config
@@ -50,6 +53,9 @@ importers:
       '@mola/plugin-cmd-go':
         specifier: workspace:*
         version: link:../plugins/cmd-go
+      '@mola/plugin-cmd-mcp':
+        specifier: workspace:*
+        version: link:../plugins/cmd-mcp
       '@mola/plugin-cmd-model':
         specifier: workspace:*
         version: link:../plugins/cmd-model
@@ -71,12 +77,21 @@ importers:
       '@mola/plugin-cmd-ultramode':
         specifier: workspace:*
         version: link:../plugins/cmd-ultramode
+      '@mola/plugin-cmd-usage':
+        specifier: workspace:*
+        version: link:../plugins/cmd-usage
       '@mola/plugin-cmd-web':
         specifier: workspace:*
         version: link:../plugins/cmd-web
+      '@mola/plugin-cmd-worktree':
+        specifier: workspace:*
+        version: link:../plugins/cmd-worktree
       '@mola/plugin-policy-approval':
         specifier: workspace:*
         version: link:../plugins/policy-approval
+      '@mola/plugin-policy-guard':
+        specifier: workspace:*
+        version: link:../plugins/policy-guard
       '@mola/plugin-rec-runs':
         specifier: workspace:*
         version: link:../plugins/rec-runs
@@ -161,6 +176,12 @@ importers:
         specifier: workspace:*
         version: link:../../plugin-sdk
 
+  packages/plugins/cmd-mcp:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
   packages/plugins/cmd-model:
     dependencies:
       '@mola/plugin-sdk':
@@ -213,7 +234,19 @@ importers:
         specifier: workspace:*
         version: link:../../core
 
+  packages/plugins/cmd-usage:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
   packages/plugins/cmd-web:
+    dependencies:
+      '@mola/plugin-sdk':
+        specifier: workspace:*
+        version: link:../../plugin-sdk
+
+  packages/plugins/cmd-worktree:
     dependencies:
       '@mola/plugin-sdk':
         specifier: workspace:*

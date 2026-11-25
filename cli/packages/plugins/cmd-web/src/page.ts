@@ -106,10 +106,14 @@ mola-ladder .rung[data-need="1"]{color:var(--m-ink)}
 const SCRIPT = `
 (function(){
 "use strict";
-var tk=new URLSearchParams(location.search).get("token");
-if(tk){sessionStorage.setItem("mola-token",tk);history.replaceState(null,"",location.pathname)}
-var token=sessionStorage.getItem("mola-token")||"";
-function q(u){return token?u+(u.indexOf("?")<0?"?":"&")+"token="+encodeURIComponent(token):u}
+// the token comes in the URL fragment (never sent to a server or a log); ?token= still works for old links
+var tk=new URLSearchParams(location.hash.slice(1)).get("token")||new URLSearchParams(location.search).get("token");
+if(tk){try{sessionStorage.setItem("mola-token",tk)}catch(e){}history.replaceState(null,"",location.pathname)}
+var token="";try{token=sessionStorage.getItem("mola-token")||tk||""}catch(e){token=tk||""}
+function q(u){return u}
+function H(h){h=h||{};if(token)h.Authorization="Bearer "+token;return h}
+// EventSource cannot send a header: trade the token for a one-use ticket that lives a minute
+function ticket(){if(!token)return Promise.resolve("");return fetch("/api/ticket",{method:"POST",headers:H({"Content-Type":"application/json"}),body:"{}"}).then(function(r){return r.ok?r.json():{}}).then(function(j){return j.ticket||""},function(){return""})}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
 function dur(ms){var s=Math.max(0,Math.round(ms/1000));if(s<60)return s+" 秒";var m=Math.floor(s/60);return m<60?m+" 分钟":Math.floor(m/60)+" 小时 "+(m%60)+" 分"}
 function ago(at){if(!at)return"";var m=Math.max(0,Math.round((Date.now()-at)/60000));return m<1?"刚刚":m<60?m+" 分钟前":m<2880?Math.round(m/60)+" 小时前":Math.round(m/1440)+" 天前"}
@@ -148,11 +152,12 @@ Object.defineProperty(MolaRun.prototype,"run",{set:function(p){
     h+="</ul>";
   }
   if(p.status==="blocked"&&p.approval&&p.approval.status==="pending"){
-    h+='<div class="ask"><p>要你点头：'+esc(p.approval.action)+'</p><div class="acts"><button class="btn yes" data-a="approve">批准</button><button class="btn no" data-a="deny">拒绝</button><button class="btn" data-a="stop">停止任务</button></div></div>';
+    h+='<div class="ask"><p>要你点头：'+esc(p.approval.action)+'</p><div class="acts"><button class="btn yes" data-a="approve">批准</button><button class="btn no" data-a="deny">拒绝</button><button class="btn" data-a="say">插话</button><button class="btn" data-a="stop">停止任务</button></div></div>';
   }else if(live){
-    h+=(p.blocked&&p.blocked.reason?'<div class="ask"><p>卡住了：'+esc(p.blocked.reason)+"</p></div>":"")+'<div class="acts"><button class="btn" data-a="stop">停止任务</button></div>';
+    h+=(p.blocked&&p.blocked.reason?'<div class="ask"><p>卡住了：'+esc(p.blocked.reason)+"</p></div>":"")+'<div class="acts"><button class="btn" data-a="say">插话</button>'+(p.checkpoints&&p.checkpoints.length>1?'<button class="btn" data-a="diff">看改动</button>':"")+'<button class="btn" data-a="stop">停止任务</button></div>';
   }else if(p.next){
     h+='<div class="where" style="margin-top:10px">'+esc(p.next)+"</div>";
+    if(p.checkpoints&&p.checkpoints.length>1)h+='<div class="acts"><button class="btn" data-a="diff">看改动</button></div>';
   }
   this.innerHTML=h;
   tickIn(this);
@@ -164,12 +169,36 @@ MolaRun.prototype.connectedCallback=function(){
     var b=e.target.closest("button[data-a]");if(!b)return;
     var p=self._p,a=b.getAttribute("data-a");
     if(a==="stop"&&!confirm("停止这个任务？"))return;
+    var where="?cwd="+encodeURIComponent(p.cwd);
+    if(a==="say"){
+      var text=prompt("给这个任务留一句话（下一个阶段开始时会读到，不会打断正在跑的阶段）");
+      if(!text||!text.trim())return;
+      b.disabled=true;
+      fetch("/api/runs/"+encodeURIComponent(p.id)+"/say"+where,{method:"POST",headers:H({"Content-Type":"application/json"}),body:JSON.stringify({text:text})})
+        .then(function(r){return r.json().then(function(j){alert(r.ok?"已排队，下一阶段会读到（未读 "+j.queued+" 条）":"没成功："+(j.error||r.status))})}).catch(function(){alert("连不上控制台服务")}).then(function(){b.disabled=false});
+      return;
+    }
+    if(a==="diff"){
+      b.disabled=true;
+      fetch("/api/runs/"+encodeURIComponent(p.id)+"/diff"+where,{headers:H()})
+        .then(function(r){return r.json()}).then(function(j){showDiff(p.id,j.diff!=null?(j.diff||"（没有改动）"):(j.error||"读不到"))},function(){alert("连不上控制台服务")}).then(function(){b.disabled=false});
+      return;
+    }
     b.disabled=true;
     var path=a==="stop"?"/api/runs/"+encodeURIComponent(p.id)+"/stop":"/api/runs/"+encodeURIComponent(p.id)+"/approvals/"+encodeURIComponent(p.blocked.approvalId);
-    fetch(q(path)+(path.indexOf("?")<0?"?":"&")+"cwd="+encodeURIComponent(p.cwd),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(a==="stop"?{}:{decision:a})})
+    fetch(q(path)+(path.indexOf("?")<0?"?":"&")+"cwd="+encodeURIComponent(p.cwd),{method:"POST",headers:H({"Content-Type":"application/json"}),body:JSON.stringify(a==="stop"?{}:{decision:a})})
       .then(function(r){if(!r.ok)alert("没成功（"+r.status+"）")}).catch(function(){alert("连不上控制台服务")}).then(function(){b.disabled=false});
   });
 };
+function showDiff(id,text){
+  var d=document.getElementById("diffbox");
+  if(!d){d=document.createElement("dialog");d.id="diffbox";d.style.cssText="max-width:min(960px,96vw);width:96vw;max-height:86vh;border:1px solid var(--m-line);border-radius:12px;padding:0;background:var(--m-surface);color:var(--m-ink)";
+    d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--m-line)"><strong></strong><button class="btn" type="button">关闭</button></div><pre style="margin:0;padding:12px 14px;overflow:auto;max-height:72vh;font:12px/1.45 var(--m-font-mono);white-space:pre"></pre>';
+    d.querySelector("button").addEventListener("click",function(){d.close()});document.body.appendChild(d)}
+  d.querySelector("strong").textContent=id+" 的改动（base → 最后一个 checkpoint）";
+  d.querySelector("pre").textContent=text;
+  if(d.showModal)d.showModal();else d.setAttribute("open","");
+}
 customElements.define("mola-run",MolaRun);
 
 // ---- <mola-ladder>: the acceptance levels as steps. found = highest level proven, need = level the project requires.
@@ -263,7 +292,7 @@ if(launchBtn)launchBtn.addEventListener("click",function(){
   var box=document.getElementById("task"),msg=document.getElementById("launchmsg"),text=box.value.trim();
   if(!text){msg.textContent="先写下要做的事。";return}
   launchBtn.disabled=true;msg.textContent="启动中…";
-  fetch(q("/api/launch"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({task:text})})
+  fetch(q("/api/launch"),{method:"POST",headers:H({"Content-Type":"application/json"}),body:JSON.stringify({task:text})})
     .then(function(r){
       if(r.status===202){box.value="";msg.textContent="已启动，稍等它出现在左边。"}
       else if(r.status===501)msg.textContent="这个控制台不能启动任务，请在终端运行 mola run。";
@@ -274,7 +303,7 @@ if(launchBtn)launchBtn.addEventListener("click",function(){
 });
 document.getElementById("recheck").addEventListener("click",function(){
   var b=this;b.disabled=true;b.textContent="体检中…";
-  fetch(q("/api/doctor"),{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"})
+  fetch(q("/api/doctor"),{method:"POST",headers:H({"Content-Type":"application/json"}),body:"{}"})
     .then(function(r){return r.ok?r.json().then(onEnv):alert(r.status===501?"这个控制台不能发起体检，请在终端运行 mola doctor":"体检没成功（"+r.status+"）")})
     .catch(function(){alert("连不上控制台服务")}).then(function(){b.disabled=false;b.textContent="重新体检"});
 });
@@ -283,8 +312,9 @@ function setMode(m){document.documentElement.setAttribute("data-theme",m);mode.t
 mode.addEventListener("click",function(){setMode(document.documentElement.getAttribute("data-theme")==="night"?"day":"night")});
 try{var saved=localStorage.getItem("mola-theme");setMode(saved||(matchMedia("(prefers-color-scheme: dark)").matches?"night":"day"))}catch(e){setMode("day")}
 
-function connect(){
-  var es=new EventSource(q("/api/stream"));
+function connect(){ticket().then(open)}
+function open(t){
+  var es=new EventSource("/api/stream"+(t?"?ticket="+encodeURIComponent(t):""));
   es.onopen=function(){conn.textContent="已连接";conn.dataset.live="1"};
   es.addEventListener("run",function(ev){onRun(JSON.parse(ev.data))});
   es.addEventListener("env",function(ev){onEnv(JSON.parse(ev.data))});
@@ -327,8 +357,10 @@ export const PAGE_HTML = pageHtml();
 const EMBED_SCRIPT = `
 (function(){
 "use strict";
-var tk=new URLSearchParams(location.search).get("token")||"";
-function q(u){return tk?u+(u.indexOf("?")<0?"?":"&")+"token="+encodeURIComponent(tk):u}
+var tk=new URLSearchParams(location.hash.slice(1)).get("token")||new URLSearchParams(location.search).get("token")||"";
+if(tk)history.replaceState(null,"",location.pathname);
+function q(u){return u}
+function H(h){h=h||{};if(tk)h.Authorization="Bearer "+tk;return h}
 var runs={},env=null,line=document.getElementById("line");
 function part(cls,text){var s=document.createElement("span");s.className=cls;s.textContent=text;return s}
 function draw(){
@@ -347,14 +379,14 @@ function draw(){
 // Polls instead of holding a stream: a host may frame this line in many tabs, and a browser keeps only six
 // connections per server open; the full console keeps the stream.
 function poll(){
-  Promise.all([fetch(q("/api/env"),{cache:"no-store"}),fetch(q("/api/runs"),{cache:"no-store"})])
+  Promise.all([fetch(q("/api/env"),{cache:"no-store",headers:H()}),fetch(q("/api/runs"),{cache:"no-store",headers:H()})])
     .then(function(rs){if(!rs[0].ok||!rs[1].ok)throw new Error(rs[0].status+"/"+rs[1].status);return Promise.all([rs[0].json(),rs[1].json()])})
     .then(function(v){env=v[0];runs={};v[1].forEach(function(r){runs[r.cwd+"|"+r.id]=r});draw()})
     .catch(function(){while(line.firstChild)line.removeChild(line.firstChild);line.appendChild(part("muted","mstack：连不上控制台"))});
 }
 poll();
 setInterval(poll,5000);
-line.href=q("/");
+line.href="/"+(tk?"#token="+encodeURIComponent(tk):"");
 })();
 `;
 
