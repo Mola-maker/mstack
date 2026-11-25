@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "id": "mola-cmd-auto",
+  "version": "0.1.0",
+  "kind": "command",
+  "displayName": "cmd-auto",
+  "mola": ">=0.1.0 <1.0.0",
+  "engine": {
+    "node": ">=22"
+  },
+  "entry": {
+    "ts": "./dist/index.js"
+  },
+  "provides": [
+    "cmd:schedule",
+    "cmd:hook",
+    "cmd:watch",
+    "cmd:serve",
+    "cmd:service"
+  ],
+  "requires": [],
+  "capabilities": [
+    "command.schedule",
+    "command.hook",
+    "command.watch",
+    "command.serve",
+    "command.service",
+    "trigger.schedule",
+    "trigger.webhook",
+    "trigger.pr"
+  ],
+  "permissions": {
+    "process.exec": [
+      "gh",
+      "git",
+      "systemctl",
+      "launchctl",
+      "schtasks",
+      "loginctl"
+    ],
+    "fs.read": [
+      "**/.mola/**",
+      "**/.mstack/**"
+    ],
+    "fs.write": [
+      "**/.mola/**",
+      "**/systemd/user/**",
+      "**/LaunchAgents/**"
+    ],
+    "mola": [
+      "commands",
+      "config.read",
+      "events"
+    ]
+  },
+  "hooks": {
+    "emit": [
+      "mola.trigger.fired"
+    ],
+    "listen": []
+  }
+}
